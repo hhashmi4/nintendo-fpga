@@ -1,0 +1,46 @@
+# Quartus generated files
+db/
+incremental_db/
+output_files/
+*.rpt
+*.summary
+*.smsg
+*.jdi
+*.sld
+*.done
+*.pin
+*.sof
+*.pof
+*.rbf
+*.qws
+*.qdf
+*.qws
+*.qsf.bak
+
+# Verilator generated files
+obj_dir/
+
+# Waveforms
+*.vcd
+*.fst
+*.lxt
+*.lxt2
+
+# Simulation/build output
+build/
+sim/build/
+coverage/
+
+# Logs
+*.log
+
+# OS/editor files
+.DS_Store
+.vscode/*
+!.vscode/tasks.json
+!.vscode/settings.json
+
+# Temporary files
+*.tmp
+*.swp
+*~
