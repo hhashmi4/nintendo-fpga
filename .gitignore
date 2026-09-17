@@ -2,6 +2,7 @@
 db/
 incremental_db/
 output_files/
+*.qpf.*
 *.rpt
 *.summary
 *.smsg
@@ -16,6 +17,7 @@ output_files/
 *.qdf
 *.qws
 *.qsf.bak
+*_pin_model_dump.txt
 
 # Verilator generated files
 obj_dir/
@@ -30,6 +32,12 @@ obj_dir/
 build/
 sim/build/
 coverage/
+
+# Python generated files
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
 
 # Logs
 *.log

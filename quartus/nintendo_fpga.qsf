@@ -1,0 +1,42 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY de1_soc_top
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/platform_config_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/platform_clock.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/reset_sync.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/nes_timing_gen.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/platform_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/diagnostic/platform_diagnostic.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_alu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_decoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_address_gen.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/de1_soc_top.sv
+set_global_assignment -name SDC_FILE ../constraints/nintendo_fpga.sdc
+
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus/output_files
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS "AS INPUT TRI-STATED"
+set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+
+# Terasic DE1-SoC 50 MHz oscillator (FPGA_CLK1_50 / CLOCK_50).
+set_location_assignment PIN_AF14 -to CLOCK_50
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
+
+# Terasic DE1-SoC KEY0 pushbutton, active-low external reset.
+set_location_assignment PIN_AA14 -to KEY0
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY0
+
+# Removable Phase 1 diagnostic outputs.
+set_location_assignment PIN_V16 -to LEDR0
+set_location_assignment PIN_W16 -to LEDR1
+set_location_assignment PIN_V17 -to LEDR2
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR0
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR1
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR2
+
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
+
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"
