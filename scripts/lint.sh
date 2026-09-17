@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-RTL_FILES=(
+PLATFORM_RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
     rtl/platform/platform_clock.sv
     rtl/platform/reset_sync.sv
@@ -16,4 +16,13 @@ RTL_FILES=(
 
 verilator --lint-only --Wall -Wno-fatal \
     --top-module de1_soc_top \
-    "${RTL_FILES[@]}"
+    "${PLATFORM_RTL_FILES[@]}"
+
+CPU_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_core.sv
+)
+
+verilator --lint-only --Wall -Wno-fatal \
+    --top-module cpu_core \
+    "${CPU_RTL_FILES[@]}"

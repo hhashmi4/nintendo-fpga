@@ -4,10 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-mkdir -p build/sim build/verilator
+mkdir -p build/sim build/verilator/platform build/verilator/cpu
 
-WAVEFORM="build/sim/platform_foundation.fst"
-rm -f "$WAVEFORM"
+PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
+CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
+rm -f "$PLATFORM_WAVEFORM" "$CPU_WAVEFORM"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -19,17 +20,39 @@ RTL_FILES=(
 )
 
 verilator --binary --timing --trace-fst --Wall -Wno-fatal \
-    --Mdir build/verilator \
+    --assert \
+    --Mdir build/verilator/platform \
     --top-module platform_foundation_tb \
     -o platform_foundation_tb \
     "${RTL_FILES[@]}" \
     sim/platform_foundation_tb.sv
 
-build/verilator/platform_foundation_tb
+build/verilator/platform/platform_foundation_tb
 
-if [[ ! -s "$WAVEFORM" ]]; then
-    echo "ERROR: simulation did not generate a non-empty $WAVEFORM" >&2
+if [[ ! -s "$PLATFORM_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $PLATFORM_WAVEFORM" >&2
     exit 1
 fi
 
-echo "Waveform: $ROOT_DIR/$WAVEFORM"
+CPU_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_core.sv
+)
+
+verilator --binary --timing --trace-fst --Wall -Wno-fatal \
+    --assert \
+    --Mdir build/verilator/cpu \
+    --top-module cpu_phase2a_tb \
+    -o cpu_phase2a_tb \
+    "${CPU_RTL_FILES[@]}" \
+    sim/cpu_phase2a_tb.sv
+
+build/verilator/cpu/cpu_phase2a_tb
+
+if [[ ! -s "$CPU_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $CPU_WAVEFORM" >&2
+    exit 1
+fi
+
+echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
+echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"

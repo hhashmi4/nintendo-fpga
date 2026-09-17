@@ -1,9 +1,9 @@
 # Nintendo FPGA
 
 FPGA-based Nintendo Entertainment System project targeting the Terasic
-DE1-SoC and its Intel Cyclone V SoC FPGA. The repository currently implements
-only the Phase 1 platform foundation; no NES CPU, PPU, APU, mapper, controller,
-or game-execution logic exists yet.
+DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
+platform foundation and the Phase 2A CPU architectural shell. No CPU instruction
+set, PPU, APU, mapper, controller, or game-execution logic exists yet.
 
 ## Phase 1 foundation
 
@@ -17,6 +17,17 @@ or game-execution logic exists yet.
 
 The architecture and timing limitations are documented in
 [`docs/platform-foundation.md`](docs/platform-foundation.md).
+
+## Phase 2A CPU foundation
+
+- 6502-family A, X, Y, SP, PC, and processor-status state
+- Deterministic reset values and CPU-enable-only sequential progression
+- Read-only placeholder fetch bus cycle with no opcode execution
+- Execution-state boundaries reserved for later CPU phases
+- Independent Python reference tests and focused self-checking RTL simulation
+
+The CPU shell, its reset choices, and its deliberately unimplemented behavior
+are documented in [`docs/cpu-phase2a.md`](docs/cpu-phase2a.md).
 
 ## Development environment
 
@@ -50,9 +61,9 @@ Run the normal suite from the repository root:
 ./scripts/test.sh
 ```
 
-This runs pytest, synthesizable RTL lint, and the self-checking platform
-simulation. The waveform is written to
-`build/sim/platform_foundation.fst`.
+This runs pytest, synthesizable RTL lint, and the self-checking platform and CPU
+simulations. Waveforms are written to `build/sim/platform_foundation.fst` and
+`build/sim/cpu_phase2a.fst`.
 
 Individual checks are also available:
 
@@ -86,7 +97,8 @@ before use.
 
 - `rtl/platform` — clock, reset, and NES timing-enable foundation
 - `rtl/diagnostic` — removable hardware diagnostic
-- `rtl/cpu`, `rtl/ppu`, `rtl/apu` — reserved for later phases
+- `rtl/cpu` — Phase 2A architectural CPU shell; no instruction set yet
+- `rtl/ppu`, `rtl/apu` — reserved for later phases
 - `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
 - `sim` — self-checking SystemVerilog testbenches
 - `verification` and `tests/python` — Python reference infrastructure/tests
