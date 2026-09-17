@@ -1,0 +1,32 @@
+name: FPGA Verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verilator:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Verilator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator
+
+      - name: Show Verilator version
+        run: verilator --version
+
+      - name: Lint SystemVerilog
+        run: |
+          FILES=$(find rtl sim -type f \( -name "*.sv" -o -name "*.v" \))
+          if [ -n "$FILES" ]; then
+            verilator --lint-only -Wall -Wno-fatal $FILES
+          else
+            echo "No HDL files yet - skipping lint."
+          fi
