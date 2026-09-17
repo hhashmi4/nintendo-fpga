@@ -1,15 +1,15 @@
 `timescale 1ns/1ps
 
 module cpu_core #(
-    // Production remains at the Phase 2A placeholder PC. Verification may
-    // override these parameters to isolate test programs and exercise flag
-    // preservation. Defaults retain the Phase 2A reset contract.
-    parameter logic [15:0] INITIAL_PC = cpu_pkg::CPU_RESET_PC,
+    // Verification may override the initial status to exercise preservation.
+    // Production uses the deterministic Ricoh 2A03 reset value.
     parameter logic [7:0] INITIAL_STATUS = cpu_pkg::CPU_RESET_STATUS
 ) (
     input  logic clk,
     input  logic reset,
     input  logic cpu_enable,
+    input  logic nmi,
+    input  logic irq,
 
     output logic [15:0] bus_address,
     output logic [7:0]  bus_write_data,
@@ -57,6 +57,21 @@ module cpu_core #(
     logic [15:0] return_address;
     logic [7:0]  rts_low_byte;
     logic        branch_taken;
+    cpu_interrupt_source_t interrupt_source;
+    logic [15:0] interrupt_vector_low_address;
+
+    // External interrupt inputs are synchronized to CLOCK_50. NMI is then
+    // edge-latched so a held request cannot repeatedly retrigger; IRQ remains
+    // a level request and is qualified by I at instruction boundaries.
+    (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+    logic nmi_meta, nmi_sync;
+    logic nmi_sync_delayed;
+    logic nmi_pending;
+    (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+    logic irq_meta, irq_sync;
+    logic accept_nmi;
+    logic accept_irq;
+    logic interrupt_boundary_request;
 
     cpu_alu_operation_t alu_operation;
     logic [7:0] alu_operand_a;
@@ -116,6 +131,50 @@ module cpu_core #(
         address_request.pointer_low_byte   = pointer_low;
         address_request.pointer_high_byte  = pointer_high;
         address_request.pointer_data_valid = pointer_data_valid;
+    end
+
+    always_comb begin
+        accept_nmi = debug_execution_state == CPU_STATE_FETCH && nmi_pending;
+        accept_irq = debug_execution_state == CPU_STATE_FETCH &&
+                     !nmi_pending && irq_sync &&
+                     !debug_status.interrupt_disable;
+        interrupt_boundary_request = accept_nmi || accept_irq;
+
+        case (interrupt_source)
+            CPU_INTERRUPT_NMI:
+                interrupt_vector_low_address = CPU_VECTOR_NMI_LOW;
+            CPU_INTERRUPT_IRQ,
+            CPU_INTERRUPT_BRK:
+                interrupt_vector_low_address = CPU_VECTOR_IRQ_LOW;
+            CPU_INTERRUPT_RESET:
+                interrupt_vector_low_address = CPU_VECTOR_RESET_LOW;
+            default:
+                interrupt_vector_low_address = 16'h0000;
+        endcase
+    end
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            nmi_meta         <= 1'b0;
+            nmi_sync         <= 1'b0;
+            nmi_sync_delayed <= 1'b0;
+            nmi_pending      <= 1'b0;
+            irq_meta         <= 1'b0;
+            irq_sync         <= 1'b0;
+        end else begin
+            nmi_meta         <= nmi;
+            nmi_sync         <= nmi_meta;
+            nmi_sync_delayed <= nmi_sync;
+            irq_meta         <= irq;
+            irq_sync         <= irq_meta;
+
+            if (cpu_enable && accept_nmi) begin
+                nmi_pending <= 1'b0;
+            end
+            if (nmi_sync && !nmi_sync_delayed) begin
+                nmi_pending <= 1'b1;
+            end
+        end
     end
 
     always_comb begin
@@ -193,14 +252,16 @@ module cpu_core #(
     end
 
     // The synchronized platform reset has priority over cpu_enable. Outside
-    // reset, every sequential CPU field changes only on a CPU enable pulse.
+    // reset, architectural/sequencer state changes only on a CPU enable
+    // pulse; the input synchronizers above intentionally run every fabric
+    // clock so interrupt edges are retained between pulses.
     always_ff @(posedge clk) begin
         if (reset) begin
             debug_a                   <= CPU_RESET_A;
             debug_x                   <= CPU_RESET_X;
             debug_y                   <= CPU_RESET_Y;
             debug_sp                  <= CPU_RESET_SP;
-            debug_pc                  <= INITIAL_PC;
+            debug_pc                  <= CPU_RESET_PC;
             debug_status              <= cpu_status_normalize(INITIAL_STATUS);
             debug_instruction         <= CPU_RESET_IR;
             debug_execution_state     <= CPU_STATE_RESET;
@@ -224,33 +285,46 @@ module cpu_core #(
             data_latch                <= 8'h00;
             return_address            <= 16'h0000;
             rts_low_byte              <= 8'h00;
+            interrupt_source          <= CPU_INTERRUPT_RESET;
         end else if (cpu_enable) begin
             case (debug_execution_state)
                 CPU_STATE_RESET: begin
-                    // Reset-vector reads remain deferred. The first enabled
-                    // step enters an opcode-fetch bus cycle.
-                    debug_execution_state <= CPU_STATE_FETCH;
+                    // Reset is bus-visible: no direct PC initialization is
+                    // permitted. This boundary enters the low-vector read.
+                    debug_execution_state <= CPU_STATE_RESET_VECTOR_LOW;
                 end
 
                 CPU_STATE_FETCH: begin
-                    debug_instruction      <= bus_read_data;
-                    debug_pc               <= debug_pc + 16'd1;
-                    debug_execution_state  <= CPU_STATE_DECODE;
-                    debug_page_cross       <= 1'b0;
-                    debug_page_cross_valid <= 1'b0;
-                    operand_low            <= 8'h00;
-                    operand_high           <= 8'h00;
-                    pointer_low            <= 8'h00;
-                    pointer_high           <= 8'h00;
-                    pointer_data_valid     <= 1'b0;
-                    data_latch             <= 8'h00;
-                    return_address         <= 16'h0000;
-                    rts_low_byte           <= 8'h00;
-                    instruction_is_load    <= 1'b0;
-                    instruction_is_store   <= 1'b0;
-                    instruction_uses_alu   <= 1'b0;
-                    instruction_is_compare <= 1'b0;
-                    instruction_is_rmw     <= 1'b0;
+                    if (accept_nmi || accept_irq) begin
+                        return_address <= debug_pc;
+                        if (accept_nmi) begin
+                            interrupt_source <= CPU_INTERRUPT_NMI;
+                        end else begin
+                            interrupt_source <= CPU_INTERRUPT_IRQ;
+                        end
+                        debug_decoded_instruction <= CPU_INSTR_INVALID;
+                        debug_execution_state <=
+                            CPU_STATE_INTERRUPT_PUSH_HIGH;
+                    end else begin
+                        debug_instruction      <= bus_read_data;
+                        debug_pc               <= debug_pc + 16'd1;
+                        debug_execution_state  <= CPU_STATE_DECODE;
+                        debug_page_cross       <= 1'b0;
+                        debug_page_cross_valid <= 1'b0;
+                        operand_low            <= 8'h00;
+                        operand_high           <= 8'h00;
+                        pointer_low            <= 8'h00;
+                        pointer_high           <= 8'h00;
+                        pointer_data_valid     <= 1'b0;
+                        data_latch             <= 8'h00;
+                        return_address         <= 16'h0000;
+                        rts_low_byte           <= 8'h00;
+                        instruction_is_load    <= 1'b0;
+                        instruction_is_store   <= 1'b0;
+                        instruction_uses_alu   <= 1'b0;
+                        instruction_is_compare <= 1'b0;
+                        instruction_is_rmw     <= 1'b0;
+                    end
                 end
 
                 CPU_STATE_DECODE: begin
@@ -266,6 +340,15 @@ module cpu_core #(
 
                     if (!decoded.valid) begin
                         debug_execution_state <= CPU_STATE_TRAP;
+                    end else if (decoded.is_interrupt) begin
+                        case (decoded.instruction)
+                            CPU_INSTR_BRK:
+                                debug_execution_state <= CPU_STATE_BRK_PADDING;
+                            CPU_INSTR_RTI:
+                                debug_execution_state <= CPU_STATE_RTI_PULL;
+                            default:
+                                debug_execution_state <= CPU_STATE_TRAP;
+                        endcase
                     end else if (decoded.is_transfer) begin
                         debug_execution_state <= CPU_STATE_TRANSFER;
                     end else if (decoded.is_stack) begin
@@ -641,6 +724,83 @@ module cpu_core #(
                     debug_execution_state <= CPU_STATE_FETCH;
                 end
 
+                CPU_STATE_RESET_VECTOR_LOW: begin
+                    operand_low <= bus_read_data;
+                    debug_execution_state <= CPU_STATE_RESET_VECTOR_HIGH;
+                end
+
+                CPU_STATE_RESET_VECTOR_HIGH: begin
+                    debug_pc <= {bus_read_data, operand_low};
+                    interrupt_source <= CPU_INTERRUPT_NONE;
+                    debug_execution_state <= CPU_STATE_FETCH;
+                end
+
+                CPU_STATE_BRK_PADDING: begin
+                    // BRK consumes a padding/signature byte. The stacked PC
+                    // therefore points two bytes beyond the BRK opcode.
+                    debug_pc <= debug_pc + 16'd1;
+                    return_address <= debug_pc + 16'd1;
+                    interrupt_source <= CPU_INTERRUPT_BRK;
+                    debug_execution_state <= CPU_STATE_INTERRUPT_PUSH_HIGH;
+                end
+
+                CPU_STATE_INTERRUPT_PUSH_HIGH: begin
+                    debug_sp <= debug_sp - 8'd1;
+                    debug_execution_state <= CPU_STATE_INTERRUPT_PUSH_LOW;
+                end
+
+                CPU_STATE_INTERRUPT_PUSH_LOW: begin
+                    debug_sp <= debug_sp - 8'd1;
+                    debug_execution_state <= CPU_STATE_INTERRUPT_PUSH_STATUS;
+                end
+
+                CPU_STATE_INTERRUPT_PUSH_STATUS: begin
+                    debug_sp <= debug_sp - 8'd1;
+                    debug_status.interrupt_disable <= 1'b1;
+                    debug_execution_state <= CPU_STATE_INTERRUPT_VECTOR_LOW;
+                end
+
+                CPU_STATE_INTERRUPT_VECTOR_LOW: begin
+                    operand_low <= bus_read_data;
+                    debug_execution_state <= CPU_STATE_INTERRUPT_VECTOR_HIGH;
+                end
+
+                CPU_STATE_INTERRUPT_VECTOR_HIGH: begin
+                    debug_pc <= {bus_read_data, operand_low};
+                    interrupt_source <= CPU_INTERRUPT_NONE;
+                    debug_execution_state <= CPU_STATE_FETCH;
+                end
+
+                CPU_STATE_RTI_PULL: begin
+                    // RTI, like every pull operation, increments S before the
+                    // first stack read.
+                    debug_sp <= debug_sp + 8'd1;
+                    debug_execution_state <= CPU_STATE_RTI_PULL_STATUS;
+                end
+
+                CPU_STATE_RTI_PULL_STATUS: begin
+                    debug_status <= cpu_status_normalize(bus_read_data);
+                    debug_sp <= debug_sp + 8'd1;
+                    debug_execution_state <= CPU_STATE_RTI_PULL_LOW;
+                end
+
+                CPU_STATE_RTI_PULL_LOW: begin
+                    rts_low_byte <= bus_read_data;
+                    debug_sp <= debug_sp + 8'd1;
+                    debug_execution_state <= CPU_STATE_RTI_PULL_HIGH;
+                end
+
+                CPU_STATE_RTI_PULL_HIGH: begin
+                    operand_high <= bus_read_data;
+                    debug_execution_state <= CPU_STATE_RTI_COMPLETE;
+                end
+
+                CPU_STATE_RTI_COMPLETE: begin
+                    // Unlike RTS, RTI resumes at the stacked address exactly.
+                    debug_pc <= {operand_high, rts_low_byte};
+                    debug_execution_state <= CPU_STATE_FETCH;
+                end
+
                 CPU_STATE_TRAP: begin
                     // Unsupported opcode: safely halt until reset.
                     debug_execution_state <= CPU_STATE_TRAP;
@@ -664,10 +824,16 @@ module cpu_core #(
         bus_valid        = 1'b0;
 
         if (reset) begin
-            bus_address = INITIAL_PC;
+            bus_address = CPU_RESET_PC;
         end else begin
             case (debug_execution_state)
-                CPU_STATE_FETCH,
+                CPU_STATE_FETCH: begin
+                    bus_address = debug_pc;
+                    // Recognition occurs before opcode consumption. Suppress
+                    // the speculative fetch when an interrupt wins priority.
+                    bus_valid = !interrupt_boundary_request;
+                end
+
                 CPU_STATE_OPERAND_LOW,
                 CPU_STATE_OPERAND_HIGH: begin
                     bus_address = debug_pc;
@@ -747,6 +913,64 @@ module cpu_core #(
                     bus_write_data   = return_address[7:0];
                     bus_write_enable = 1'b1;
                     bus_valid        = 1'b1;
+                end
+
+                CPU_STATE_RESET_VECTOR_LOW: begin
+                    bus_address = CPU_VECTOR_RESET_LOW;
+                    bus_valid   = 1'b1;
+                end
+
+                CPU_STATE_RESET_VECTOR_HIGH: begin
+                    bus_address = CPU_VECTOR_RESET_LOW + 16'd1;
+                    bus_valid   = 1'b1;
+                end
+
+                CPU_STATE_BRK_PADDING: begin
+                    bus_address = debug_pc;
+                    bus_valid   = 1'b1;
+                end
+
+                CPU_STATE_INTERRUPT_PUSH_HIGH: begin
+                    bus_address      = {8'h01, debug_sp};
+                    bus_write_data   = return_address[15:8];
+                    bus_write_enable = 1'b1;
+                    bus_valid        = 1'b1;
+                end
+
+                CPU_STATE_INTERRUPT_PUSH_LOW: begin
+                    bus_address      = {8'h01, debug_sp};
+                    bus_write_data   = return_address[7:0];
+                    bus_write_enable = 1'b1;
+                    bus_valid        = 1'b1;
+                end
+
+                CPU_STATE_INTERRUPT_PUSH_STATUS: begin
+                    bus_address = {8'h01, debug_sp};
+                    if (interrupt_source == CPU_INTERRUPT_BRK) begin
+                        bus_write_data = cpu_status_for_php(debug_status);
+                    end else begin
+                        bus_write_data =
+                            cpu_status_for_interrupt(debug_status);
+                    end
+                    bus_write_enable = 1'b1;
+                    bus_valid        = 1'b1;
+                end
+
+                CPU_STATE_INTERRUPT_VECTOR_LOW: begin
+                    bus_address = interrupt_vector_low_address;
+                    bus_valid   = 1'b1;
+                end
+
+                CPU_STATE_INTERRUPT_VECTOR_HIGH: begin
+                    bus_address = interrupt_vector_low_address + 16'd1;
+                    bus_valid   = 1'b1;
+                end
+
+                CPU_STATE_RTI_PULL_STATUS,
+                CPU_STATE_RTI_PULL_LOW,
+                CPU_STATE_RTI_PULL_HIGH: begin
+                    bus_address = {8'h01, debug_sp};
+                    bus_valid   = 1'b1;
                 end
 
                 default: begin

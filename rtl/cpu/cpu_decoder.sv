@@ -9,7 +9,8 @@ module cpu_decoder (
     always_comb begin
         decoded = '0;
 
-        // Only official Phase 2D/2E/2F opcodes are recognized. Every other byte
+        // Only official opcodes implemented through Phase 2G are recognized.
+        // Every other byte
         // retains the invalid, inert default.
         case (opcode)
             // LDA
@@ -189,6 +190,10 @@ module cpu_decoder (
             8'h08: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_PHP; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
             8'h28: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_PLP; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
 
+            // Software interrupt and interrupt return
+            8'h00: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BRK; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'h40: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_RTI; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+
             default: begin
                 // Unsupported instructions are intentionally invalid.
             end
@@ -295,6 +300,9 @@ module cpu_decoder (
                 CPU_INSTR_PLA,
                 CPU_INSTR_PHP,
                 CPU_INSTR_PLP: decoded.is_stack = 1'b1;
+
+                CPU_INSTR_BRK,
+                CPU_INSTR_RTI: decoded.is_interrupt = 1'b1;
 
                 default: begin
                     // The explicit opcode case prevents this path.

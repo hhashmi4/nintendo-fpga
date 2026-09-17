@@ -1,4 +1,4 @@
-"""Independent reference models for the Phase 2A through 2F CPU blocks."""
+"""Independent reference models for the Phase 2A through 2G CPU blocks."""
 
 from dataclasses import dataclass, replace
 from enum import IntEnum
@@ -13,6 +13,9 @@ RESET_STATUS = 0x24
 RESET_INSTRUCTION = 0x00
 STATUS_BREAK_MASK = 0x10
 STATUS_UNUSED_MASK = 0x20
+VECTOR_NMI_LOW = 0xFFFA
+VECTOR_RESET_LOW = 0xFFFC
+VECTOR_IRQ_LOW = 0xFFFE
 
 
 def normalize_status(value: int) -> int:
@@ -27,6 +30,12 @@ def status_for_php(value: int) -> int:
     """Synthesize the PHP stack byte without making B persistent."""
 
     return normalize_status(value) | STATUS_BREAK_MASK
+
+
+def status_for_interrupt(value: int) -> int:
+    """Synthesize a hardware IRQ/NMI stack byte (B=0, U=1)."""
+
+    return normalize_status(value)
 
 
 class ExecutionState(IntEnum):
@@ -57,6 +66,29 @@ class ExecutionState(IntEnum):
     RTS_PULL_LOW = 22
     RTS_PULL_HIGH = 23
     RTS_COMPLETE = 24
+    RESET_VECTOR_LOW = 25
+    RESET_VECTOR_HIGH = 26
+    INTERRUPT_PUSH_HIGH = 27
+    INTERRUPT_PUSH_LOW = 28
+    INTERRUPT_PUSH_STATUS = 29
+    INTERRUPT_VECTOR_LOW = 30
+    INTERRUPT_VECTOR_HIGH = 31
+    BRK_PADDING = 32
+    RTI_PULL = 33
+    RTI_PULL_STATUS = 34
+    RTI_PULL_LOW = 35
+    RTI_PULL_HIGH = 36
+    RTI_COMPLETE = 37
+
+
+class InterruptSource(IntEnum):
+    """Phase 2G interrupt-source metadata."""
+
+    NONE = 0
+    RESET = 1
+    NMI = 2
+    IRQ = 3
+    BRK = 4
 
 
 class AluOperation(IntEnum):
@@ -111,7 +143,7 @@ class AddressingMode(IntEnum):
 
 
 class Instruction(IntEnum):
-    """Instruction identifiers implemented through the Phase 2F decoder."""
+    """Instruction identifiers implemented through the Phase 2G decoder."""
 
     INVALID = 0
     LDA = 1
@@ -159,6 +191,8 @@ class Instruction(IntEnum):
     PLA = 43
     PHP = 44
     PLP = 45
+    BRK = 46
+    RTI = 47
 
 
 @dataclass(frozen=True)
@@ -341,6 +375,9 @@ OPCODE_TABLE = {
     0x68: _opcode(Instruction.PLA, AddressingMode.IMPLIED),
     0x08: _opcode(Instruction.PHP, AddressingMode.IMPLIED),
     0x28: _opcode(Instruction.PLP, AddressingMode.IMPLIED),
+    # Software interrupt and interrupt return
+    0x00: _opcode(Instruction.BRK, AddressingMode.IMPLIED),
+    0x40: _opcode(Instruction.RTI, AddressingMode.IMPLIED),
 }
 
 
@@ -399,6 +436,8 @@ CONTROL_STACK_INSTRUCTIONS = BRANCH_INSTRUCTIONS | {
     Instruction.PLA,
     Instruction.PHP,
     Instruction.PLP,
+    Instruction.BRK,
+    Instruction.RTI,
 }
 
 
@@ -584,6 +623,7 @@ class CpuPhase2DModel:
         self.instruction = RESET_INSTRUCTION
         self.memory = bytearray(0x10000)
         self.writes: list[tuple[int, int]] = []
+        self.reads: list[int] = []
         self.unsupported = False
         self.last_effective_address = 0
         self.last_page_cross = False
@@ -596,7 +636,9 @@ class CpuPhase2DModel:
             self.memory[(address + offset) & 0xFFFF] = value
 
     def _read(self, address: int) -> int:
-        return self.memory[address & 0xFFFF]
+        wrapped_address = address & 0xFFFF
+        self.reads.append(wrapped_address)
+        return self.memory[wrapped_address]
 
     def _write(self, address: int, value: int) -> None:
         wrapped_address = address & 0xFFFF
@@ -853,6 +895,20 @@ class CpuPhase2DModel:
             self.status = normalize_status(self._pull())
             return
 
+        if instruction is Instruction.BRK:
+            # The opcode fetch already advanced PC once. BRK performs one
+            # additional padding/signature-byte read before stacking PC+2.
+            self._fetch_byte()
+            self._enter_interrupt(InterruptSource.BRK, self.pc)
+            return
+
+        if instruction is Instruction.RTI:
+            self.status = normalize_status(self._pull())
+            low = self._pull()
+            high = self._pull()
+            self.pc = (high << 8) | low
+            return
+
         raise RuntimeError("unhandled Phase 2F control/stack instruction")
 
     def _execute_transfer(self, instruction: Instruction) -> None:
@@ -984,6 +1040,99 @@ class CpuPhase2FModel(CpuPhase2EModel):
         return instruction <= Instruction.PLP
 
 
+class CpuPhase2GModel(CpuPhase2FModel):
+    """Functional reset/interrupt model independent of RTL microstates."""
+
+    def __init__(
+        self,
+        *,
+        initial_pc: int = RESET_PC,
+        initial_status: int = RESET_STATUS,
+    ) -> None:
+        super().__init__(initial_pc=initial_pc, initial_status=initial_status)
+        self.nmi_pending = False
+        self.nmi_level = False
+        self.irq_level = False
+        self.last_interrupt_source = InterruptSource.NONE
+
+    def _instruction_supported(self, instruction: Instruction) -> bool:
+        return instruction <= Instruction.RTI
+
+    def reset_from_vector(self) -> int:
+        """Apply deterministic reset state, then fetch $FFFC/$FFFD."""
+
+        self.a = RESET_A
+        self.x = RESET_X
+        self.y = RESET_Y
+        self.sp = RESET_SP
+        self.pc = RESET_PC
+        self.status = normalize_status(RESET_STATUS)
+        self.instruction = RESET_INSTRUCTION
+        self.unsupported = False
+        self.nmi_pending = False
+        self.nmi_level = False
+        self.irq_level = False
+        self.last_interrupt_source = InterruptSource.RESET
+        low = self._read(VECTOR_RESET_LOW)
+        high = self._read(VECTOR_RESET_LOW + 1)
+        self.pc = (high << 8) | low
+        return self.pc
+
+    def sample_interrupt_inputs(self, *, nmi: bool, irq: bool) -> None:
+        """Edge-capture logical NMI and retain logical IRQ as a level."""
+
+        nmi_value = bool(nmi)
+        if nmi_value and not self.nmi_level:
+            self.nmi_pending = True
+        self.nmi_level = nmi_value
+        self.irq_level = bool(irq)
+
+    def service_pending_interrupt(self) -> InterruptSource:
+        """Service RESET-external priority at an instruction boundary."""
+
+        if self.nmi_pending:
+            self.nmi_pending = False
+            source = InterruptSource.NMI
+        elif self.irq_level and not (self.status & 0x04):
+            source = InterruptSource.IRQ
+        else:
+            return InterruptSource.NONE
+        self._enter_interrupt(source, self.pc)
+        return source
+
+    def _enter_interrupt(
+        self,
+        source: InterruptSource,
+        return_pc: int,
+    ) -> None:
+        """Push a frame and load the selected vector."""
+
+        if source not in (
+            InterruptSource.NMI,
+            InterruptSource.IRQ,
+            InterruptSource.BRK,
+        ):
+            raise ValueError("source is not an entry-capable interrupt")
+        self.last_interrupt_source = source
+        self._push((return_pc >> 8) & 0xFF)
+        self._push(return_pc & 0xFF)
+        pushed_status = (
+            status_for_php(self.status)
+            if source is InterruptSource.BRK
+            else status_for_interrupt(self.status)
+        )
+        self._push(pushed_status)
+        self.status |= 0x04
+        vector_low = (
+            VECTOR_NMI_LOW
+            if source is InterruptSource.NMI
+            else VECTOR_IRQ_LOW
+        )
+        low = self._read(vector_low)
+        high = self._read(vector_low + 1)
+        self.pc = (high << 8) | low
+
+
 def _signed_byte(value: int) -> int:
     return value if value < 0x80 else value - 0x100
 
@@ -1094,10 +1243,11 @@ class CpuSnapshot:
 
 
 class CpuPhase2AModel:
-    """Model reset, CPU-enable gating, and the placeholder fetch boundary."""
+    """Model deterministic reset, vector reads, and CPU-enable gating."""
 
     def __init__(self) -> None:
         self._snapshot = self.reset_snapshot()
+        self._reset_vector_low = 0
 
     @staticmethod
     def reset_snapshot() -> CpuSnapshot:
@@ -1123,16 +1273,53 @@ class CpuPhase2AModel:
             raise ValueError("read_data must be an 8-bit value")
         if reset:
             self._snapshot = self.reset_snapshot()
+            self._reset_vector_low = 0
         elif cpu_enable and self._snapshot.execution_state is ExecutionState.RESET:
             self._snapshot = replace(
-                self._snapshot, execution_state=ExecutionState.FETCH
+                self._snapshot,
+                execution_state=ExecutionState.RESET_VECTOR_LOW,
+            )
+        elif (
+            cpu_enable
+            and self._snapshot.execution_state is ExecutionState.RESET_VECTOR_LOW
+        ):
+            self._reset_vector_low = read_data
+            self._snapshot = replace(
+                self._snapshot,
+                execution_state=ExecutionState.RESET_VECTOR_HIGH,
+            )
+        elif (
+            cpu_enable
+            and self._snapshot.execution_state is ExecutionState.RESET_VECTOR_HIGH
+        ):
+            self._snapshot = replace(
+                self._snapshot,
+                pc=(read_data << 8) | self._reset_vector_low,
+                execution_state=ExecutionState.FETCH,
             )
         elif cpu_enable and self._snapshot.execution_state is ExecutionState.FETCH:
-            self._snapshot = replace(self._snapshot, instruction=read_data)
+            self._snapshot = replace(
+                self._snapshot,
+                instruction=read_data,
+                pc=(self._snapshot.pc + 1) & 0xFFFF,
+                execution_state=ExecutionState.DECODE,
+            )
 
     def bus_outputs(self, *, reset: bool) -> tuple[int, int, bool, bool]:
         """Return address, write data, write-enable, and cycle-valid."""
 
-        address = RESET_PC if reset else self._snapshot.pc
-        valid = not reset and self._snapshot.execution_state is ExecutionState.FETCH
+        state = self._snapshot.execution_state
+        if reset:
+            address = RESET_PC
+        elif state is ExecutionState.RESET_VECTOR_LOW:
+            address = VECTOR_RESET_LOW
+        elif state is ExecutionState.RESET_VECTOR_HIGH:
+            address = VECTOR_RESET_LOW + 1
+        else:
+            address = self._snapshot.pc
+        valid = not reset and state in (
+            ExecutionState.RESET_VECTOR_LOW,
+            ExecutionState.RESET_VECTOR_HIGH,
+            ExecutionState.FETCH,
+        )
         return address, 0x00, False, valid

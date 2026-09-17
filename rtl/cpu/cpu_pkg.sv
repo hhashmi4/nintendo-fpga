@@ -1,8 +1,9 @@
 `timescale 1ns/1ps
 
 package cpu_pkg;
-    // Deterministic Phase 2A architectural reset values. PC is a placeholder;
-    // a later CPU phase will replace it with the 6502 reset-vector sequence.
+    // Deterministic post-reset architectural values. PC remains zero while
+    // reset is asserted, then is loaded only by the bus-visible $FFFC/$FFFD
+    // reset-vector sequence.
     localparam logic [7:0]  CPU_RESET_A      = 8'h00;
     localparam logic [7:0]  CPU_RESET_X      = 8'h00;
     localparam logic [7:0]  CPU_RESET_Y      = 8'h00;
@@ -26,6 +27,10 @@ package cpu_pkg;
     localparam logic [7:0] CPU_STATUS_BREAK_MASK  = 8'h10;
     localparam logic [7:0] CPU_STATUS_UNUSED_MASK = 8'h20;
 
+    localparam logic [15:0] CPU_VECTOR_NMI_LOW   = 16'hFFFA;
+    localparam logic [15:0] CPU_VECTOR_RESET_LOW = 16'hFFFC;
+    localparam logic [15:0] CPU_VECTOR_IRQ_LOW   = 16'hFFFE;
+
     // B is not persistent processor state on NMOS 6502-family hardware; it is
     // synthesized when status is pushed. Keep stored B clear and U set. The D
     // bit remains stored for architectural compatibility, although the 2A03
@@ -47,34 +52,55 @@ package cpu_pkg;
                              CPU_STATUS_BREAK_MASK;
     endfunction
 
-    // Phase 2F uses explicit micro-operation boundaries. Each state advances
+    // Hardware interrupt entry writes B=0 and U=1. PHP and BRK instead use
+    // cpu_status_for_php(), which synthesizes B=1 and U=1.
+    function automatic logic [7:0] cpu_status_for_interrupt(
+        input logic [7:0] value
+    );
+        cpu_status_for_interrupt = cpu_status_normalize(value);
+    endfunction
+
+    // Explicit micro-operation boundaries. Each state advances
     // only on cpu_enable; bus states remain stable between enable pulses.
-    typedef enum logic [4:0] {
-        CPU_STATE_RESET          = 5'd0,
-        CPU_STATE_FETCH          = 5'd1,
-        CPU_STATE_DECODE         = 5'd2,
-        CPU_STATE_OPERAND_LOW    = 5'd3,
-        CPU_STATE_OPERAND_HIGH   = 5'd4,
-        CPU_STATE_ADDRESS        = 5'd5,
-        CPU_STATE_POINTER_LOW    = 5'd6,
-        CPU_STATE_POINTER_HIGH   = 5'd7,
-        CPU_STATE_MEMORY_READ    = 5'd8,
-        CPU_STATE_MEMORY_WRITE   = 5'd9,
-        CPU_STATE_WRITEBACK      = 5'd10,
-        CPU_STATE_TRANSFER       = 5'd11,
-        CPU_STATE_TRAP           = 5'd12,
-        CPU_STATE_ALU_EXECUTE    = 5'd13,
-        CPU_STATE_RMW_WRITE      = 5'd14,
-        CPU_STATE_BRANCH_DECIDE  = 5'd15,
-        CPU_STATE_STACK_PUSH     = 5'd16,
-        CPU_STATE_STACK_PULL     = 5'd17,
-        CPU_STATE_STACK_READ     = 5'd18,
-        CPU_STATE_JSR_PUSH_HIGH  = 5'd19,
-        CPU_STATE_JSR_PUSH_LOW   = 5'd20,
-        CPU_STATE_RTS_PULL       = 5'd21,
-        CPU_STATE_RTS_PULL_LOW   = 5'd22,
-        CPU_STATE_RTS_PULL_HIGH  = 5'd23,
-        CPU_STATE_RTS_COMPLETE   = 5'd24
+    typedef enum logic [5:0] {
+        CPU_STATE_RESET                 = 6'd0,
+        CPU_STATE_FETCH                 = 6'd1,
+        CPU_STATE_DECODE                = 6'd2,
+        CPU_STATE_OPERAND_LOW           = 6'd3,
+        CPU_STATE_OPERAND_HIGH          = 6'd4,
+        CPU_STATE_ADDRESS               = 6'd5,
+        CPU_STATE_POINTER_LOW           = 6'd6,
+        CPU_STATE_POINTER_HIGH          = 6'd7,
+        CPU_STATE_MEMORY_READ           = 6'd8,
+        CPU_STATE_MEMORY_WRITE          = 6'd9,
+        CPU_STATE_WRITEBACK             = 6'd10,
+        CPU_STATE_TRANSFER              = 6'd11,
+        CPU_STATE_TRAP                  = 6'd12,
+        CPU_STATE_ALU_EXECUTE           = 6'd13,
+        CPU_STATE_RMW_WRITE             = 6'd14,
+        CPU_STATE_BRANCH_DECIDE         = 6'd15,
+        CPU_STATE_STACK_PUSH            = 6'd16,
+        CPU_STATE_STACK_PULL            = 6'd17,
+        CPU_STATE_STACK_READ            = 6'd18,
+        CPU_STATE_JSR_PUSH_HIGH         = 6'd19,
+        CPU_STATE_JSR_PUSH_LOW          = 6'd20,
+        CPU_STATE_RTS_PULL              = 6'd21,
+        CPU_STATE_RTS_PULL_LOW          = 6'd22,
+        CPU_STATE_RTS_PULL_HIGH         = 6'd23,
+        CPU_STATE_RTS_COMPLETE          = 6'd24,
+        CPU_STATE_RESET_VECTOR_LOW      = 6'd25,
+        CPU_STATE_RESET_VECTOR_HIGH     = 6'd26,
+        CPU_STATE_INTERRUPT_PUSH_HIGH   = 6'd27,
+        CPU_STATE_INTERRUPT_PUSH_LOW    = 6'd28,
+        CPU_STATE_INTERRUPT_PUSH_STATUS = 6'd29,
+        CPU_STATE_INTERRUPT_VECTOR_LOW  = 6'd30,
+        CPU_STATE_INTERRUPT_VECTOR_HIGH = 6'd31,
+        CPU_STATE_BRK_PADDING           = 6'd32,
+        CPU_STATE_RTI_PULL              = 6'd33,
+        CPU_STATE_RTI_PULL_STATUS       = 6'd34,
+        CPU_STATE_RTI_PULL_LOW          = 6'd35,
+        CPU_STATE_RTI_PULL_HIGH         = 6'd36,
+        CPU_STATE_RTI_COMPLETE          = 6'd37
     } cpu_execution_state_t;
 
     typedef enum logic [5:0] {
@@ -123,8 +149,18 @@ package cpu_pkg;
         CPU_INSTR_PHA     = 6'd42,
         CPU_INSTR_PLA     = 6'd43,
         CPU_INSTR_PHP     = 6'd44,
-        CPU_INSTR_PLP     = 6'd45
+        CPU_INSTR_PLP     = 6'd45,
+        CPU_INSTR_BRK     = 6'd46,
+        CPU_INSTR_RTI     = 6'd47
     } cpu_instruction_t;
+
+    typedef enum logic [2:0] {
+        CPU_INTERRUPT_NONE  = 3'd0,
+        CPU_INTERRUPT_RESET = 3'd1,
+        CPU_INTERRUPT_NMI   = 3'd2,
+        CPU_INTERRUPT_IRQ   = 3'd3,
+        CPU_INTERRUPT_BRK   = 3'd4
+    } cpu_interrupt_source_t;
 
     typedef enum logic [3:0] {
         CPU_ALU_ADD = 4'd0,
@@ -203,6 +239,7 @@ package cpu_pkg;
         logic             is_branch;
         logic             is_jump;
         logic             is_stack;
+        logic             is_interrupt;
         logic             valid;
     } cpu_decode_result_t;
 endpackage

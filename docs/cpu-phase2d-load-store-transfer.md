@@ -1,5 +1,9 @@
 # Phase 2D CPU load, store, and transfer instructions
 
+> Historical phase note: Phase 2G removes the verification-only `INITIAL_PC`
+> boot path and starts every execution test through the bus-visible reset
+> vector. Phase 2D instruction behavior and coverage remain unchanged.
+
 Phase 2D turns the architectural shell into a functional instruction engine
 for the first official Ricoh 2A03 instruction subset. It implements only
 loads, stores, and register transfers. The design still uses `CLOCK_50` as its
@@ -94,12 +98,11 @@ PC increments on the enabled edge that consumes each instruction byte:
 - absolute-family instructions advance by 3;
 - both indexed-indirect families advance by 2.
 
-No branch or jump can redirect PC in this phase. Production reset retains the
-Phase 2A placeholder `PC=0000`; reset-vector reads remain deferred. `cpu_core`
-has an `INITIAL_PC` parameter whose default is that architectural value. The
-Phase 2D testbench deliberately overrides it to `0200` so program bytes do not
-collide with zero-page pointer tests. Board and standalone synthesis use the
-default, so the test mechanism does not change production reset behavior.
+No branch or jump can redirect PC in this phase. At the original Phase 2D
+boundary, reset retained the Phase 2A placeholder and the testbench used an
+`INITIAL_PC` parameter. Phase 2G supersedes that mechanism: production and all
+historical instruction regressions now fetch `FFFC`/`FFFD` through the bus,
+with each testbench placing its program start in that vector.
 
 ## Register and flag behavior
 

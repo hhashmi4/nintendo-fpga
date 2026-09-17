@@ -5,7 +5,8 @@ DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
 platform foundation, the Phase 2A CPU architectural shell, the Phase 2B
 reusable ALU, the Phase 2C address generator, the Phase 2D load/store/transfer
 subset, the Phase 2E arithmetic/logic subset, and the Phase 2F control-flow/
-stack subset. No complete CPU instruction set, PPU, APU, mapper, controller,
+stack subset, and Phase 2G reset/interrupt sequencing. No complete CPU
+instruction set, PPU, APU, mapper, controller,
 or game-execution logic exists yet.
 
 ## Phase 1 foundation
@@ -24,8 +25,8 @@ The architecture and timing limitations are documented in
 ## Phase 2A CPU foundation
 
 - 6502-family A, X, Y, SP, PC, and processor-status state
-- Deterministic reset values and CPU-enable-only sequential progression
-- Read-only placeholder fetch bus cycle with no opcode execution
+- Deterministic reset values and CPU-enable-only architectural progression
+- Phase 2A fetch scaffold, now superseded by Phase 2G reset-vector sequencing
 - Execution-state boundaries reserved for later CPU phases
 - Independent Python reference tests and focused self-checking RTL simulation
 
@@ -91,6 +92,18 @@ The PC-redirection paths, stack contract, status representation, step counts,
 and exact coverage are documented in
 [`docs/cpu-phase2f-control-stack.md`](docs/cpu-phase2f-control-stack.md).
 
+## Phase 2G CPU interrupts and reset
+
+- Bus-visible RESET, NMI, and IRQ/BRK vector fetches
+- Synchronized edge-latched NMI and synchronized level-sensitive masked IRQ
+- Shared high/low/status stack-entry states for NMI, IRQ, and BRK
+- Official BRK and RTI with explicit B/U status-byte representation
+- 86 directed RTL vectors, 14 enable stalls, and eight reset-priority checks
+
+The priority policy, vector ordering, status representation, functional step
+counts, and verification coverage are documented in
+[`docs/cpu-phase2g-interrupts-reset.md`](docs/cpu-phase2g-interrupts-reset.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -124,10 +137,10 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-ALU, address-generator, and Phase 2D through Phase 2F instruction simulations.
+ALU, address-generator, and Phase 2D through Phase 2G instruction simulations.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`, `cpu_address_gen.fst`, `cpu_phase2d.fst`,
-`cpu_phase2e.fst`, and `cpu_phase2f.fst`.
+`cpu_phase2e.fst`, `cpu_phase2f.fst`, and `cpu_phase2g.fst`.
 
 Individual checks are also available:
 
@@ -167,7 +180,7 @@ before use.
 
 - `rtl/platform` — clock, reset, and NES timing-enable foundation
 - `rtl/diagnostic` — removable hardware diagnostic
-- `rtl/cpu` — CPU state, ALU, addressing, decoder, and Phase 2D/2E sequencer
+- `rtl/cpu` — CPU state, ALU, addressing, decoder, and shared instruction sequencer
 - `rtl/ppu`, `rtl/apu` — reserved for later phases
 - `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
 - `sim` — self-checking SystemVerilog testbenches
