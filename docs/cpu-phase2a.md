@@ -1,8 +1,10 @@
 # CPU Phase 2A architectural foundation
 
-> Historical phase note: Phase 2G supersedes the placeholder PC behavior
-> described below with bus-visible `$FFFC/$FFFD` reset-vector sequencing while
-> preserving the documented deterministic register/status reset values.
+> Historical phase note: Phase 2G superseded the placeholder PC behavior with
+> bus-visible `$FFFC/$FFFD` reset-vector sequencing. Phase 2H further models
+> seven reset cycles: deterministic entry SP=`00`, three stack-page reads and
+> decrements, and post-sequence SP=`FD`. The original Phase 2A behavior below
+> is retained as historical design context.
 
 Phase 2A establishes the synthesizable architectural and bus shell for the
 future Ricoh 2A03-compatible CPU. It uses the existing 50 MHz system clock and

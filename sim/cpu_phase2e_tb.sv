@@ -263,24 +263,28 @@ module cpu_phase2e_tb;
 
     function automatic int unsigned expected_enabled_steps(
         input logic [3:0] mode,
-        input logic is_rmw
+        input logic is_rmw,
+        input logic page_cross
     );
         if (mode == CPU_ADDR_IMPLIED || mode == CPU_ADDR_ACCUMULATOR) begin
-            return 3;
+            return 2;
         end
         if (mode == CPU_ADDR_IMMEDIATE) begin
-            return 5;
+            return 2;
         end
-        if (mode == CPU_ADDR_INDEXED_INDIRECT_X ||
-            mode == CPU_ADDR_INDIRECT_INDEXED_Y) begin
-            return 9;
+        if (mode == CPU_ADDR_INDEXED_INDIRECT_X) begin
+            return 6;
         end
-        if (mode == CPU_ADDR_ABSOLUTE ||
-            mode == CPU_ADDR_ABSOLUTE_X ||
-            mode == CPU_ADDR_ABSOLUTE_Y) begin
-            return is_rmw ? 8 : 7;
+        if (mode == CPU_ADDR_INDIRECT_INDEXED_Y) begin
+            return page_cross ? 6 : 5;
         end
-        return is_rmw ? 7 : 6;
+        if (mode == CPU_ADDR_ABSOLUTE_X || mode == CPU_ADDR_ABSOLUTE_Y) begin
+            if (is_rmw) return 7;
+            return page_cross ? 5 : 4;
+        end
+        if (mode == CPU_ADDR_ABSOLUTE) return is_rmw ? 6 : 4;
+        if (mode == CPU_ADDR_ZERO_PAGE_X) return is_rmw ? 6 : 4;
+        return is_rmw ? 5 : 3;
     endfunction
 
     function automatic logic [7:0] status_with_alu_flags(
@@ -325,7 +329,12 @@ module cpu_phase2e_tb;
         end
 
         if (record_target && cpu_enable &&
-            debug_execution_state == CPU_STATE_ALU_EXECUTE) begin
+            (debug_execution_state == CPU_STATE_ALU_EXECUTE ||
+             (debug_execution_state == CPU_STATE_OPERAND_LOW &&
+              debug_addressing_mode == CPU_ADDR_IMMEDIATE) ||
+             debug_execution_state == CPU_STATE_MEMORY_READ ||
+             (debug_execution_state == CPU_STATE_INDEXED_READ &&
+              !dut.address_response.page_cross))) begin
             assert (dut.alu_operation == expected_alu_operation &&
                     dut.alu_operand_a == expected_alu_operand_a &&
                     dut.alu_operand_b == expected_alu_operand_b &&
@@ -396,13 +405,7 @@ module cpu_phase2e_tb;
 
         reset = 1'b0;
         cpu_enable = 1'b1;
-        step_cpu(1'b0);
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_LOW)
-            else $fatal(1, "CPU did not begin reset-vector fetch");
-        step_cpu(1'b0);
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_HIGH)
-            else $fatal(1, "CPU did not fetch reset-vector low byte");
-        step_cpu(1'b0);
+        repeat (7) step_cpu(1'b0);
         memory_model.memory[CPU_VECTOR_RESET_LOW] = saved_vector_low;
         memory_model.memory[CPU_VECTOR_RESET_LOW + 16'd1] = saved_vector_high;
         assert (debug_execution_state == CPU_STATE_FETCH &&
@@ -602,6 +605,8 @@ module cpu_phase2e_tb;
         int unsigned setup_steps;
         int unsigned event_index;
         int unsigned prior_alu_observations;
+        logic [15:0] tentative_address;
+        logic final_read_seen;
 
         opcode = OPCODES[opcode_index];
         instruction = INSTRUCTIONS[opcode_index];
@@ -618,6 +623,8 @@ module cpu_phase2e_tb;
         expected_page_cross = 1'b0;
         expected_page_cross_valid = 1'b0;
         is_rmw = instruction_is_memory_rmw(instruction, mode);
+        tentative_address = 16'h0000;
+        final_read_seen = 1'b0;
 
         reset = 1'b1;
         cpu_enable = 1'b0;
@@ -800,7 +807,8 @@ module cpu_phase2e_tb;
         prior_alu_observations = alu_observation_count;
         execute_current_instruction(1'b1, enabled_steps);
 
-        assert (enabled_steps == expected_enabled_steps(mode, is_rmw))
+        assert (enabled_steps == expected_enabled_steps(
+                    mode, is_rmw, expected_page_cross))
             else $fatal(1, "enabled-step mismatch opcode=%02h got=%0d",
                         opcode, enabled_steps);
         assert (alu_observation_count == prior_alu_observations + 1)
@@ -848,7 +856,7 @@ module cpu_phase2e_tb;
                             opcode);
         end else begin
             assert (debug_a == before_a && debug_x == before_x &&
-                    debug_y == before_y && memory_write_count == 1 &&
+                    debug_y == before_y && memory_write_count == 2 &&
                     last_write_address == target_address &&
                     last_write_data == expected_alu_result &&
                     memory_model.memory[target_address] == expected_alu_result)
@@ -882,6 +890,19 @@ module cpu_phase2e_tb;
                 else $fatal(1, "operand-high trace mismatch opcode=%02h", opcode);
             event_index++;
         end
+        if (mode == CPU_ADDR_IMPLIED || mode == CPU_ADDR_ACCUMULATOR) begin
+            assert (!trace_write_enable[event_index] &&
+                    trace_address[event_index] == target_pc + 16'd1)
+                else $fatal(1, "implied/accumulator dummy mismatch opcode=%02h", opcode);
+            event_index++;
+        end
+        if (mode == CPU_ADDR_ZERO_PAGE_X ||
+            mode == CPU_ADDR_INDEXED_INDIRECT_X) begin
+            assert (!trace_write_enable[event_index] &&
+                    trace_address[event_index] == {8'h00, zp_operand})
+                else $fatal(1, "zero-page index dummy mismatch opcode=%02h", opcode);
+            event_index++;
+        end
         if (mode == CPU_ADDR_INDEXED_INDIRECT_X ||
             mode == CPU_ADDR_INDIRECT_INDEXED_Y) begin
             assert (!trace_write_enable[event_index] &&
@@ -893,20 +914,45 @@ module cpu_phase2e_tb;
                 else $fatal(1, "pointer-high trace mismatch opcode=%02h", opcode);
             event_index++;
         end
+        if (mode == CPU_ADDR_ABSOLUTE_X ||
+            mode == CPU_ADDR_ABSOLUTE_Y ||
+            mode == CPU_ADDR_INDIRECT_INDEXED_Y) begin
+            tentative_address = {
+                (mode == CPU_ADDR_INDIRECT_INDEXED_Y)
+                    ? pointer_base[15:8] : base_address[15:8],
+                target_address[7:0]
+            };
+            assert (!trace_write_enable[event_index] &&
+                    trace_address[event_index] == tentative_address)
+                else $fatal(1, "indexed tentative read mismatch opcode=%02h", opcode);
+            if (!is_rmw && !expected_page_cross) begin
+                assert (trace_read_data[event_index] == operand)
+                    else $fatal(1, "indexed final read data mismatch opcode=%02h", opcode);
+                final_read_seen = 1'b1;
+            end
+            event_index++;
+        end
         if (mode != CPU_ADDR_IMPLIED &&
             mode != CPU_ADDR_ACCUMULATOR &&
             mode != CPU_ADDR_IMMEDIATE) begin
-            assert (!trace_write_enable[event_index] &&
-                    trace_address[event_index] == target_address &&
-                    trace_read_data[event_index] == operand)
-                else $fatal(1, "memory-read trace mismatch opcode=%02h", opcode);
-            event_index++;
+            if (!final_read_seen) begin
+                assert (!trace_write_enable[event_index] &&
+                        trace_address[event_index] == target_address &&
+                        trace_read_data[event_index] == operand)
+                    else $fatal(1, "memory-read trace mismatch opcode=%02h", opcode);
+                event_index++;
+            end
         end
         if (is_rmw) begin
             assert (trace_write_enable[event_index] &&
                     trace_address[event_index] == target_address &&
+                    trace_write_data[event_index] == operand)
+                else $fatal(1, "RMW original-value write mismatch opcode=%02h", opcode);
+            event_index++;
+            assert (trace_write_enable[event_index] &&
+                    trace_address[event_index] == target_address &&
                     trace_write_data[event_index] == expected_alu_result)
-                else $fatal(1, "RMW write trace mismatch opcode=%02h", opcode);
+                else $fatal(1, "RMW final write mismatch opcode=%02h", opcode);
             event_index++;
         end
         assert (trace_count == event_index)
@@ -935,10 +981,13 @@ module cpu_phase2e_tb;
         cpu_enable = 1'b0;
         case (target_state)
             CPU_STATE_FETCH,
-            CPU_STATE_OPERAND_LOW,
-            CPU_STATE_ALU_EXECUTE: begin
+            CPU_STATE_OPERAND_LOW: begin
                 memory_model.memory[PROGRAM_START] = 8'h69; // ADC #$01
                 memory_model.memory[PROGRAM_START + 1] = 8'h01;
+            end
+
+            CPU_STATE_ALU_EXECUTE: begin
+                memory_model.memory[PROGRAM_START] = 8'h0A; // ASL A
             end
 
             CPU_STATE_MEMORY_READ: begin
@@ -947,11 +996,7 @@ module cpu_phase2e_tb;
                 memory_model.memory[16'h0080] = 8'h01;
             end
 
-            CPU_STATE_WRITEBACK: begin
-                memory_model.memory[PROGRAM_START] = 8'hA9; // LDA #$80
-                memory_model.memory[PROGRAM_START + 1] = 8'h80;
-            end
-
+            CPU_STATE_RMW_DUMMY_WRITE,
             CPU_STATE_RMW_WRITE: begin
                 memory_model.memory[PROGRAM_START] = 8'hE6; // INC $80
                 memory_model.memory[PROGRAM_START + 1] = 8'h80;
@@ -1003,11 +1048,11 @@ module cpu_phase2e_tb;
         if (target_state == CPU_STATE_RMW_WRITE) begin
             assert (held_bus_valid && held_bus_write_enable &&
                     held_bus_address == 16'h0080 &&
-                    held_bus_write_data == 8'h00 && held_write_count == 0)
+                    held_bus_write_data == 8'h00 && held_write_count == 1)
                 else $fatal(1, "RMW write was not presented during stall");
             cpu_enable = 1'b1;
             step_cpu(1'b0);
-            assert (memory_write_count == 1 &&
+            assert (memory_write_count == 2 &&
                     memory_model.memory[16'h0080] == 8'h00 &&
                     debug_execution_state == CPU_STATE_FETCH)
                 else $fatal(1, "stalled RMW did not commit exactly once");
@@ -1019,7 +1064,6 @@ module cpu_phase2e_tb;
         cpu_enable = 1'b0;
         memory_model.memory[PROGRAM_START] = 8'hEB; // unofficial SBC
         reset_core();
-        step_cpu(1'b0);
         step_cpu(1'b0);
         assert (debug_execution_state == CPU_STATE_TRAP &&
                 debug_decoded_instruction == CPU_INSTR_INVALID &&
@@ -1079,7 +1123,7 @@ module cpu_phase2e_tb;
         test_stall_in_state(CPU_STATE_OPERAND_LOW);
         test_stall_in_state(CPU_STATE_MEMORY_READ);
         test_stall_in_state(CPU_STATE_ALU_EXECUTE);
-        test_stall_in_state(CPU_STATE_WRITEBACK);
+        test_stall_in_state(CPU_STATE_RMW_DUMMY_WRITE);
         test_stall_in_state(CPU_STATE_RMW_WRITE);
         test_unsupported_opcode();
 

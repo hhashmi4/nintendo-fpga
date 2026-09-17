@@ -1,5 +1,10 @@
 # Phase 2G CPU interrupts and reset
 
+> Historical phase note: Phase 2H supersedes the functional step counts and
+> reset model below with seven-cycle RESET/IRQ/NMI/BRK sequencing, explicit
+> dummy reads, three reset stack reads/decrements, and six-cycle RTI. Phase 2G
+> interrupt semantics and coverage remain in regression.
+
 Phase 2G adds bus-visible reset-vector sequencing, synchronized external NMI
 and IRQ requests, BRK, and RTI to the existing CPU sequencer. It does not add
 a second execution engine, a derived clock, hidden stack memory, or a hidden

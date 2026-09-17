@@ -1,5 +1,10 @@
 # Phase 2E CPU arithmetic and logic instructions
 
+> Historical phase note: Phase 2H supersedes the functional step counts and
+> one-write RMW description below. Memory RMW now performs an original-value
+> dummy write followed by the modified-value write; opcode semantics and ALU
+> coverage remain unchanged.
+
 Phase 2E integrates the verified Phase 2B ALU into the Phase 2D instruction
 engine. It implements only official arithmetic, logic, compare,
 increment/decrement, shift, and rotate opcodes. The Phase 1 board diagnostic

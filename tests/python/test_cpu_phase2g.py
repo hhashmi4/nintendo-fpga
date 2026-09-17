@@ -19,6 +19,7 @@ from verification.cpu import (
     RESET_INSTRUCTION,
     RESET_PC,
     RESET_SP,
+    POST_RESET_SP,
     RESET_STATUS,
     RESET_X,
     RESET_Y,
@@ -74,9 +75,15 @@ def test_reset_fetches_vector_and_restores_deterministic_state(target: int) -> N
     model.reads.clear()
 
     assert model.reset_from_vector() == target
-    assert model.reads == [VECTOR_RESET_LOW, VECTOR_RESET_LOW + 1]
+    assert model.reads == [
+        0x0100,
+        0x01FF,
+        0x01FE,
+        VECTOR_RESET_LOW,
+        VECTOR_RESET_LOW + 1,
+    ]
     assert (model.a, model.x, model.y) == (RESET_A, RESET_X, RESET_Y)
-    assert model.sp == RESET_SP
+    assert model.sp == POST_RESET_SP
     assert model.status == RESET_STATUS
     assert model.instruction == RESET_INSTRUCTION
     assert not model.unsupported
@@ -275,7 +282,8 @@ def test_phase2f_boundary_still_rejects_brk_and_rti() -> None:
 
 def test_reference_constants_are_intentionally_fixed() -> None:
     assert (RESET_A, RESET_X, RESET_Y) == (0, 0, 0)
-    assert (RESET_SP, RESET_PC, RESET_STATUS, RESET_INSTRUCTION) == (
+    assert (RESET_SP, POST_RESET_SP, RESET_PC, RESET_STATUS, RESET_INSTRUCTION) == (
+        0x00,
         0xFD,
         0x0000,
         0x24,

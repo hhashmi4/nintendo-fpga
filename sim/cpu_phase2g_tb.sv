@@ -132,6 +132,7 @@ module cpu_phase2g_tb;
         if (bus_write_enable) begin
             assert (debug_execution_state inside {
                 CPU_STATE_MEMORY_WRITE,
+                CPU_STATE_RMW_DUMMY_WRITE,
                 CPU_STATE_RMW_WRITE,
                 CPU_STATE_STACK_PUSH,
                 CPU_STATE_JSR_PUSH_HIGH,
@@ -222,22 +223,19 @@ module cpu_phase2g_tb;
 
         reset = 1'b0;
         cpu_enable = 1'b1;
-        step_cpu(1'b1);
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_LOW &&
-                bus_valid && bus_address == CPU_VECTOR_RESET_LOW)
-            else $fatal(1, "reset low-vector state mismatch");
-        step_cpu(1'b1);
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_HIGH &&
-                bus_valid && bus_address == CPU_VECTOR_RESET_LOW + 16'd1)
-            else $fatal(1, "reset high-vector state mismatch");
-        step_cpu(1'b1);
+        repeat (7) step_cpu(1'b1);
         assert (debug_execution_state == CPU_STATE_FETCH &&
-                debug_pc == target)
+                debug_pc == target && debug_sp == CPU_POST_RESET_SP)
             else $fatal(1, "reset vector did not load PC");
-        assert (trace_count == 2)
-            else $fatal(1, "reset must expose exactly two vector reads");
-        check_trace_read(0, CPU_VECTOR_RESET_LOW);
-        check_trace_read(1, CPU_VECTOR_RESET_LOW + 16'd1);
+        assert (trace_count == 7)
+            else $fatal(1, "reset must expose seven bus reads");
+        check_trace_read(0, CPU_RESET_PC);
+        check_trace_read(1, CPU_RESET_PC);
+        check_trace_read(2, 16'h0100);
+        check_trace_read(3, 16'h01FF);
+        check_trace_read(4, 16'h01FE);
+        check_trace_read(5, CPU_VECTOR_RESET_LOW);
+        check_trace_read(6, CPU_VECTOR_RESET_LOW + 16'd1);
         trace_count = 0;
     endtask
 
@@ -299,7 +297,7 @@ module cpu_phase2g_tb;
         enabled_steps = 0;
         step_cpu(1'b1);
         enabled_steps++;
-        assert (debug_execution_state == CPU_STATE_INTERRUPT_PUSH_HIGH)
+        assert (debug_execution_state == CPU_STATE_INTERRUPT_DUMMY)
             else $fatal(1, "interrupt was not recognized");
         while (debug_execution_state != CPU_STATE_FETCH) begin
             step_cpu(1'b1);
@@ -307,7 +305,7 @@ module cpu_phase2g_tb;
             assert (enabled_steps < 12)
                 else $fatal(1, "interrupt entry did not complete");
         end
-        assert (enabled_steps == 6)
+        assert (enabled_steps == 7)
             else $fatal(1, "unexpected interrupt enabled-step count");
     endtask
 
@@ -317,14 +315,16 @@ module cpu_phase2g_tb;
         input logic [7:0] status,
         input logic [15:0] vector_low
     );
-        assert (trace_count == 5)
+        assert (trace_count == 7)
             else $fatal(1, "hardware interrupt trace length mismatch");
-        check_trace_write(0, {8'h01, starting_sp}, return_pc[15:8]);
-        check_trace_write(1, {8'h01, starting_sp - 8'd1}, return_pc[7:0]);
-        check_trace_write(2, {8'h01, starting_sp - 8'd2},
+        check_trace_read(0, return_pc);
+        check_trace_read(1, return_pc);
+        check_trace_write(2, {8'h01, starting_sp}, return_pc[15:8]);
+        check_trace_write(3, {8'h01, starting_sp - 8'd1}, return_pc[7:0]);
+        check_trace_write(4, {8'h01, starting_sp - 8'd2},
                           cpu_status_for_interrupt(status));
-        check_trace_read(3, vector_low);
-        check_trace_read(4, vector_low + 16'd1);
+        check_trace_read(5, vector_low);
+        check_trace_read(6, vector_low + 16'd1);
     endtask
 
     task automatic test_status_space;
@@ -348,16 +348,18 @@ module cpu_phase2g_tb;
                                            CPU_VECTOR_NMI_LOW);
             trace_count = 0;
             execute_current_instruction(1'b1, rti_steps);
-            assert (rti_steps == 7 && debug_pc == return_pc &&
+            assert (rti_steps == 6 && debug_pc == return_pc &&
                     debug_sp == 8'hFD &&
                     debug_status == cpu_status_normalize(status))
                 else $fatal(1, "NMI/RTI status round trip failed");
-            assert (trace_count == 4)
+            assert (trace_count == 6)
                 else $fatal(1, "RTI trace length mismatch");
             check_trace_read(0, NMI_HANDLER);
-            check_trace_read(1, 16'h01FB);
-            check_trace_read(2, 16'h01FC);
-            check_trace_read(3, 16'h01FD);
+            check_trace_read(1, NMI_HANDLER + 16'd1);
+            check_trace_read(2, 16'h01FA);
+            check_trace_read(3, 16'h01FB);
+            check_trace_read(4, 16'h01FC);
+            check_trace_read(5, 16'h01FD);
             directed_vector_count++;
         end
     endtask
@@ -413,7 +415,7 @@ module cpu_phase2g_tb;
                                        CPU_VECTOR_NMI_LOW);
         trace_count = 0;
         execute_current_instruction(1'b0, rti_steps);
-        assert (rti_steps == 7 && debug_pc == return_pc &&
+        assert (rti_steps == 6 && debug_pc == return_pc &&
                 !debug_status.interrupt_disable)
             else $fatal(1, "RTI did not restore pre-NMI frame");
         trace_count = 0;
@@ -437,7 +439,7 @@ module cpu_phase2g_tb;
         service_interrupt();
         trace_count = 0;
         execute_current_instruction(1'b0, rti_steps);
-        assert (rti_steps == 7 && debug_pc == first_return && bus_valid &&
+        assert (rti_steps == 6 && debug_pc == first_return && bus_valid &&
                 !dut.nmi_pending)
             else $fatal(1, "held NMI retriggered or lost return PC");
 
@@ -469,7 +471,7 @@ module cpu_phase2g_tb;
             memory_model.memory[IRQ_HANDLER] = 8'h40;
             trace_count = 0;
             execute_current_instruction(1'b1, brk_steps);
-            assert (brk_steps == 8 && debug_pc == IRQ_HANDLER &&
+            assert (brk_steps == 7 && debug_pc == IRQ_HANDLER &&
                     debug_sp == sp - 8'd3 && trace_count == 7)
                 else $fatal(1, "BRK sequencing mismatch");
             check_trace_read(0, brk_pc);
@@ -482,7 +484,7 @@ module cpu_phase2g_tb;
             check_trace_read(6, CPU_VECTOR_IRQ_LOW + 16'd1);
             trace_count = 0;
             execute_current_instruction(1'b1, rti_steps);
-            assert (rti_steps == 7 && debug_pc == return_pc &&
+            assert (rti_steps == 6 && debug_pc == return_pc &&
                     debug_sp == sp && debug_status == cpu_status_normalize(8'h69))
                 else $fatal(1, "BRK/RTI round trip mismatch");
             directed_vector_count++;
@@ -526,7 +528,12 @@ module cpu_phase2g_tb;
                      held_status, held_state, held_bus_address,
                      held_bus_data, held_bus_write, held_bus_valid,
                      held_write_count})
-                else $fatal(1, "cpu_enable stall was not stable");
+                else $fatal(1,
+                    "cpu_enable stall was not stable: state=%0d held_addr=%04h addr=%04h held_we=%0b we=%0b held_valid=%0b valid=%0b held_writes=%0d writes=%0d",
+                    held_state, held_bus_address, bus_address,
+                    held_bus_write, bus_write_enable,
+                    held_bus_valid, bus_valid,
+                    held_write_count, memory_write_count);
         end
         cpu_enable = 1'b1;
         stall_check_count++;
@@ -541,6 +548,8 @@ module cpu_phase2g_tb;
         synchronize_nmi(1'b1);
         cpu_enable = 1'b1;
         stall_current_state(); // recognition boundary with pending NMI
+        step_cpu(1'b0);
+        stall_current_state(); // second discarded interrupt read
         step_cpu(1'b0);
         stall_current_state(); // push high
         step_cpu(1'b0);
@@ -557,17 +566,17 @@ module cpu_phase2g_tb;
             else $fatal(1, "stalled NMI did not complete");
 
         trace_count = 0;
-        step_cpu(1'b0); // fetch RTI
-        step_cpu(1'b0); // decode RTI
-        stall_current_state(); // RTI_PULL
+        stall_current_state(); // RTI opcode fetch
         step_cpu(1'b0);
-        stall_current_state(); // status
+        stall_current_state(); // dummy next-PC read
         step_cpu(1'b0);
-        stall_current_state(); // low
+        stall_current_state(); // dummy current-stack read
         step_cpu(1'b0);
-        stall_current_state(); // high
+        stall_current_state(); // status pull
         step_cpu(1'b0);
-        stall_current_state(); // completion
+        stall_current_state(); // PC low pull
+        step_cpu(1'b0);
+        stall_current_state(); // PC high pull
         step_cpu(1'b0);
         assert (debug_execution_state == CPU_STATE_FETCH)
             else $fatal(1, "stalled RTI did not complete");
@@ -578,11 +587,11 @@ module cpu_phase2g_tb;
         step_cpu(1'b0);
         reset = 1'b0;
         cpu_enable = 1'b1;
-        step_cpu(1'b0);
-        stall_current_state();
-        step_cpu(1'b0);
-        stall_current_state();
-        step_cpu(1'b0);
+        #1; // Allow reset-qualified combinational bus outputs to settle.
+        repeat (7) begin
+            stall_current_state();
+            step_cpu(1'b0);
+        end
         assert (debug_execution_state == CPU_STATE_FETCH)
             else $fatal(1, "stalled reset vector did not complete");
     endtask
@@ -644,7 +653,7 @@ module cpu_phase2g_tb;
         synchronize_nmi(1'b1);
         cpu_enable = 1'b1;
         step_cpu(1'b0);
-        assert (debug_execution_state == CPU_STATE_INTERRUPT_PUSH_HIGH)
+        assert (debug_execution_state == CPU_STATE_INTERRUPT_DUMMY)
             else $fatal(1, "failed to enter interrupt state for reset test");
         reset = 1'b1;
         #1;
@@ -664,7 +673,6 @@ module cpu_phase2g_tb;
         reset_core(PROGRAM_START);
         memory_model.memory[PROGRAM_START] = 8'h02;
         cpu_enable = 1'b1;
-        step_cpu(1'b0);
         step_cpu(1'b0);
         assert (debug_execution_state == CPU_STATE_TRAP &&
                 memory_write_count == 0 && !bus_valid && !bus_write_enable)
@@ -695,7 +703,7 @@ module cpu_phase2g_tb;
         assert (directed_vector_count == 86)
             else $fatal(1, "Phase 2G directed vector accounting mismatch: %0d",
                         directed_vector_count);
-        assert (stall_check_count == 14)
+        assert (stall_check_count == 21)
             else $fatal(1, "Phase 2G stall accounting mismatch: %0d",
                         stall_check_count);
         assert (reset_priority_count == 8)

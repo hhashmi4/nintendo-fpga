@@ -191,24 +191,33 @@ module cpu_phase2d_tb;
 
     function automatic int unsigned expected_enabled_steps(
         input logic [3:0] mode,
-        input logic is_load
+        input logic is_load,
+        input logic page_cross
     );
         if (mode == CPU_ADDR_IMPLIED) begin
-            return 3;
+            return 2;
         end
         if (mode == CPU_ADDR_IMMEDIATE) begin
-            return 5;
+            return 2;
         end
-        if (mode == CPU_ADDR_INDEXED_INDIRECT_X ||
-            mode == CPU_ADDR_INDIRECT_INDEXED_Y) begin
-            return is_load ? 9 : 8;
+        if (mode == CPU_ADDR_INDEXED_INDIRECT_X) begin
+            return 6;
         end
-        if (mode == CPU_ADDR_ABSOLUTE ||
-            mode == CPU_ADDR_ABSOLUTE_X ||
+        if (mode == CPU_ADDR_INDIRECT_INDEXED_Y) begin
+            return is_load ? (page_cross ? 6 : 5) : 6;
+        end
+        if (mode == CPU_ADDR_ABSOLUTE_X ||
             mode == CPU_ADDR_ABSOLUTE_Y) begin
-            return is_load ? 7 : 6;
+            return is_load ? (page_cross ? 5 : 4) : 5;
         end
-        return is_load ? 6 : 5;
+        if (mode == CPU_ADDR_ABSOLUTE) begin
+            return 4;
+        end
+        if (mode == CPU_ADDR_ZERO_PAGE_X ||
+            mode == CPU_ADDR_ZERO_PAGE_Y) begin
+            return 4;
+        end
+        return 3;
     endfunction
 
     task automatic append_byte(
@@ -280,13 +289,7 @@ module cpu_phase2d_tb;
 
         reset = 1'b0;
         cpu_enable = 1'b1;
-        step_cpu(1'b0);
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_LOW)
-            else $fatal(1, "CPU did not begin reset-vector fetch");
-        step_cpu(1'b0);
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_HIGH)
-            else $fatal(1, "CPU did not fetch reset-vector low byte");
-        step_cpu(1'b0);
+        repeat (7) step_cpu(1'b0);
         memory_model.memory[CPU_VECTOR_RESET_LOW] = saved_vector_low;
         memory_model.memory[CPU_VECTOR_RESET_LOW + 16'd1] = saved_vector_high;
         assert (debug_execution_state == CPU_STATE_FETCH &&
@@ -337,6 +340,8 @@ module cpu_phase2d_tb;
         int unsigned enabled_steps;
         int unsigned setup_steps;
         int unsigned event_index;
+        logic [15:0] tentative_address;
+        logic final_access_seen;
 
         opcode = OPCODES[opcode_index];
         instruction = INSTRUCTIONS[opcode_index];
@@ -352,6 +357,8 @@ module cpu_phase2d_tb;
         pointer_high_address = 16'h0000;
         expected_page_cross = 1'b0;
         expected_page_cross_valid = 1'b0;
+        tentative_address = 16'h0000;
+        final_access_seen = 1'b0;
 
         // Assert reset before rewriting the generic memory image.
         reset = 1'b1;
@@ -537,7 +544,8 @@ module cpu_phase2d_tb;
         execute_current_instruction(1'b1, enabled_steps);
 
         assert (enabled_steps ==
-                expected_enabled_steps(mode, instruction_is_load(instruction)))
+                expected_enabled_steps(mode, instruction_is_load(instruction),
+                                       expected_page_cross))
             else $fatal(1, "cycle scaffold mismatch opcode=%02h steps=%0d",
                         opcode, enabled_steps);
         assert (debug_instruction == opcode &&
@@ -645,6 +653,20 @@ module cpu_phase2d_tb;
                 else $fatal(1, "high operand trace mismatch opcode=%02h", opcode);
             event_index++;
         end
+        if (mode == CPU_ADDR_IMPLIED) begin
+            assert (!trace_write_enable[event_index] &&
+                    trace_address[event_index] == target_pc + 16'd1)
+                else $fatal(1, "implied dummy-read mismatch opcode=%02h", opcode);
+            event_index++;
+        end
+        if (mode == CPU_ADDR_ZERO_PAGE_X ||
+            mode == CPU_ADDR_ZERO_PAGE_Y ||
+            mode == CPU_ADDR_INDEXED_INDIRECT_X) begin
+            assert (!trace_write_enable[event_index] &&
+                    trace_address[event_index] == {8'h00, operand})
+                else $fatal(1, "zero-page index dummy mismatch opcode=%02h", opcode);
+            event_index++;
+        end
         if (mode == CPU_ADDR_INDEXED_INDIRECT_X ||
             mode == CPU_ADDR_INDIRECT_INDEXED_Y) begin
             assert (!trace_write_enable[event_index] &&
@@ -656,19 +678,39 @@ module cpu_phase2d_tb;
                 else $fatal(1, "pointer-high trace mismatch opcode=%02h", opcode);
             event_index++;
         end
-        if (mode != CPU_ADDR_IMPLIED && mode != CPU_ADDR_IMMEDIATE) begin
-            assert (trace_address[event_index] == target_address &&
-                    trace_write_enable[event_index] ==
-                    instruction_is_store(instruction))
-                else $fatal(1, "final bus trace mismatch opcode=%02h", opcode);
-            if (instruction_is_store(instruction)) begin
-                assert (trace_write_data[event_index] == value)
-                    else $fatal(1, "store data trace mismatch opcode=%02h", opcode);
-            end else begin
+        if (mode == CPU_ADDR_ABSOLUTE_X ||
+            mode == CPU_ADDR_ABSOLUTE_Y ||
+            mode == CPU_ADDR_INDIRECT_INDEXED_Y) begin
+            tentative_address = {
+                (mode == CPU_ADDR_INDIRECT_INDEXED_Y)
+                    ? pointer_base[15:8] : base_address[15:8],
+                target_address[7:0]
+            };
+            assert (!trace_write_enable[event_index] &&
+                    trace_address[event_index] == tentative_address)
+                else $fatal(1, "indexed tentative-read mismatch opcode=%02h", opcode);
+            if (instruction_is_load(instruction) && !expected_page_cross) begin
                 assert (trace_read_data[event_index] == value)
-                    else $fatal(1, "load data trace mismatch opcode=%02h", opcode);
+                    else $fatal(1, "indexed final data mismatch opcode=%02h", opcode);
+                final_access_seen = 1'b1;
             end
             event_index++;
+        end
+        if (mode != CPU_ADDR_IMPLIED && mode != CPU_ADDR_IMMEDIATE) begin
+            if (!final_access_seen) begin
+                assert (trace_address[event_index] == target_address &&
+                        trace_write_enable[event_index] ==
+                        instruction_is_store(instruction))
+                    else $fatal(1, "final bus trace mismatch opcode=%02h", opcode);
+                if (instruction_is_store(instruction)) begin
+                    assert (trace_write_data[event_index] == value)
+                        else $fatal(1, "store data trace mismatch opcode=%02h", opcode);
+                end else begin
+                    assert (trace_read_data[event_index] == value)
+                        else $fatal(1, "load data trace mismatch opcode=%02h", opcode);
+                end
+                event_index++;
+            end
         end
         assert (trace_count == event_index)
             else $fatal(1, "unexpected bus cycle count opcode=%02h", opcode);
@@ -741,8 +783,7 @@ module cpu_phase2d_tb;
         memory_model.memory[PROGRAM_START] = 8'h02;
         memory_model.memory[PROGRAM_START + 1] = 8'hA9;
         reset_core();
-        step_cpu(1'b0); // FETCH -> DECODE
-        step_cpu(1'b0); // DECODE -> TRAP
+        step_cpu(1'b0); // FETCH -> TRAP
         assert (debug_execution_state == CPU_STATE_TRAP &&
                 debug_pc == PROGRAM_START + 16'd1 &&
                 debug_instruction == 8'h02 &&
@@ -750,7 +791,8 @@ module cpu_phase2d_tb;
             else $fatal(1, "unsupported opcode did not enter deterministic trap");
         assert (!bus_valid && !bus_write_enable && memory_write_count == 0 &&
                 debug_a == CPU_RESET_A && debug_x == CPU_RESET_X &&
-                debug_y == CPU_RESET_Y && debug_sp == CPU_RESET_SP &&
+                debug_y == CPU_RESET_Y &&
+                debug_sp == CPU_POST_RESET_SP &&
                 debug_status == CPU_RESET_STATUS)
             else $fatal(1, "unsupported opcode caused an architectural effect");
         repeat (3) begin
