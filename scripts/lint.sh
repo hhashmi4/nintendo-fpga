@@ -20,6 +20,7 @@ verilator --lint-only --Wall -Wno-fatal \
 
 CPU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
     rtl/cpu/cpu_decoder.sv
     rtl/cpu/cpu_address_gen.sv
     rtl/cpu/cpu_core.sv

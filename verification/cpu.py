@@ -1,4 +1,4 @@
-"""Independent reference models for the Phase 2A through 2D CPU blocks."""
+"""Independent reference models for the Phase 2A through 2E CPU blocks."""
 
 from dataclasses import dataclass, replace
 from enum import IntEnum
@@ -29,6 +29,8 @@ class ExecutionState(IntEnum):
     WRITEBACK = 10
     TRANSFER = 11
     TRAP = 12
+    ALU_EXECUTE = 13
+    RMW_WRITE = 14
 
 
 class AluOperation(IntEnum):
@@ -83,7 +85,7 @@ class AddressingMode(IntEnum):
 
 
 class Instruction(IntEnum):
-    """Instruction identifiers implemented by the Phase 2D decoder."""
+    """Instruction identifiers implemented through the Phase 2E decoder."""
 
     INVALID = 0
     LDA = 1
@@ -98,6 +100,24 @@ class Instruction(IntEnum):
     TYA = 10
     TSX = 11
     TXS = 12
+    ADC = 13
+    SBC = 14
+    AND = 15
+    ORA = 16
+    EOR = 17
+    CMP = 18
+    CPX = 19
+    CPY = 20
+    INX = 21
+    INY = 22
+    DEX = 23
+    DEY = 24
+    INC = 25
+    DEC = 26
+    ASL = 27
+    LSR = 28
+    ROL = 29
+    ROR = 30
 
 
 @dataclass(frozen=True)
@@ -113,7 +133,10 @@ def _opcode(
     instruction: Instruction,
     addressing_mode: AddressingMode,
 ) -> OpcodeSpec:
-    if addressing_mode is AddressingMode.IMPLIED:
+    if addressing_mode in (
+        AddressingMode.IMPLIED,
+        AddressingMode.ACCUMULATOR,
+    ):
         operand_bytes = 0
     elif addressing_mode in (
         AddressingMode.ABSOLUTE,
@@ -167,6 +190,133 @@ OPCODE_TABLE = {
     0x98: _opcode(Instruction.TYA, AddressingMode.IMPLIED),
     0xBA: _opcode(Instruction.TSX, AddressingMode.IMPLIED),
     0x9A: _opcode(Instruction.TXS, AddressingMode.IMPLIED),
+    # Arithmetic and logic
+    0x69: _opcode(Instruction.ADC, AddressingMode.IMMEDIATE),
+    0x65: _opcode(Instruction.ADC, AddressingMode.ZERO_PAGE),
+    0x75: _opcode(Instruction.ADC, AddressingMode.ZERO_PAGE_X),
+    0x6D: _opcode(Instruction.ADC, AddressingMode.ABSOLUTE),
+    0x7D: _opcode(Instruction.ADC, AddressingMode.ABSOLUTE_X),
+    0x79: _opcode(Instruction.ADC, AddressingMode.ABSOLUTE_Y),
+    0x61: _opcode(Instruction.ADC, AddressingMode.INDEXED_INDIRECT_X),
+    0x71: _opcode(Instruction.ADC, AddressingMode.INDIRECT_INDEXED_Y),
+    0xE9: _opcode(Instruction.SBC, AddressingMode.IMMEDIATE),
+    0xE5: _opcode(Instruction.SBC, AddressingMode.ZERO_PAGE),
+    0xF5: _opcode(Instruction.SBC, AddressingMode.ZERO_PAGE_X),
+    0xED: _opcode(Instruction.SBC, AddressingMode.ABSOLUTE),
+    0xFD: _opcode(Instruction.SBC, AddressingMode.ABSOLUTE_X),
+    0xF9: _opcode(Instruction.SBC, AddressingMode.ABSOLUTE_Y),
+    0xE1: _opcode(Instruction.SBC, AddressingMode.INDEXED_INDIRECT_X),
+    0xF1: _opcode(Instruction.SBC, AddressingMode.INDIRECT_INDEXED_Y),
+    0x29: _opcode(Instruction.AND, AddressingMode.IMMEDIATE),
+    0x25: _opcode(Instruction.AND, AddressingMode.ZERO_PAGE),
+    0x35: _opcode(Instruction.AND, AddressingMode.ZERO_PAGE_X),
+    0x2D: _opcode(Instruction.AND, AddressingMode.ABSOLUTE),
+    0x3D: _opcode(Instruction.AND, AddressingMode.ABSOLUTE_X),
+    0x39: _opcode(Instruction.AND, AddressingMode.ABSOLUTE_Y),
+    0x21: _opcode(Instruction.AND, AddressingMode.INDEXED_INDIRECT_X),
+    0x31: _opcode(Instruction.AND, AddressingMode.INDIRECT_INDEXED_Y),
+    0x09: _opcode(Instruction.ORA, AddressingMode.IMMEDIATE),
+    0x05: _opcode(Instruction.ORA, AddressingMode.ZERO_PAGE),
+    0x15: _opcode(Instruction.ORA, AddressingMode.ZERO_PAGE_X),
+    0x0D: _opcode(Instruction.ORA, AddressingMode.ABSOLUTE),
+    0x1D: _opcode(Instruction.ORA, AddressingMode.ABSOLUTE_X),
+    0x19: _opcode(Instruction.ORA, AddressingMode.ABSOLUTE_Y),
+    0x01: _opcode(Instruction.ORA, AddressingMode.INDEXED_INDIRECT_X),
+    0x11: _opcode(Instruction.ORA, AddressingMode.INDIRECT_INDEXED_Y),
+    0x49: _opcode(Instruction.EOR, AddressingMode.IMMEDIATE),
+    0x45: _opcode(Instruction.EOR, AddressingMode.ZERO_PAGE),
+    0x55: _opcode(Instruction.EOR, AddressingMode.ZERO_PAGE_X),
+    0x4D: _opcode(Instruction.EOR, AddressingMode.ABSOLUTE),
+    0x5D: _opcode(Instruction.EOR, AddressingMode.ABSOLUTE_X),
+    0x59: _opcode(Instruction.EOR, AddressingMode.ABSOLUTE_Y),
+    0x41: _opcode(Instruction.EOR, AddressingMode.INDEXED_INDIRECT_X),
+    0x51: _opcode(Instruction.EOR, AddressingMode.INDIRECT_INDEXED_Y),
+    # Compare
+    0xC9: _opcode(Instruction.CMP, AddressingMode.IMMEDIATE),
+    0xC5: _opcode(Instruction.CMP, AddressingMode.ZERO_PAGE),
+    0xD5: _opcode(Instruction.CMP, AddressingMode.ZERO_PAGE_X),
+    0xCD: _opcode(Instruction.CMP, AddressingMode.ABSOLUTE),
+    0xDD: _opcode(Instruction.CMP, AddressingMode.ABSOLUTE_X),
+    0xD9: _opcode(Instruction.CMP, AddressingMode.ABSOLUTE_Y),
+    0xC1: _opcode(Instruction.CMP, AddressingMode.INDEXED_INDIRECT_X),
+    0xD1: _opcode(Instruction.CMP, AddressingMode.INDIRECT_INDEXED_Y),
+    0xE0: _opcode(Instruction.CPX, AddressingMode.IMMEDIATE),
+    0xE4: _opcode(Instruction.CPX, AddressingMode.ZERO_PAGE),
+    0xEC: _opcode(Instruction.CPX, AddressingMode.ABSOLUTE),
+    0xC0: _opcode(Instruction.CPY, AddressingMode.IMMEDIATE),
+    0xC4: _opcode(Instruction.CPY, AddressingMode.ZERO_PAGE),
+    0xCC: _opcode(Instruction.CPY, AddressingMode.ABSOLUTE),
+    # Register and memory increment/decrement
+    0xE8: _opcode(Instruction.INX, AddressingMode.IMPLIED),
+    0xC8: _opcode(Instruction.INY, AddressingMode.IMPLIED),
+    0xCA: _opcode(Instruction.DEX, AddressingMode.IMPLIED),
+    0x88: _opcode(Instruction.DEY, AddressingMode.IMPLIED),
+    0xE6: _opcode(Instruction.INC, AddressingMode.ZERO_PAGE),
+    0xF6: _opcode(Instruction.INC, AddressingMode.ZERO_PAGE_X),
+    0xEE: _opcode(Instruction.INC, AddressingMode.ABSOLUTE),
+    0xFE: _opcode(Instruction.INC, AddressingMode.ABSOLUTE_X),
+    0xC6: _opcode(Instruction.DEC, AddressingMode.ZERO_PAGE),
+    0xD6: _opcode(Instruction.DEC, AddressingMode.ZERO_PAGE_X),
+    0xCE: _opcode(Instruction.DEC, AddressingMode.ABSOLUTE),
+    0xDE: _opcode(Instruction.DEC, AddressingMode.ABSOLUTE_X),
+    # Shift and rotate
+    0x0A: _opcode(Instruction.ASL, AddressingMode.ACCUMULATOR),
+    0x06: _opcode(Instruction.ASL, AddressingMode.ZERO_PAGE),
+    0x16: _opcode(Instruction.ASL, AddressingMode.ZERO_PAGE_X),
+    0x0E: _opcode(Instruction.ASL, AddressingMode.ABSOLUTE),
+    0x1E: _opcode(Instruction.ASL, AddressingMode.ABSOLUTE_X),
+    0x4A: _opcode(Instruction.LSR, AddressingMode.ACCUMULATOR),
+    0x46: _opcode(Instruction.LSR, AddressingMode.ZERO_PAGE),
+    0x56: _opcode(Instruction.LSR, AddressingMode.ZERO_PAGE_X),
+    0x4E: _opcode(Instruction.LSR, AddressingMode.ABSOLUTE),
+    0x5E: _opcode(Instruction.LSR, AddressingMode.ABSOLUTE_X),
+    0x2A: _opcode(Instruction.ROL, AddressingMode.ACCUMULATOR),
+    0x26: _opcode(Instruction.ROL, AddressingMode.ZERO_PAGE),
+    0x36: _opcode(Instruction.ROL, AddressingMode.ZERO_PAGE_X),
+    0x2E: _opcode(Instruction.ROL, AddressingMode.ABSOLUTE),
+    0x3E: _opcode(Instruction.ROL, AddressingMode.ABSOLUTE_X),
+    0x6A: _opcode(Instruction.ROR, AddressingMode.ACCUMULATOR),
+    0x66: _opcode(Instruction.ROR, AddressingMode.ZERO_PAGE),
+    0x76: _opcode(Instruction.ROR, AddressingMode.ZERO_PAGE_X),
+    0x6E: _opcode(Instruction.ROR, AddressingMode.ABSOLUTE),
+    0x7E: _opcode(Instruction.ROR, AddressingMode.ABSOLUTE_X),
+}
+
+
+INSTRUCTION_ALU_OPERATION = {
+    Instruction.ADC: AluOperation.ADD,
+    Instruction.SBC: AluOperation.SUB,
+    Instruction.AND: AluOperation.AND,
+    Instruction.ORA: AluOperation.OR,
+    Instruction.EOR: AluOperation.XOR,
+    Instruction.CMP: AluOperation.CMP,
+    Instruction.CPX: AluOperation.CMP,
+    Instruction.CPY: AluOperation.CMP,
+    Instruction.INX: AluOperation.INC,
+    Instruction.INY: AluOperation.INC,
+    Instruction.DEX: AluOperation.DEC,
+    Instruction.DEY: AluOperation.DEC,
+    Instruction.INC: AluOperation.INC,
+    Instruction.DEC: AluOperation.DEC,
+    Instruction.ASL: AluOperation.ASL,
+    Instruction.LSR: AluOperation.LSR,
+    Instruction.ROL: AluOperation.ROL,
+    Instruction.ROR: AluOperation.ROR,
+}
+
+COMPARE_INSTRUCTIONS = {
+    Instruction.CMP,
+    Instruction.CPX,
+    Instruction.CPY,
+}
+
+MEMORY_RMW_INSTRUCTIONS = {
+    Instruction.INC,
+    Instruction.DEC,
+    Instruction.ASL,
+    Instruction.LSR,
+    Instruction.ROL,
+    Instruction.ROR,
 }
 
 
@@ -333,7 +483,7 @@ def generate_address(
 
 
 class CpuPhase2DModel:
-    """Functional load/store/transfer model without RTL microcycle mimicry."""
+    """Functional Phase 2D/2E model without RTL microcycle mimicry."""
 
     def __init__(self, *, initial_pc: int = RESET_PC) -> None:
         if not 0 <= initial_pc <= 0xFFFF:
@@ -378,6 +528,22 @@ class CpuPhase2DModel:
             self.status |= 0x80
         if value == 0:
             self.status |= 0x02
+
+    def _apply_alu_flags(self, result: AluResult) -> None:
+        """Apply exactly the status fields owned by an ALU operation."""
+
+        flag_updates = (
+            (result.n_valid, 0x80, result.negative),
+            (result.v_valid, 0x40, result.overflow),
+            (result.z_valid, 0x02, result.zero),
+            (result.c_valid, 0x01, result.carry),
+        )
+        for valid, mask, value in flag_updates:
+            if valid:
+                if value:
+                    self.status |= mask
+                else:
+                    self.status &= ~mask
 
     def _resolve_address(
         self,
@@ -438,6 +604,13 @@ class CpuPhase2DModel:
             self._execute_transfer(spec.instruction)
             return spec
 
+        if spec.addressing_mode in (
+            AddressingMode.IMPLIED,
+            AddressingMode.ACCUMULATOR,
+        ):
+            self._execute_alu_instruction(spec.instruction)
+            return spec
+
         if spec.addressing_mode is AddressingMode.IMMEDIATE:
             value = operand_low
         else:
@@ -473,6 +646,14 @@ class CpuPhase2DModel:
             self._write(self.last_effective_address, self.x)
         elif spec.instruction is Instruction.STY:
             self._write(self.last_effective_address, self.y)
+        elif spec.instruction in INSTRUCTION_ALU_OPERATION:
+            self._execute_alu_instruction(
+                spec.instruction,
+                operand=value,
+                address=self.last_effective_address
+                if spec.addressing_mode is not AddressingMode.IMMEDIATE
+                else None,
+            )
         else:
             raise RuntimeError("decoder classified an unsupported instruction")
 
@@ -498,6 +679,101 @@ class CpuPhase2DModel:
             self.sp = self.x
         else:
             raise RuntimeError("invalid transfer instruction")
+
+    def _execute_alu_instruction(
+        self,
+        instruction: Instruction,
+        *,
+        operand: int | None = None,
+        address: int | None = None,
+    ) -> None:
+        """Execute one Phase 2E ALU-backed architectural operation."""
+
+        operation = INSTRUCTION_ALU_OPERATION.get(instruction)
+        if operation is None:
+            raise RuntimeError("instruction has no Phase 2E ALU operation")
+
+        if instruction in (
+            Instruction.ADC,
+            Instruction.SBC,
+            Instruction.AND,
+            Instruction.ORA,
+            Instruction.EOR,
+            Instruction.CMP,
+        ):
+            operand_a = self.a
+            operand_b = operand
+        elif instruction is Instruction.CPX:
+            operand_a = self.x
+            operand_b = operand
+        elif instruction is Instruction.CPY:
+            operand_a = self.y
+            operand_b = operand
+        elif instruction in (Instruction.INX, Instruction.DEX):
+            operand_a = self.x
+            operand_b = 0
+        elif instruction in (Instruction.INY, Instruction.DEY):
+            operand_a = self.y
+            operand_b = 0
+        elif instruction in (
+            Instruction.ASL,
+            Instruction.LSR,
+            Instruction.ROL,
+            Instruction.ROR,
+        ) and operand is None:
+            operand_a = self.a
+            operand_b = 0
+        else:
+            operand_a = operand
+            operand_b = 0
+
+        if operand_a is None or operand_b is None:
+            raise RuntimeError("ALU instruction requires an operand")
+
+        alu_result = evaluate_alu(
+            operation,
+            operand_a,
+            operand_b,
+            self.status & 0x01,
+        )
+        self._apply_alu_flags(alu_result)
+
+        if instruction in COMPARE_INSTRUCTIONS:
+            if alu_result.result_valid:
+                raise RuntimeError("compare unexpectedly advertised writeback")
+            return
+        if not alu_result.result_valid:
+            raise RuntimeError("ALU instruction did not produce a result")
+
+        if instruction in (
+            Instruction.ADC,
+            Instruction.SBC,
+            Instruction.AND,
+            Instruction.ORA,
+            Instruction.EOR,
+        ):
+            self.a = alu_result.result
+        elif instruction in (Instruction.INX, Instruction.DEX):
+            self.x = alu_result.result
+        elif instruction in (Instruction.INY, Instruction.DEY):
+            self.y = alu_result.result
+        elif instruction in (
+            Instruction.ASL,
+            Instruction.LSR,
+            Instruction.ROL,
+            Instruction.ROR,
+        ) and operand is None:
+            self.a = alu_result.result
+        elif instruction in MEMORY_RMW_INSTRUCTIONS:
+            if address is None:
+                raise RuntimeError("memory RMW instruction requires an address")
+            self._write(address, alu_result.result)
+        else:
+            raise RuntimeError("unhandled Phase 2E ALU destination")
+
+
+class CpuPhase2EModel(CpuPhase2DModel):
+    """Named Phase 2E entry point retaining Phase 2D compatibility."""
 
 
 def _signed_byte(value: int) -> int:

@@ -100,7 +100,9 @@ module cpu_phase2d_tb;
     logic [7:0] trace_read_data [0:7];
     logic trace_write_enable [0:7];
     int unsigned trace_count = 0;
-    int unsigned instruction_vector_count [0:12];
+    // Sized for the shared Phase 2E instruction enum so enum-valued indices
+    // remain width-clean while this regression still exercises IDs 1..12.
+    int unsigned instruction_vector_count [0:30];
 
     cpu_core #(
         .INITIAL_PC (PROGRAM_START)
@@ -753,7 +755,7 @@ module cpu_phase2d_tb;
         // before the first vector installs its program image.
         #1;
 
-        for (int unsigned instruction = 0; instruction < 13; instruction++) begin
+        for (int unsigned instruction = 0; instruction < 31; instruction++) begin
             instruction_vector_count[instruction] = 0;
         end
 

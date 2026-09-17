@@ -10,19 +10,22 @@ mkdir -p \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
-    build/verilator/cpu_phase2d
+    build/verilator/cpu_phase2d \
+    build/verilator/cpu_phase2e
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
 CPU_PHASE2D_WAVEFORM="build/sim/cpu_phase2d.fst"
+CPU_PHASE2E_WAVEFORM="build/sim/cpu_phase2e.fst"
 rm -f \
     "$PLATFORM_WAVEFORM" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
-    "$CPU_PHASE2D_WAVEFORM"
+    "$CPU_PHASE2D_WAVEFORM" \
+    "$CPU_PHASE2E_WAVEFORM"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -50,6 +53,7 @@ fi
 
 CPU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
     rtl/cpu/cpu_decoder.sv
     rtl/cpu/cpu_address_gen.sv
     rtl/cpu/cpu_core.sv
@@ -114,6 +118,7 @@ fi
 
 PHASE2D_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
     rtl/cpu/cpu_decoder.sv
     rtl/cpu/cpu_address_gen.sv
     rtl/cpu/cpu_core.sv
@@ -135,8 +140,33 @@ if [[ ! -s "$CPU_PHASE2D_WAVEFORM" ]]; then
     exit 1
 fi
 
+PHASE2E_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
+    rtl/cpu/cpu_decoder.sv
+    rtl/cpu/cpu_address_gen.sv
+    rtl/cpu/cpu_core.sv
+)
+
+verilator --binary --timing --trace-fst --Wall -Wno-fatal \
+    --assert \
+    --Mdir build/verilator/cpu_phase2e \
+    --top-module cpu_phase2e_tb \
+    -o cpu_phase2e_tb \
+    "${PHASE2E_RTL_FILES[@]}" \
+    sim/cpu_test_memory.sv \
+    sim/cpu_phase2e_tb.sv
+
+build/verilator/cpu_phase2e/cpu_phase2e_tb
+
+if [[ ! -s "$CPU_PHASE2E_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $CPU_PHASE2E_WAVEFORM" >&2
+    exit 1
+fi
+
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"
 echo "Phase 2D waveform: $ROOT_DIR/$CPU_PHASE2D_WAVEFORM"
+echo "Phase 2E waveform: $ROOT_DIR/$CPU_PHASE2E_WAVEFORM"

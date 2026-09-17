@@ -2,8 +2,10 @@
 
 module cpu_core #(
     // Production remains at the Phase 2A placeholder PC. Verification may
-    // override this parameter to keep test programs out of zero page.
-    parameter logic [15:0] INITIAL_PC = cpu_pkg::CPU_RESET_PC
+    // override these parameters to isolate test programs and exercise flag
+    // preservation. Defaults retain the Phase 2A reset contract.
+    parameter logic [15:0] INITIAL_PC = cpu_pkg::CPU_RESET_PC,
+    parameter logic [7:0] INITIAL_STATUS = cpu_pkg::CPU_RESET_STATUS
 ) (
     input  logic clk,
     input  logic reset,
@@ -34,8 +36,8 @@ module cpu_core #(
 
     cpu_decode_result_t   decoded;
     cpu_address_request_t address_request;
-    // The shared Phase 2C result also carries branch/accumulator metadata that
-    // this deliberately limited instruction subset cannot consume.
+    // The shared Phase 2C result also carries branch and indirect-JMP metadata
+    // that this deliberately limited instruction subset cannot consume.
     /* verilator lint_off UNUSEDSIGNAL */
     cpu_address_result_t address_response;
     /* verilator lint_on UNUSEDSIGNAL */
@@ -43,12 +45,30 @@ module cpu_core #(
     logic [1:0] operand_bytes;
     logic       instruction_is_load;
     logic       instruction_is_store;
+    logic       instruction_uses_alu;
+    logic       instruction_is_compare;
+    logic       instruction_is_rmw;
     logic [7:0] operand_low;
     logic [7:0] operand_high;
     logic [7:0] pointer_low;
     logic [7:0] pointer_high;
     logic       pointer_data_valid;
     logic [7:0] data_latch;
+
+    cpu_alu_operation_t alu_operation;
+    logic [7:0] alu_operand_a;
+    logic [7:0] alu_operand_b;
+    logic       alu_carry_in;
+    logic [7:0] alu_result;
+    logic       alu_result_valid;
+    logic       alu_negative;
+    logic       alu_overflow;
+    logic       alu_zero;
+    logic       alu_carry;
+    logic       alu_n_valid;
+    logic       alu_v_valid;
+    logic       alu_z_valid;
+    logic       alu_c_valid;
 
     cpu_decoder decoder (
         .opcode  (debug_instruction),
@@ -58,6 +78,23 @@ module cpu_core #(
     cpu_address_gen address_generator (
         .request  (address_request),
         .response (address_response)
+    );
+
+    cpu_alu alu (
+        .operation    (alu_operation),
+        .operand_a    (alu_operand_a),
+        .operand_b    (alu_operand_b),
+        .carry_in     (alu_carry_in),
+        .result       (alu_result),
+        .result_valid (alu_result_valid),
+        .negative     (alu_negative),
+        .overflow     (alu_overflow),
+        .zero         (alu_zero),
+        .carry        (alu_carry),
+        .n_valid      (alu_n_valid),
+        .v_valid      (alu_v_valid),
+        .z_valid      (alu_z_valid),
+        .c_valid      (alu_c_valid)
     );
 
     always_comb begin
@@ -72,6 +109,63 @@ module cpu_core #(
         address_request.pointer_data_valid = pointer_data_valid;
     end
 
+    // Operand routing is instruction-class based. The ALU remains the only
+    // implementation of arithmetic, logic, compare, increment/decrement,
+    // shift, rotate, and their N/V/Z/C semantics.
+    always_comb begin
+        alu_operand_a = data_latch;
+        alu_operand_b = 8'h00;
+        alu_carry_in  = 1'b0;
+
+        case (debug_decoded_instruction)
+            CPU_INSTR_ADC,
+            CPU_INSTR_SBC,
+            CPU_INSTR_AND,
+            CPU_INSTR_ORA,
+            CPU_INSTR_EOR,
+            CPU_INSTR_CMP: begin
+                alu_operand_a = debug_a;
+                alu_operand_b = data_latch;
+            end
+
+            CPU_INSTR_CPX: begin
+                alu_operand_a = debug_x;
+                alu_operand_b = data_latch;
+            end
+
+            CPU_INSTR_CPY: begin
+                alu_operand_a = debug_y;
+                alu_operand_b = data_latch;
+            end
+
+            CPU_INSTR_INX,
+            CPU_INSTR_DEX: alu_operand_a = debug_x;
+
+            CPU_INSTR_INY,
+            CPU_INSTR_DEY: alu_operand_a = debug_y;
+
+            CPU_INSTR_ASL,
+            CPU_INSTR_LSR,
+            CPU_INSTR_ROL,
+            CPU_INSTR_ROR: begin
+                if (debug_addressing_mode == CPU_ADDR_ACCUMULATOR) begin
+                    alu_operand_a = debug_a;
+                end
+            end
+
+            default: begin
+                // Memory INC/DEC and memory shifts use data_latch.
+            end
+        endcase
+
+        if (debug_decoded_instruction == CPU_INSTR_ADC ||
+            debug_decoded_instruction == CPU_INSTR_SBC ||
+            debug_decoded_instruction == CPU_INSTR_ROL ||
+            debug_decoded_instruction == CPU_INSTR_ROR) begin
+            alu_carry_in = debug_status.carry;
+        end
+    end
+
     // The synchronized platform reset has priority over cpu_enable. Outside
     // reset, every sequential CPU field changes only on a CPU enable pulse.
     always_ff @(posedge clk) begin
@@ -81,7 +175,7 @@ module cpu_core #(
             debug_y                   <= CPU_RESET_Y;
             debug_sp                  <= CPU_RESET_SP;
             debug_pc                  <= INITIAL_PC;
-            debug_status              <= cpu_status_normalize(CPU_RESET_STATUS);
+            debug_status              <= cpu_status_normalize(INITIAL_STATUS);
             debug_instruction         <= CPU_RESET_IR;
             debug_execution_state     <= CPU_STATE_RESET;
             debug_decoded_instruction <= CPU_INSTR_INVALID;
@@ -92,6 +186,10 @@ module cpu_core #(
             operand_bytes             <= 2'd0;
             instruction_is_load       <= 1'b0;
             instruction_is_store      <= 1'b0;
+            instruction_uses_alu      <= 1'b0;
+            instruction_is_compare    <= 1'b0;
+            instruction_is_rmw        <= 1'b0;
+            alu_operation             <= CPU_ALU_ADD;
             operand_low               <= 8'h00;
             operand_high              <= 8'h00;
             pointer_low               <= 8'h00;
@@ -118,6 +216,11 @@ module cpu_core #(
                     pointer_high           <= 8'h00;
                     pointer_data_valid     <= 1'b0;
                     data_latch             <= 8'h00;
+                    instruction_is_load    <= 1'b0;
+                    instruction_is_store   <= 1'b0;
+                    instruction_uses_alu   <= 1'b0;
+                    instruction_is_compare <= 1'b0;
+                    instruction_is_rmw     <= 1'b0;
                 end
 
                 CPU_STATE_DECODE: begin
@@ -126,11 +229,20 @@ module cpu_core #(
                     operand_bytes             <= decoded.operand_bytes;
                     instruction_is_load       <= decoded.is_load;
                     instruction_is_store      <= decoded.is_store;
+                    instruction_uses_alu      <= decoded.uses_alu;
+                    instruction_is_compare    <= decoded.is_compare;
+                    instruction_is_rmw        <= decoded.is_rmw;
+                    alu_operation             <= decoded.alu_operation;
 
                     if (!decoded.valid) begin
                         debug_execution_state <= CPU_STATE_TRAP;
                     end else if (decoded.is_transfer) begin
                         debug_execution_state <= CPU_STATE_TRANSFER;
+                    end else if (decoded.uses_alu &&
+                                 (decoded.addressing_mode == CPU_ADDR_IMPLIED ||
+                                  decoded.addressing_mode ==
+                                  CPU_ADDR_ACCUMULATOR)) begin
+                        debug_execution_state <= CPU_STATE_ALU_EXECUTE;
                     end else begin
                         debug_execution_state <= CPU_STATE_OPERAND_LOW;
                     end
@@ -156,7 +268,13 @@ module cpu_core #(
                     if (debug_addressing_mode == CPU_ADDR_IMMEDIATE) begin
                         if (address_response.immediate_valid) begin
                             data_latch <= address_response.immediate_value;
-                            debug_execution_state <= CPU_STATE_WRITEBACK;
+                            if (instruction_is_load) begin
+                                debug_execution_state <= CPU_STATE_WRITEBACK;
+                            end else if (instruction_uses_alu) begin
+                                debug_execution_state <= CPU_STATE_ALU_EXECUTE;
+                            end else begin
+                                debug_execution_state <= CPU_STATE_TRAP;
+                            end
                         end else begin
                             debug_execution_state <= CPU_STATE_TRAP;
                         end
@@ -172,7 +290,7 @@ module cpu_core #(
                             debug_page_cross <= address_response.page_cross;
                             debug_page_cross_valid <=
                                 address_response.page_cross_valid;
-                            if (instruction_is_load) begin
+                            if (instruction_is_load || instruction_uses_alu) begin
                                 debug_execution_state <= CPU_STATE_MEMORY_READ;
                             end else if (instruction_is_store) begin
                                 debug_execution_state <= CPU_STATE_MEMORY_WRITE;
@@ -188,7 +306,7 @@ module cpu_core #(
                         debug_page_cross <= address_response.page_cross;
                         debug_page_cross_valid <=
                             address_response.page_cross_valid;
-                        if (instruction_is_load) begin
+                        if (instruction_is_load || instruction_uses_alu) begin
                             debug_execution_state <= CPU_STATE_MEMORY_READ;
                         end else if (instruction_is_store) begin
                             debug_execution_state <= CPU_STATE_MEMORY_WRITE;
@@ -213,7 +331,13 @@ module cpu_core #(
 
                 CPU_STATE_MEMORY_READ: begin
                     data_latch             <= bus_read_data;
-                    debug_execution_state <= CPU_STATE_WRITEBACK;
+                    if (instruction_is_load) begin
+                        debug_execution_state <= CPU_STATE_WRITEBACK;
+                    end else if (instruction_uses_alu) begin
+                        debug_execution_state <= CPU_STATE_ALU_EXECUTE;
+                    end else begin
+                        debug_execution_state <= CPU_STATE_TRAP;
+                    end
                 end
 
                 CPU_STATE_MEMORY_WRITE: begin
@@ -278,6 +402,94 @@ module cpu_core #(
                     debug_execution_state <= CPU_STATE_FETCH;
                 end
 
+                CPU_STATE_ALU_EXECUTE: begin
+                    // Apply only the flags explicitly owned by this ALU
+                    // operation. In particular CMP has no result writeback
+                    // and logic/shift operations preserve V as advertised.
+                    if (alu_n_valid) begin
+                        debug_status.negative <= alu_negative;
+                    end
+                    if (alu_v_valid) begin
+                        debug_status.overflow <= alu_overflow;
+                    end
+                    if (alu_z_valid) begin
+                        debug_status.zero <= alu_zero;
+                    end
+                    if (alu_c_valid) begin
+                        debug_status.carry <= alu_carry;
+                    end
+
+                    if (instruction_is_compare) begin
+                        if (alu_n_valid && alu_z_valid && alu_c_valid &&
+                            !alu_v_valid) begin
+                            debug_execution_state <= CPU_STATE_FETCH;
+                        end else begin
+                            debug_execution_state <= CPU_STATE_TRAP;
+                        end
+                    end else if (!alu_result_valid) begin
+                        debug_execution_state <= CPU_STATE_TRAP;
+                    end else begin
+                        case (debug_decoded_instruction)
+                            CPU_INSTR_ADC,
+                            CPU_INSTR_SBC,
+                            CPU_INSTR_AND,
+                            CPU_INSTR_ORA,
+                            CPU_INSTR_EOR: begin
+                                debug_a <= alu_result;
+                                debug_execution_state <= CPU_STATE_FETCH;
+                            end
+
+                            CPU_INSTR_INX,
+                            CPU_INSTR_DEX: begin
+                                debug_x <= alu_result;
+                                debug_execution_state <= CPU_STATE_FETCH;
+                            end
+
+                            CPU_INSTR_INY,
+                            CPU_INSTR_DEY: begin
+                                debug_y <= alu_result;
+                                debug_execution_state <= CPU_STATE_FETCH;
+                            end
+
+                            CPU_INSTR_INC,
+                            CPU_INSTR_DEC: begin
+                                if (instruction_is_rmw) begin
+                                    data_latch <= alu_result;
+                                    debug_execution_state <= CPU_STATE_RMW_WRITE;
+                                end else begin
+                                    debug_execution_state <= CPU_STATE_TRAP;
+                                end
+                            end
+
+                            CPU_INSTR_ASL,
+                            CPU_INSTR_LSR,
+                            CPU_INSTR_ROL,
+                            CPU_INSTR_ROR: begin
+                                if (debug_addressing_mode ==
+                                    CPU_ADDR_ACCUMULATOR) begin
+                                    debug_a <= alu_result;
+                                    debug_execution_state <= CPU_STATE_FETCH;
+                                end else if (instruction_is_rmw) begin
+                                    data_latch <= alu_result;
+                                    debug_execution_state <= CPU_STATE_RMW_WRITE;
+                                end else begin
+                                    debug_execution_state <= CPU_STATE_TRAP;
+                                end
+                            end
+
+                            default: begin
+                                debug_execution_state <= CPU_STATE_TRAP;
+                            end
+                        endcase
+                    end
+                end
+
+                CPU_STATE_RMW_WRITE: begin
+                    // The transformed value is committed exactly once by the
+                    // external bus consumer on this enabled edge.
+                    debug_execution_state <= CPU_STATE_FETCH;
+                end
+
                 CPU_STATE_TRAP: begin
                     // Unsupported opcode: safely halt until reset.
                     debug_execution_state <= CPU_STATE_TRAP;
@@ -292,7 +504,8 @@ module cpu_core #(
     end
 
     // A bus cycle remains active between CPU enable pulses. The consumer must
-    // commit a write once, on the enabled edge that completes MEMORY_WRITE.
+    // commit a write once, on the enabled edge that completes MEMORY_WRITE or
+    // RMW_WRITE.
     always_comb begin
         bus_address      = debug_pc;
         bus_write_data   = 8'h00;
@@ -339,6 +552,13 @@ module cpu_core #(
                             bus_valid        = 1'b0;
                         end
                     endcase
+                end
+
+                CPU_STATE_RMW_WRITE: begin
+                    bus_address      = debug_effective_address;
+                    bus_write_data   = data_latch;
+                    bus_write_enable = 1'b1;
+                    bus_valid        = 1'b1;
                 end
 
                 default: begin

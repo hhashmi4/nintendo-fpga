@@ -4,8 +4,9 @@ FPGA-based Nintendo Entertainment System project targeting the Terasic
 DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
 platform foundation, the Phase 2A CPU architectural shell, and the Phase 2B
 reusable ALU, the Phase 2C address generator, and the Phase 2D load/store/
-transfer execution subset. No complete CPU instruction set, PPU, APU, mapper,
-controller, or game-execution logic exists yet.
+transfer execution subset, plus the Phase 2E arithmetic/logic subset. No
+complete CPU instruction set, PPU, APU, mapper, controller, or game-execution
+logic exists yet.
 
 ## Phase 1 foundation
 
@@ -66,6 +67,18 @@ The execution lifecycle, opcode matrix, current functional cycle counts, and
 remaining CPU work are documented in
 [`docs/cpu-phase2d-load-store-transfer.md`](docs/cpu-phase2d-load-store-transfer.md).
 
+## Phase 2E CPU arithmetic and logic
+
+- Official ADC, SBC, AND, ORA, EOR, CMP, CPX, CPY, INC/DEC, and shift/rotate opcodes
+- Verified Phase 2B ALU reused for results and per-flag validity
+- Accumulator, register, memory-source, and explicit memory RMW paths
+- 516 directed RTL vectors across all 86 new opcodes/addressing combinations
+- 2,048 deterministic randomized ADC/SBC instruction executions in Python
+
+The opcode matrix, ALU integration, RMW architecture, current cycle scaffold,
+and exact coverage are documented in
+[`docs/cpu-phase2e-arithmetic-logic.md`](docs/cpu-phase2e-arithmetic-logic.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -99,9 +112,10 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-ALU, address-generator, and Phase 2D instruction simulations. Waveforms are written under
+ALU, address-generator, Phase 2D, and Phase 2E instruction simulations. Waveforms are written under
 `build/sim`, including `platform_foundation.fst`, `cpu_phase2a.fst`,
-`cpu_alu.fst`, `cpu_address_gen.fst`, and `cpu_phase2d.fst`.
+`cpu_alu.fst`, `cpu_address_gen.fst`, `cpu_phase2d.fst`, and
+`cpu_phase2e.fst`.
 
 Individual checks are also available:
 
@@ -135,7 +149,7 @@ before use.
 
 - `rtl/platform` — clock, reset, and NES timing-enable foundation
 - `rtl/diagnostic` — removable hardware diagnostic
-- `rtl/cpu` — CPU state, ALU, addressing, decoder, and Phase 2D sequencer
+- `rtl/cpu` — CPU state, ALU, addressing, decoder, and Phase 2D/2E sequencer
 - `rtl/ppu`, `rtl/apu` — reserved for later phases
 - `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
 - `sim` — self-checking SystemVerilog testbenches
