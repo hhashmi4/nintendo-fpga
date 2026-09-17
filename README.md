@@ -2,11 +2,11 @@
 
 FPGA-based Nintendo Entertainment System project targeting the Terasic
 DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
-platform foundation, the Phase 2A CPU architectural shell, and the Phase 2B
-reusable ALU, the Phase 2C address generator, and the Phase 2D load/store/
-transfer execution subset, plus the Phase 2E arithmetic/logic subset. No
-complete CPU instruction set, PPU, APU, mapper, controller, or game-execution
-logic exists yet.
+platform foundation, the Phase 2A CPU architectural shell, the Phase 2B
+reusable ALU, the Phase 2C address generator, the Phase 2D load/store/transfer
+subset, the Phase 2E arithmetic/logic subset, and the Phase 2F control-flow/
+stack subset. No complete CPU instruction set, PPU, APU, mapper, controller,
+or game-execution logic exists yet.
 
 ## Phase 1 foundation
 
@@ -79,6 +79,18 @@ The opcode matrix, ALU integration, RMW architecture, current cycle scaffold,
 and exact coverage are documented in
 [`docs/cpu-phase2e-arithmetic-logic.md`](docs/cpu-phase2e-arithmetic-logic.md).
 
+## Phase 2F CPU control flow and stack
+
+- Official JMP, JSR, RTS, eight conditional branches, PHA, PLA, PHP, and PLP
+- Explicit page-1 stack bus cycles with wrapping 8-bit SP behavior
+- Phase 2C relative targets and NMOS indirect-JMP pointer wrapping reused
+- Nonpersistent B and forced-U internal status policy with PHP synthesis
+- 241 directed RTL vectors, 10 enable-stall checks, and deterministic random tests
+
+The PC-redirection paths, stack contract, status representation, step counts,
+and exact coverage are documented in
+[`docs/cpu-phase2f-control-stack.md`](docs/cpu-phase2f-control-stack.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -112,10 +124,10 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-ALU, address-generator, Phase 2D, and Phase 2E instruction simulations. Waveforms are written under
-`build/sim`, including `platform_foundation.fst`, `cpu_phase2a.fst`,
-`cpu_alu.fst`, `cpu_address_gen.fst`, `cpu_phase2d.fst`, and
-`cpu_phase2e.fst`.
+ALU, address-generator, and Phase 2D through Phase 2F instruction simulations.
+Waveforms are written under `build/sim`, including `platform_foundation.fst`,
+`cpu_phase2a.fst`, `cpu_alu.fst`, `cpu_address_gen.fst`, `cpu_phase2d.fst`,
+`cpu_phase2e.fst`, and `cpu_phase2f.fst`.
 
 Individual checks are also available:
 
@@ -126,6 +138,12 @@ python -m pytest -v
 ```
 
 ## Quartus and hardware
+
+Run standalone CPU analysis and synthesis without changing the board top:
+
+```bash
+./scripts/build_cpu_quartus.sh
+```
 
 Build the SOF and RBF locally:
 

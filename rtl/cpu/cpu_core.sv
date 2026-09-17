@@ -36,8 +36,8 @@ module cpu_core #(
 
     cpu_decode_result_t   decoded;
     cpu_address_request_t address_request;
-    // The shared Phase 2C result also carries branch and indirect-JMP metadata
-    // that this deliberately limited instruction subset cannot consume.
+    // Mode-specific result fields that are not relevant to the execution
+    // path in use remain intentionally unconsumed.
     /* verilator lint_off UNUSEDSIGNAL */
     cpu_address_result_t address_response;
     /* verilator lint_on UNUSEDSIGNAL */
@@ -54,6 +54,9 @@ module cpu_core #(
     logic [7:0] pointer_high;
     logic       pointer_data_valid;
     logic [7:0] data_latch;
+    logic [15:0] return_address;
+    logic [7:0]  rts_low_byte;
+    logic        branch_taken;
 
     cpu_alu_operation_t alu_operation;
     logic [7:0] alu_operand_a;
@@ -100,13 +103,36 @@ module cpu_core #(
     always_comb begin
         address_request                    = '0;
         address_request.addressing_mode    = debug_addressing_mode;
-        address_request.base_address       = {operand_high, operand_low};
+        if (debug_addressing_mode == CPU_ADDR_RELATIVE) begin
+            // The caller explicitly supplies the PC after the displacement
+            // byte has been consumed, matching the Phase 2C contract.
+            address_request.base_address = debug_pc;
+        end else begin
+            address_request.base_address = {operand_high, operand_low};
+        end
         address_request.operand_byte       = operand_low;
         address_request.x_index            = debug_x;
         address_request.y_index            = debug_y;
         address_request.pointer_low_byte   = pointer_low;
         address_request.pointer_high_byte  = pointer_high;
         address_request.pointer_data_valid = pointer_data_valid;
+    end
+
+    always_comb begin
+        branch_taken = 1'b0;
+        case (debug_decoded_instruction)
+            CPU_INSTR_BCC: branch_taken = !debug_status.carry;
+            CPU_INSTR_BCS: branch_taken = debug_status.carry;
+            CPU_INSTR_BEQ: branch_taken = debug_status.zero;
+            CPU_INSTR_BMI: branch_taken = debug_status.negative;
+            CPU_INSTR_BNE: branch_taken = !debug_status.zero;
+            CPU_INSTR_BPL: branch_taken = !debug_status.negative;
+            CPU_INSTR_BVC: branch_taken = !debug_status.overflow;
+            CPU_INSTR_BVS: branch_taken = debug_status.overflow;
+            default: begin
+                // Non-branch instructions never redirect in BRANCH_DECIDE.
+            end
+        endcase
     end
 
     // Operand routing is instruction-class based. The ALU remains the only
@@ -196,6 +222,8 @@ module cpu_core #(
             pointer_high              <= 8'h00;
             pointer_data_valid        <= 1'b0;
             data_latch                <= 8'h00;
+            return_address            <= 16'h0000;
+            rts_low_byte              <= 8'h00;
         end else if (cpu_enable) begin
             case (debug_execution_state)
                 CPU_STATE_RESET: begin
@@ -216,6 +244,8 @@ module cpu_core #(
                     pointer_high           <= 8'h00;
                     pointer_data_valid     <= 1'b0;
                     data_latch             <= 8'h00;
+                    return_address         <= 16'h0000;
+                    rts_low_byte           <= 8'h00;
                     instruction_is_load    <= 1'b0;
                     instruction_is_store   <= 1'b0;
                     instruction_uses_alu   <= 1'b0;
@@ -238,6 +268,25 @@ module cpu_core #(
                         debug_execution_state <= CPU_STATE_TRAP;
                     end else if (decoded.is_transfer) begin
                         debug_execution_state <= CPU_STATE_TRANSFER;
+                    end else if (decoded.is_stack) begin
+                        case (decoded.instruction)
+                            CPU_INSTR_PHA,
+                            CPU_INSTR_PHP:
+                                debug_execution_state <= CPU_STATE_STACK_PUSH;
+
+                            CPU_INSTR_PLA,
+                            CPU_INSTR_PLP:
+                                debug_execution_state <= CPU_STATE_STACK_PULL;
+
+                            default:
+                                debug_execution_state <= CPU_STATE_TRAP;
+                        endcase
+                    end else if (decoded.is_jump || decoded.is_branch) begin
+                        if (decoded.instruction == CPU_INSTR_RTS) begin
+                            debug_execution_state <= CPU_STATE_RTS_PULL;
+                        end else begin
+                            debug_execution_state <= CPU_STATE_OPERAND_LOW;
+                        end
                     end else if (decoded.uses_alu &&
                                  (decoded.addressing_mode == CPU_ADDR_IMPLIED ||
                                   decoded.addressing_mode ==
@@ -278,7 +327,19 @@ module cpu_core #(
                         end else begin
                             debug_execution_state <= CPU_STATE_TRAP;
                         end
+                    end else if (debug_addressing_mode == CPU_ADDR_RELATIVE) begin
+                        if (address_response.branch_target_valid &&
+                            address_response.page_cross_valid) begin
+                            debug_effective_address <=
+                                address_response.branch_target;
+                            debug_page_cross <= address_response.page_cross;
+                            debug_page_cross_valid <= 1'b1;
+                            debug_execution_state <= CPU_STATE_BRANCH_DECIDE;
+                        end else begin
+                            debug_execution_state <= CPU_STATE_TRAP;
+                        end
                     end else if (
+                        debug_addressing_mode == CPU_ADDR_INDIRECT ||
                         debug_addressing_mode == CPU_ADDR_INDEXED_INDIRECT_X ||
                         debug_addressing_mode == CPU_ADDR_INDIRECT_INDEXED_Y
                     ) begin
@@ -290,7 +351,11 @@ module cpu_core #(
                             debug_page_cross <= address_response.page_cross;
                             debug_page_cross_valid <=
                                 address_response.page_cross_valid;
-                            if (instruction_is_load || instruction_uses_alu) begin
+                            if (debug_decoded_instruction == CPU_INSTR_JMP) begin
+                                debug_pc <= address_response.effective_address;
+                                debug_execution_state <= CPU_STATE_FETCH;
+                            end else if (instruction_is_load ||
+                                         instruction_uses_alu) begin
                                 debug_execution_state <= CPU_STATE_MEMORY_READ;
                             end else if (instruction_is_store) begin
                                 debug_execution_state <= CPU_STATE_MEMORY_WRITE;
@@ -306,7 +371,17 @@ module cpu_core #(
                         debug_page_cross <= address_response.page_cross;
                         debug_page_cross_valid <=
                             address_response.page_cross_valid;
-                        if (instruction_is_load || instruction_uses_alu) begin
+                        if (debug_decoded_instruction == CPU_INSTR_JMP) begin
+                            debug_pc <= address_response.effective_address;
+                            debug_execution_state <= CPU_STATE_FETCH;
+                        end else if (debug_decoded_instruction == CPU_INSTR_JSR) begin
+                            // After both target bytes have been consumed, PC
+                            // points one beyond JSR. NMOS 6502 JSR stacks the
+                            // address of the high operand byte (PC - 1).
+                            return_address <= debug_pc - 16'd1;
+                            debug_execution_state <= CPU_STATE_JSR_PUSH_HIGH;
+                        end else if (instruction_is_load ||
+                                     instruction_uses_alu) begin
                             debug_execution_state <= CPU_STATE_MEMORY_READ;
                         end else if (instruction_is_store) begin
                             debug_execution_state <= CPU_STATE_MEMORY_WRITE;
@@ -490,6 +565,82 @@ module cpu_core #(
                     debug_execution_state <= CPU_STATE_FETCH;
                 end
 
+                CPU_STATE_BRANCH_DECIDE: begin
+                    if (branch_taken) begin
+                        debug_pc <= debug_effective_address;
+                    end
+                    debug_execution_state <= CPU_STATE_FETCH;
+                end
+
+                CPU_STATE_STACK_PUSH: begin
+                    // PHA/PHP write at the current S, then decrement it.
+                    debug_sp <= debug_sp - 8'd1;
+                    debug_execution_state <= CPU_STATE_FETCH;
+                end
+
+                CPU_STATE_STACK_PULL: begin
+                    // PLA/PLP pre-increment S before presenting the read.
+                    debug_sp <= debug_sp + 8'd1;
+                    debug_execution_state <= CPU_STATE_STACK_READ;
+                end
+
+                CPU_STATE_STACK_READ: begin
+                    case (debug_decoded_instruction)
+                        CPU_INSTR_PLA: begin
+                            debug_a               <= bus_read_data;
+                            debug_status.negative <= bus_read_data[7];
+                            debug_status.zero     <= (bus_read_data == 8'h00);
+                            debug_execution_state <= CPU_STATE_FETCH;
+                        end
+
+                        CPU_INSTR_PLP: begin
+                            // B is discarded and U is forced high; the six
+                            // physical status fields come from the stack.
+                            debug_status <= cpu_status_normalize(bus_read_data);
+                            debug_execution_state <= CPU_STATE_FETCH;
+                        end
+
+                        default: debug_execution_state <= CPU_STATE_TRAP;
+                    endcase
+                end
+
+                CPU_STATE_JSR_PUSH_HIGH: begin
+                    // The stack receives return high first, then S decrements.
+                    debug_sp <= debug_sp - 8'd1;
+                    debug_execution_state <= CPU_STATE_JSR_PUSH_LOW;
+                end
+
+                CPU_STATE_JSR_PUSH_LOW: begin
+                    debug_sp <= debug_sp - 8'd1;
+                    debug_pc <= debug_effective_address;
+                    debug_execution_state <= CPU_STATE_FETCH;
+                end
+
+                CPU_STATE_RTS_PULL: begin
+                    // First pull pre-increments S, exactly like PLA/PLP.
+                    debug_sp <= debug_sp + 8'd1;
+                    debug_execution_state <= CPU_STATE_RTS_PULL_LOW;
+                end
+
+                CPU_STATE_RTS_PULL_LOW: begin
+                    rts_low_byte <= bus_read_data;
+                    // Prepare S for the following high-byte pull.
+                    debug_sp <= debug_sp + 8'd1;
+                    debug_execution_state <= CPU_STATE_RTS_PULL_HIGH;
+                end
+
+                CPU_STATE_RTS_PULL_HIGH: begin
+                    operand_high <= bus_read_data;
+                    debug_execution_state <= CPU_STATE_RTS_COMPLETE;
+                end
+
+                CPU_STATE_RTS_COMPLETE: begin
+                    // JSR stored the address of its last operand; RTS adds one
+                    // after rebuilding the 16-bit return address.
+                    debug_pc <= {operand_high, rts_low_byte} + 16'd1;
+                    debug_execution_state <= CPU_STATE_FETCH;
+                end
+
                 CPU_STATE_TRAP: begin
                     // Unsupported opcode: safely halt until reset.
                     debug_execution_state <= CPU_STATE_TRAP;
@@ -557,6 +708,43 @@ module cpu_core #(
                 CPU_STATE_RMW_WRITE: begin
                     bus_address      = debug_effective_address;
                     bus_write_data   = data_latch;
+                    bus_write_enable = 1'b1;
+                    bus_valid        = 1'b1;
+                end
+
+                CPU_STATE_STACK_PUSH: begin
+                    bus_address      = {8'h01, debug_sp};
+                    bus_write_enable = 1'b1;
+                    bus_valid        = 1'b1;
+                    case (debug_decoded_instruction)
+                        CPU_INSTR_PHA: bus_write_data = debug_a;
+                        CPU_INSTR_PHP:
+                            bus_write_data = cpu_status_for_php(debug_status);
+                        default: begin
+                            bus_write_data   = 8'h00;
+                            bus_write_enable = 1'b0;
+                            bus_valid        = 1'b0;
+                        end
+                    endcase
+                end
+
+                CPU_STATE_STACK_READ,
+                CPU_STATE_RTS_PULL_LOW,
+                CPU_STATE_RTS_PULL_HIGH: begin
+                    bus_address = {8'h01, debug_sp};
+                    bus_valid   = 1'b1;
+                end
+
+                CPU_STATE_JSR_PUSH_HIGH: begin
+                    bus_address      = {8'h01, debug_sp};
+                    bus_write_data   = return_address[15:8];
+                    bus_write_enable = 1'b1;
+                    bus_valid        = 1'b1;
+                end
+
+                CPU_STATE_JSR_PUSH_LOW: begin
+                    bus_address      = {8'h01, debug_sp};
+                    bus_write_data   = return_address[7:0];
                     bus_write_enable = 1'b1;
                     bus_valid        = 1'b1;
                 end

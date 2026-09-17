@@ -161,7 +161,9 @@ module cpu_phase2e_tb;
     logic trace_write_enable [0:7];
     int unsigned trace_count = 0;
     int unsigned alu_observation_count = 0;
-    int unsigned instruction_vector_count [0:30];
+    // The shared instruction enum now extends through Phase 2F; this Phase 2E
+    // regression still accumulates only IDs through ROR.
+    int unsigned instruction_vector_count [0:45];
 
     cpu_alu_operation_t expected_alu_operation;
     logic [7:0] expected_alu_operand_a;
