@@ -3,8 +3,9 @@
 FPGA-based Nintendo Entertainment System project targeting the Terasic
 DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
 platform foundation, the Phase 2A CPU architectural shell, and the Phase 2B
-reusable ALU, plus the Phase 2C address generator. No CPU instruction set,
-PPU, APU, mapper, controller, or game-execution logic exists yet.
+reusable ALU, the Phase 2C address generator, and the Phase 2D load/store/
+transfer execution subset. No complete CPU instruction set, PPU, APU, mapper,
+controller, or game-execution logic exists yet.
 
 ## Phase 1 foundation
 
@@ -52,6 +53,19 @@ The interface, wrap rules, bus-sequencing boundary, and exact coverage are
 documented in
 [`docs/cpu-phase2c-addressing.md`](docs/cpu-phase2c-addressing.md).
 
+## Phase 2D CPU execution subset
+
+- Official LDA, LDX, LDY, STA, STX, STY, and register-transfer opcodes
+- Explicit fetch, decode, operand, pointer, memory, and writeback states
+- Existing Phase 2C address generator reused for every effective address
+- Deterministic unsupported-opcode trap with no bus or architectural effects
+- Generic 64 KiB simulation memory and exact bus-trace verification
+- 222 directed RTL vectors covering all 37 opcodes with six boundary values
+
+The execution lifecycle, opcode matrix, current functional cycle counts, and
+remaining CPU work are documented in
+[`docs/cpu-phase2d-load-store-transfer.md`](docs/cpu-phase2d-load-store-transfer.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -85,9 +99,9 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-ALU, and address-generator simulations. Waveforms are written under
+ALU, address-generator, and Phase 2D instruction simulations. Waveforms are written under
 `build/sim`, including `platform_foundation.fst`, `cpu_phase2a.fst`,
-`cpu_alu.fst`, and `cpu_address_gen.fst`.
+`cpu_alu.fst`, `cpu_address_gen.fst`, and `cpu_phase2d.fst`.
 
 Individual checks are also available:
 
@@ -121,7 +135,7 @@ before use.
 
 - `rtl/platform` — clock, reset, and NES timing-enable foundation
 - `rtl/diagnostic` — removable hardware diagnostic
-- `rtl/cpu` — Phase 2A state, Phase 2B ALU, and Phase 2C addressing blocks
+- `rtl/cpu` — CPU state, ALU, addressing, decoder, and Phase 2D sequencer
 - `rtl/ppu`, `rtl/apu` — reserved for later phases
 - `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
 - `sim` — self-checking SystemVerilog testbenches

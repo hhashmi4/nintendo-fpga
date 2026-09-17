@@ -37,16 +37,39 @@ package cpu_pkg;
             (value | CPU_STATUS_UNUSED_MASK) & ~CPU_STATUS_BREAK_MASK;
     endfunction
 
-    // Only RESET and FETCH are active in Phase 2A. The remaining encodings
-    // reserve clean boundaries for later instruction-engine phases.
-    typedef enum logic [2:0] {
-        CPU_STATE_RESET     = 3'd0,
-        CPU_STATE_FETCH     = 3'd1,
-        CPU_STATE_DECODE    = 3'd2,
-        CPU_STATE_EXECUTE   = 3'd3,
-        CPU_STATE_MEMORY    = 3'd4,
-        CPU_STATE_WRITEBACK = 3'd5
+    // Phase 2D uses explicit micro-operation boundaries. Each state advances
+    // only on cpu_enable; bus states remain stable between enable pulses.
+    typedef enum logic [3:0] {
+        CPU_STATE_RESET        = 4'd0,
+        CPU_STATE_FETCH        = 4'd1,
+        CPU_STATE_DECODE       = 4'd2,
+        CPU_STATE_OPERAND_LOW  = 4'd3,
+        CPU_STATE_OPERAND_HIGH = 4'd4,
+        CPU_STATE_ADDRESS      = 4'd5,
+        CPU_STATE_POINTER_LOW  = 4'd6,
+        CPU_STATE_POINTER_HIGH = 4'd7,
+        CPU_STATE_MEMORY_READ  = 4'd8,
+        CPU_STATE_MEMORY_WRITE = 4'd9,
+        CPU_STATE_WRITEBACK    = 4'd10,
+        CPU_STATE_TRANSFER     = 4'd11,
+        CPU_STATE_TRAP         = 4'd12
     } cpu_execution_state_t;
+
+    typedef enum logic [3:0] {
+        CPU_INSTR_INVALID = 4'd0,
+        CPU_INSTR_LDA     = 4'd1,
+        CPU_INSTR_LDX     = 4'd2,
+        CPU_INSTR_LDY     = 4'd3,
+        CPU_INSTR_STA     = 4'd4,
+        CPU_INSTR_STX     = 4'd5,
+        CPU_INSTR_STY     = 4'd6,
+        CPU_INSTR_TAX     = 4'd7,
+        CPU_INSTR_TAY     = 4'd8,
+        CPU_INSTR_TXA     = 4'd9,
+        CPU_INSTR_TYA     = 4'd10,
+        CPU_INSTR_TSX     = 4'd11,
+        CPU_INSTR_TXS     = 4'd12
+    } cpu_instruction_t;
 
     typedef enum logic [3:0] {
         CPU_ALU_ADD = 4'd0,
@@ -110,4 +133,14 @@ package cpu_pkg;
         logic        mode_valid;
         logic        result_valid;
     } cpu_address_result_t;
+
+    typedef struct packed {
+        cpu_instruction_t instruction;
+        logic [3:0]       addressing_mode;
+        logic [1:0]       operand_bytes;
+        logic             is_load;
+        logic             is_store;
+        logic             is_transfer;
+        logic             valid;
+    } cpu_decode_result_t;
 endpackage

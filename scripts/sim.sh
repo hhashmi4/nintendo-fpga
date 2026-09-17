@@ -9,17 +9,20 @@ mkdir -p \
     build/verilator/platform \
     build/verilator/cpu \
     build/verilator/alu \
-    build/verilator/address
+    build/verilator/address \
+    build/verilator/cpu_phase2d
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
+CPU_PHASE2D_WAVEFORM="build/sim/cpu_phase2d.fst"
 rm -f \
     "$PLATFORM_WAVEFORM" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
-    "$ADDRESS_WAVEFORM"
+    "$ADDRESS_WAVEFORM" \
+    "$CPU_PHASE2D_WAVEFORM"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -47,6 +50,8 @@ fi
 
 CPU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_decoder.sv
+    rtl/cpu/cpu_address_gen.sv
     rtl/cpu/cpu_core.sv
 )
 
@@ -107,7 +112,31 @@ if [[ ! -s "$ADDRESS_WAVEFORM" ]]; then
     exit 1
 fi
 
+PHASE2D_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_decoder.sv
+    rtl/cpu/cpu_address_gen.sv
+    rtl/cpu/cpu_core.sv
+)
+
+verilator --binary --timing --trace-fst --Wall -Wno-fatal \
+    --assert \
+    --Mdir build/verilator/cpu_phase2d \
+    --top-module cpu_phase2d_tb \
+    -o cpu_phase2d_tb \
+    "${PHASE2D_RTL_FILES[@]}" \
+    sim/cpu_test_memory.sv \
+    sim/cpu_phase2d_tb.sv
+
+build/verilator/cpu_phase2d/cpu_phase2d_tb
+
+if [[ ! -s "$CPU_PHASE2D_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $CPU_PHASE2D_WAVEFORM" >&2
+    exit 1
+fi
+
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"
+echo "Phase 2D waveform: $ROOT_DIR/$CPU_PHASE2D_WAVEFORM"

@@ -1,4 +1,4 @@
-"""Independent reference models for the Phase 2A, 2B, and 2C CPU blocks."""
+"""Independent reference models for the Phase 2A through 2D CPU blocks."""
 
 from dataclasses import dataclass, replace
 from enum import IntEnum
@@ -14,14 +14,21 @@ RESET_INSTRUCTION = 0x00
 
 
 class ExecutionState(IntEnum):
-    """Reserved execution-state encodings shared with the Phase 2A RTL."""
+    """Execution-state encodings shared with the evolving CPU RTL."""
 
     RESET = 0
     FETCH = 1
     DECODE = 2
-    EXECUTE = 3
-    MEMORY = 4
-    WRITEBACK = 5
+    OPERAND_LOW = 3
+    OPERAND_HIGH = 4
+    ADDRESS = 5
+    POINTER_LOW = 6
+    POINTER_HIGH = 7
+    MEMORY_READ = 8
+    MEMORY_WRITE = 9
+    WRITEBACK = 10
+    TRANSFER = 11
+    TRAP = 12
 
 
 class AluOperation(IntEnum):
@@ -73,6 +80,94 @@ class AddressingMode(IntEnum):
     INDEXED_INDIRECT_X = 10
     INDIRECT_INDEXED_Y = 11
     RELATIVE = 12
+
+
+class Instruction(IntEnum):
+    """Instruction identifiers implemented by the Phase 2D decoder."""
+
+    INVALID = 0
+    LDA = 1
+    LDX = 2
+    LDY = 3
+    STA = 4
+    STX = 5
+    STY = 6
+    TAX = 7
+    TAY = 8
+    TXA = 9
+    TYA = 10
+    TSX = 11
+    TXS = 12
+
+
+@dataclass(frozen=True)
+class OpcodeSpec:
+    """Architectural decode information, independent of RTL sequencing."""
+
+    instruction: Instruction
+    addressing_mode: AddressingMode
+    operand_bytes: int
+
+
+def _opcode(
+    instruction: Instruction,
+    addressing_mode: AddressingMode,
+) -> OpcodeSpec:
+    if addressing_mode is AddressingMode.IMPLIED:
+        operand_bytes = 0
+    elif addressing_mode in (
+        AddressingMode.ABSOLUTE,
+        AddressingMode.ABSOLUTE_X,
+        AddressingMode.ABSOLUTE_Y,
+    ):
+        operand_bytes = 2
+    else:
+        operand_bytes = 1
+    return OpcodeSpec(instruction, addressing_mode, operand_bytes)
+
+
+OPCODE_TABLE = {
+    # Loads
+    0xA9: _opcode(Instruction.LDA, AddressingMode.IMMEDIATE),
+    0xA5: _opcode(Instruction.LDA, AddressingMode.ZERO_PAGE),
+    0xB5: _opcode(Instruction.LDA, AddressingMode.ZERO_PAGE_X),
+    0xAD: _opcode(Instruction.LDA, AddressingMode.ABSOLUTE),
+    0xBD: _opcode(Instruction.LDA, AddressingMode.ABSOLUTE_X),
+    0xB9: _opcode(Instruction.LDA, AddressingMode.ABSOLUTE_Y),
+    0xA1: _opcode(Instruction.LDA, AddressingMode.INDEXED_INDIRECT_X),
+    0xB1: _opcode(Instruction.LDA, AddressingMode.INDIRECT_INDEXED_Y),
+    0xA2: _opcode(Instruction.LDX, AddressingMode.IMMEDIATE),
+    0xA6: _opcode(Instruction.LDX, AddressingMode.ZERO_PAGE),
+    0xB6: _opcode(Instruction.LDX, AddressingMode.ZERO_PAGE_Y),
+    0xAE: _opcode(Instruction.LDX, AddressingMode.ABSOLUTE),
+    0xBE: _opcode(Instruction.LDX, AddressingMode.ABSOLUTE_Y),
+    0xA0: _opcode(Instruction.LDY, AddressingMode.IMMEDIATE),
+    0xA4: _opcode(Instruction.LDY, AddressingMode.ZERO_PAGE),
+    0xB4: _opcode(Instruction.LDY, AddressingMode.ZERO_PAGE_X),
+    0xAC: _opcode(Instruction.LDY, AddressingMode.ABSOLUTE),
+    0xBC: _opcode(Instruction.LDY, AddressingMode.ABSOLUTE_X),
+    # Stores
+    0x85: _opcode(Instruction.STA, AddressingMode.ZERO_PAGE),
+    0x95: _opcode(Instruction.STA, AddressingMode.ZERO_PAGE_X),
+    0x8D: _opcode(Instruction.STA, AddressingMode.ABSOLUTE),
+    0x9D: _opcode(Instruction.STA, AddressingMode.ABSOLUTE_X),
+    0x99: _opcode(Instruction.STA, AddressingMode.ABSOLUTE_Y),
+    0x81: _opcode(Instruction.STA, AddressingMode.INDEXED_INDIRECT_X),
+    0x91: _opcode(Instruction.STA, AddressingMode.INDIRECT_INDEXED_Y),
+    0x86: _opcode(Instruction.STX, AddressingMode.ZERO_PAGE),
+    0x96: _opcode(Instruction.STX, AddressingMode.ZERO_PAGE_Y),
+    0x8E: _opcode(Instruction.STX, AddressingMode.ABSOLUTE),
+    0x84: _opcode(Instruction.STY, AddressingMode.ZERO_PAGE),
+    0x94: _opcode(Instruction.STY, AddressingMode.ZERO_PAGE_X),
+    0x8C: _opcode(Instruction.STY, AddressingMode.ABSOLUTE),
+    # Transfers
+    0xAA: _opcode(Instruction.TAX, AddressingMode.IMPLIED),
+    0xA8: _opcode(Instruction.TAY, AddressingMode.IMPLIED),
+    0x8A: _opcode(Instruction.TXA, AddressingMode.IMPLIED),
+    0x98: _opcode(Instruction.TYA, AddressingMode.IMPLIED),
+    0xBA: _opcode(Instruction.TSX, AddressingMode.IMPLIED),
+    0x9A: _opcode(Instruction.TXS, AddressingMode.IMPLIED),
+}
 
 
 @dataclass(frozen=True)
@@ -235,6 +330,174 @@ def generate_address(
         page_cross_valid=True,
         result_valid=True,
     )
+
+
+class CpuPhase2DModel:
+    """Functional load/store/transfer model without RTL microcycle mimicry."""
+
+    def __init__(self, *, initial_pc: int = RESET_PC) -> None:
+        if not 0 <= initial_pc <= 0xFFFF:
+            raise ValueError("initial_pc must be a 16-bit value")
+        self.a = RESET_A
+        self.x = RESET_X
+        self.y = RESET_Y
+        self.sp = RESET_SP
+        self.pc = initial_pc
+        self.status = RESET_STATUS
+        self.instruction = RESET_INSTRUCTION
+        self.memory = bytearray(0x10000)
+        self.writes: list[tuple[int, int]] = []
+        self.unsupported = False
+        self.last_effective_address = 0
+        self.last_page_cross = False
+        self.last_page_cross_valid = False
+
+    def load_program(self, address: int, data: bytes | list[int]) -> None:
+        """Place bytes in generic test memory without changing the PC."""
+
+        for offset, value in enumerate(data):
+            self.memory[(address + offset) & 0xFFFF] = value
+
+    def _read(self, address: int) -> int:
+        return self.memory[address & 0xFFFF]
+
+    def _write(self, address: int, value: int) -> None:
+        wrapped_address = address & 0xFFFF
+        wrapped_value = value & 0xFF
+        self.memory[wrapped_address] = wrapped_value
+        self.writes.append((wrapped_address, wrapped_value))
+
+    def _fetch_byte(self) -> int:
+        value = self._read(self.pc)
+        self.pc = (self.pc + 1) & 0xFFFF
+        return value
+
+    def _update_nz(self, value: int) -> None:
+        self.status &= ~0x82
+        if value & 0x80:
+            self.status |= 0x80
+        if value == 0:
+            self.status |= 0x02
+
+    def _resolve_address(
+        self,
+        mode: AddressingMode,
+        operand_low: int,
+        operand_high: int,
+    ) -> AddressResult:
+        base_address = (operand_high << 8) | operand_low
+        unresolved = generate_address(
+            mode,
+            base_address=base_address,
+            operand_byte=operand_low,
+            x_index=self.x,
+            y_index=self.y,
+        )
+        if mode not in (
+            AddressingMode.INDEXED_INDIRECT_X,
+            AddressingMode.INDIRECT_INDEXED_Y,
+        ):
+            return unresolved
+
+        pointer_low = self._read(unresolved.pointer_low_address)
+        pointer_high = self._read(unresolved.pointer_high_address)
+        return generate_address(
+            mode,
+            base_address=base_address,
+            operand_byte=operand_low,
+            x_index=self.x,
+            y_index=self.y,
+            pointer_low_byte=pointer_low,
+            pointer_high_byte=pointer_high,
+            pointer_data_valid=True,
+        )
+
+    def execute_one(self) -> OpcodeSpec | None:
+        """Execute one supported instruction or enter the unsupported trap."""
+
+        if self.unsupported:
+            return None
+
+        self.instruction = self._fetch_byte()
+        spec = OPCODE_TABLE.get(self.instruction)
+        if spec is None:
+            self.unsupported = True
+            return None
+
+        operand_low = self._fetch_byte() if spec.operand_bytes else 0
+        operand_high = self._fetch_byte() if spec.operand_bytes == 2 else 0
+
+        if spec.instruction in (
+            Instruction.TAX,
+            Instruction.TAY,
+            Instruction.TXA,
+            Instruction.TYA,
+            Instruction.TSX,
+            Instruction.TXS,
+        ):
+            self._execute_transfer(spec.instruction)
+            return spec
+
+        if spec.addressing_mode is AddressingMode.IMMEDIATE:
+            value = operand_low
+        else:
+            address = self._resolve_address(
+                spec.addressing_mode, operand_low, operand_high
+            )
+            if not address.effective_address_valid:
+                raise RuntimeError("implemented mode did not resolve an address")
+            self.last_effective_address = address.effective_address
+            self.last_page_cross = address.page_cross
+            self.last_page_cross_valid = address.page_cross_valid
+            if spec.instruction in (
+                Instruction.STA,
+                Instruction.STX,
+                Instruction.STY,
+            ):
+                value = 0
+            else:
+                value = self._read(address.effective_address)
+
+        if spec.instruction is Instruction.LDA:
+            self.a = value
+            self._update_nz(value)
+        elif spec.instruction is Instruction.LDX:
+            self.x = value
+            self._update_nz(value)
+        elif spec.instruction is Instruction.LDY:
+            self.y = value
+            self._update_nz(value)
+        elif spec.instruction is Instruction.STA:
+            self._write(self.last_effective_address, self.a)
+        elif spec.instruction is Instruction.STX:
+            self._write(self.last_effective_address, self.x)
+        elif spec.instruction is Instruction.STY:
+            self._write(self.last_effective_address, self.y)
+        else:
+            raise RuntimeError("decoder classified an unsupported instruction")
+
+        return spec
+
+    def _execute_transfer(self, instruction: Instruction) -> None:
+        if instruction is Instruction.TAX:
+            self.x = self.a
+            self._update_nz(self.x)
+        elif instruction is Instruction.TAY:
+            self.y = self.a
+            self._update_nz(self.y)
+        elif instruction is Instruction.TXA:
+            self.a = self.x
+            self._update_nz(self.a)
+        elif instruction is Instruction.TYA:
+            self.a = self.y
+            self._update_nz(self.a)
+        elif instruction is Instruction.TSX:
+            self.x = self.sp
+            self._update_nz(self.x)
+        elif instruction is Instruction.TXS:
+            self.sp = self.x
+        else:
+            raise RuntimeError("invalid transfer instruction")
 
 
 def _signed_byte(value: int) -> int:
