@@ -37,3 +37,14 @@ ALU_RTL_FILES=(
 verilator --lint-only --Wall -Wno-fatal -Wno-UNUSEDPARAM \
     --top-module cpu_alu \
     "${ALU_RTL_FILES[@]}"
+
+ADDRESS_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_address_gen.sv
+)
+
+# The standalone address top also leaves earlier-phase package constants
+# unused; their real consumers remain covered by the other lint targets.
+verilator --lint-only --Wall -Wno-fatal -Wno-UNUSEDPARAM \
+    --top-module cpu_address_gen \
+    "${ADDRESS_RTL_FILES[@]}"

@@ -8,12 +8,18 @@ mkdir -p \
     build/sim \
     build/verilator/platform \
     build/verilator/cpu \
-    build/verilator/alu
+    build/verilator/alu \
+    build/verilator/address
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
-rm -f "$PLATFORM_WAVEFORM" "$CPU_WAVEFORM" "$ALU_WAVEFORM"
+ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
+rm -f \
+    "$PLATFORM_WAVEFORM" \
+    "$CPU_WAVEFORM" \
+    "$ALU_WAVEFORM" \
+    "$ADDRESS_WAVEFORM"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -80,6 +86,28 @@ if [[ ! -s "$ALU_WAVEFORM" ]]; then
     exit 1
 fi
 
+ADDRESS_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_address_gen.sv
+)
+
+# Suppress only shared-package constants unused by this standalone top.
+verilator --binary --timing --trace-fst --Wall -Wno-fatal -Wno-UNUSEDPARAM \
+    --assert \
+    --Mdir build/verilator/address \
+    --top-module cpu_address_gen_tb \
+    -o cpu_address_gen_tb \
+    "${ADDRESS_RTL_FILES[@]}" \
+    sim/cpu_address_gen_tb.sv
+
+build/verilator/address/cpu_address_gen_tb
+
+if [[ ! -s "$ADDRESS_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $ADDRESS_WAVEFORM" >&2
+    exit 1
+fi
+
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
+echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

@@ -3,8 +3,8 @@
 FPGA-based Nintendo Entertainment System project targeting the Terasic
 DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
 platform foundation, the Phase 2A CPU architectural shell, and the Phase 2B
-reusable ALU. No CPU instruction set, PPU, APU, mapper, controller, or
-game-execution logic exists yet.
+reusable ALU, plus the Phase 2C address generator. No CPU instruction set,
+PPU, APU, mapper, controller, or game-execution logic exists yet.
 
 ## Phase 1 foundation
 
@@ -40,6 +40,18 @@ are documented in [`docs/cpu-phase2a.md`](docs/cpu-phase2a.md).
 The ALU interface, carry semantics, flag ownership, and exhaustive coverage are
 documented in [`docs/cpu-phase2b-alu.md`](docs/cpu-phase2b-alu.md).
 
+## Phase 2C CPU addressing
+
+- Opcode-independent arithmetic for all base 6502 addressing modes
+- Explicit pointer-fetch addresses without hidden memory access
+- Zero-page, 16-bit, relative, and NMOS indirect-JMP wrapping behavior
+- Page-cross metadata for later instruction timing logic
+- Independent Python model and 1,508,186-vector RTL simulation
+
+The interface, wrap rules, bus-sequencing boundary, and exact coverage are
+documented in
+[`docs/cpu-phase2c-addressing.md`](docs/cpu-phase2c-addressing.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -73,8 +85,9 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-and ALU simulations. Waveforms are written under `build/sim`, including
-`platform_foundation.fst`, `cpu_phase2a.fst`, and `cpu_alu.fst`.
+ALU, and address-generator simulations. Waveforms are written under
+`build/sim`, including `platform_foundation.fst`, `cpu_phase2a.fst`,
+`cpu_alu.fst`, and `cpu_address_gen.fst`.
 
 Individual checks are also available:
 
@@ -108,7 +121,7 @@ before use.
 
 - `rtl/platform` — clock, reset, and NES timing-enable foundation
 - `rtl/diagnostic` — removable hardware diagnostic
-- `rtl/cpu` — Phase 2A state shell and Phase 2B ALU; no instruction set yet
+- `rtl/cpu` — Phase 2A state, Phase 2B ALU, and Phase 2C addressing blocks
 - `rtl/ppu`, `rtl/apu` — reserved for later phases
 - `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
 - `sim` — self-checking SystemVerilog testbenches
