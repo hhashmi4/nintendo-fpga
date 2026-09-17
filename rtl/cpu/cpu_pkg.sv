@@ -47,4 +47,19 @@ package cpu_pkg;
         CPU_STATE_MEMORY    = 3'd4,
         CPU_STATE_WRITEBACK = 3'd5
     } cpu_execution_state_t;
+
+    typedef enum logic [3:0] {
+        CPU_ALU_ADD = 4'd0,
+        CPU_ALU_SUB = 4'd1,
+        CPU_ALU_AND = 4'd2,
+        CPU_ALU_OR  = 4'd3,
+        CPU_ALU_XOR = 4'd4,
+        CPU_ALU_ASL = 4'd5,
+        CPU_ALU_LSR = 4'd6,
+        CPU_ALU_ROL = 4'd7,
+        CPU_ALU_ROR = 4'd8,
+        CPU_ALU_INC = 4'd9,
+        CPU_ALU_DEC = 4'd10,
+        CPU_ALU_CMP = 4'd11
+    } cpu_alu_operation_t;
 endpackage

@@ -2,8 +2,9 @@
 
 FPGA-based Nintendo Entertainment System project targeting the Terasic
 DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
-platform foundation and the Phase 2A CPU architectural shell. No CPU instruction
-set, PPU, APU, mapper, controller, or game-execution logic exists yet.
+platform foundation, the Phase 2A CPU architectural shell, and the Phase 2B
+reusable ALU. No CPU instruction set, PPU, APU, mapper, controller, or
+game-execution logic exists yet.
 
 ## Phase 1 foundation
 
@@ -28,6 +29,16 @@ The architecture and timing limitations are documented in
 
 The CPU shell, its reset choices, and its deliberately unimplemented behavior
 are documented in [`docs/cpu-phase2a.md`](docs/cpu-phase2a.md).
+
+## Phase 2B CPU ALU
+
+- Binary-only 2A03 ADD/SUB arithmetic and signed-overflow behavior
+- AND, OR, XOR, shifts, rotates, increment, decrement, and compare
+- Explicit result and N/V/Z/C validity signals for later flag preservation
+- Exhaustive Python and RTL verification across every functional input tuple
+
+The ALU interface, carry semantics, flag ownership, and exhaustive coverage are
+documented in [`docs/cpu-phase2b-alu.md`](docs/cpu-phase2b-alu.md).
 
 ## Development environment
 
@@ -61,9 +72,9 @@ Run the normal suite from the repository root:
 ./scripts/test.sh
 ```
 
-This runs pytest, synthesizable RTL lint, and the self-checking platform and CPU
-simulations. Waveforms are written to `build/sim/platform_foundation.fst` and
-`build/sim/cpu_phase2a.fst`.
+This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
+and ALU simulations. Waveforms are written under `build/sim`, including
+`platform_foundation.fst`, `cpu_phase2a.fst`, and `cpu_alu.fst`.
 
 Individual checks are also available:
 
@@ -97,7 +108,7 @@ before use.
 
 - `rtl/platform` — clock, reset, and NES timing-enable foundation
 - `rtl/diagnostic` — removable hardware diagnostic
-- `rtl/cpu` — Phase 2A architectural CPU shell; no instruction set yet
+- `rtl/cpu` — Phase 2A state shell and Phase 2B ALU; no instruction set yet
 - `rtl/ppu`, `rtl/apu` — reserved for later phases
 - `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
 - `sim` — self-checking SystemVerilog testbenches

@@ -4,11 +4,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-mkdir -p build/sim build/verilator/platform build/verilator/cpu
+mkdir -p \
+    build/sim \
+    build/verilator/platform \
+    build/verilator/cpu \
+    build/verilator/alu
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
-rm -f "$PLATFORM_WAVEFORM" "$CPU_WAVEFORM"
+ALU_WAVEFORM="build/sim/cpu_alu.fst"
+rm -f "$PLATFORM_WAVEFORM" "$CPU_WAVEFORM" "$ALU_WAVEFORM"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -54,5 +59,27 @@ if [[ ! -s "$CPU_WAVEFORM" ]]; then
     exit 1
 fi
 
+ALU_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
+)
+
+# Suppress only shared-package reset constants unused by this standalone top.
+verilator --binary --timing --trace-fst --Wall -Wno-fatal -Wno-UNUSEDPARAM \
+    --assert \
+    --Mdir build/verilator/alu \
+    --top-module cpu_alu_tb \
+    -o cpu_alu_tb \
+    "${ALU_RTL_FILES[@]}" \
+    sim/cpu_alu_tb.sv
+
+build/verilator/alu/cpu_alu_tb
+
+if [[ ! -s "$ALU_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $ALU_WAVEFORM" >&2
+    exit 1
+fi
+
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
+echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"

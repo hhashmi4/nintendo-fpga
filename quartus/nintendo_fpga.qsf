@@ -9,6 +9,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/nes_timing_gen.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/platform_core.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/diagnostic/platform_diagnostic.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_alu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_core.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/de1_soc_top.sv
 set_global_assignment -name SDC_FILE ../constraints/nintendo_fpga.sdc

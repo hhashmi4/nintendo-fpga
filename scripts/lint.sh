@@ -26,3 +26,14 @@ CPU_RTL_FILES=(
 verilator --lint-only --Wall -Wno-fatal \
     --top-module cpu_core \
     "${CPU_RTL_FILES[@]}"
+
+ALU_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
+)
+
+# The standalone ALU top does not consume Phase 2A reset constants from the
+# shared package; cpu_core's separate lint target checks their real consumer.
+verilator --lint-only --Wall -Wno-fatal -Wno-UNUSEDPARAM \
+    --top-module cpu_alu \
+    "${ALU_RTL_FILES[@]}"
