@@ -1,5 +1,8 @@
 # Phase 2F CPU control flow and stack
 
+> Historical phase note: Phase 2G now implements the BRK, RTI, interrupt, and
+> reset-vector items listed as limitations in this phase document.
+
 Phase 2F extends the existing CPU sequencer with official NMOS 6502/Ricoh
 2A03 branches, jumps, subroutine control, and explicit stack operations. It
 does not create a second execution engine, a derived clock, or hidden memory.

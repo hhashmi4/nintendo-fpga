@@ -133,6 +133,8 @@ module cpu_phase2e_tb;
     logic clk = 1'b0;
     logic reset = 1'b1;
     logic cpu_enable = 1'b0;
+    logic nmi = 1'b0;
+    logic irq = 1'b0;
     logic [15:0] bus_address;
     logic [7:0] bus_write_data;
     logic [7:0] bus_read_data;
@@ -181,12 +183,13 @@ module cpu_phase2e_tb;
     logic expected_c_valid;
 
     cpu_core #(
-        .INITIAL_PC     (PROGRAM_START),
         .INITIAL_STATUS (TEST_RESET_STATUS)
     ) dut (
         .clk                       (clk),
         .reset                     (reset),
         .cpu_enable                (cpu_enable),
+        .nmi                       (nmi),
+        .irq                       (irq),
         .bus_address               (bus_address),
         .bus_write_data            (bus_write_data),
         .bus_read_data             (bus_read_data),
@@ -371,12 +374,19 @@ module cpu_phase2e_tb;
     endtask
 
     task automatic reset_core;
+        logic [7:0] saved_vector_low;
+        logic [7:0] saved_vector_high;
+        saved_vector_low = memory_model.memory[CPU_VECTOR_RESET_LOW];
+        saved_vector_high = memory_model.memory[CPU_VECTOR_RESET_LOW + 16'd1];
+        memory_model.memory[CPU_VECTOR_RESET_LOW] = PROGRAM_START[7:0];
+        memory_model.memory[CPU_VECTOR_RESET_LOW + 16'd1] =
+            PROGRAM_START[15:8];
         reset = 1'b1;
         cpu_enable = 1'b0;
         step_cpu(1'b0);
         step_cpu(1'b0);
         assert (debug_execution_state == CPU_STATE_RESET &&
-                debug_pc == PROGRAM_START &&
+                debug_pc == CPU_RESET_PC &&
                 debug_a == CPU_RESET_A && debug_x == CPU_RESET_X &&
                 debug_y == CPU_RESET_Y && debug_sp == CPU_RESET_SP &&
                 debug_status == TEST_RESET_STATUS)
@@ -387,6 +397,14 @@ module cpu_phase2e_tb;
         reset = 1'b0;
         cpu_enable = 1'b1;
         step_cpu(1'b0);
+        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_LOW)
+            else $fatal(1, "CPU did not begin reset-vector fetch");
+        step_cpu(1'b0);
+        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_HIGH)
+            else $fatal(1, "CPU did not fetch reset-vector low byte");
+        step_cpu(1'b0);
+        memory_model.memory[CPU_VECTOR_RESET_LOW] = saved_vector_low;
+        memory_model.memory[CPU_VECTOR_RESET_LOW + 16'd1] = saved_vector_high;
         assert (debug_execution_state == CPU_STATE_FETCH &&
                 debug_pc == PROGRAM_START)
             else $fatal(1, "CPU did not enter FETCH after reset");

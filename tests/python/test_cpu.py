@@ -11,6 +11,7 @@ from verification.cpu import (
     RESET_STATUS,
     RESET_X,
     RESET_Y,
+    VECTOR_RESET_LOW,
     CpuPhase2AModel,
     ExecutionState,
 )
@@ -68,19 +69,25 @@ def test_cpu_enable_gates_all_sequential_progress() -> None:
         assert model.snapshot == original
 
 
-def test_fetch_boundary_and_sampling_are_enable_gated() -> None:
+def test_reset_vector_and_fetch_sampling_are_enable_gated() -> None:
     model = CpuPhase2AModel()
 
     model.tick(reset=False, cpu_enable=True, read_data=0xA9)
-    assert model.snapshot.execution_state is ExecutionState.FETCH
+    assert model.snapshot.execution_state is ExecutionState.RESET_VECTOR_LOW
     assert model.snapshot.instruction == RESET_INSTRUCTION
 
     model.tick(reset=False, cpu_enable=False, read_data=0x5A)
     assert model.snapshot.instruction == RESET_INSTRUCTION
 
+    model.tick(reset=False, cpu_enable=True, read_data=0x34)
+    assert model.snapshot.execution_state is ExecutionState.RESET_VECTOR_HIGH
+    model.tick(reset=False, cpu_enable=True, read_data=0x12)
+    assert model.snapshot.execution_state is ExecutionState.FETCH
+    assert model.snapshot.pc == 0x1234
     model.tick(reset=False, cpu_enable=True, read_data=0x5A)
     assert model.snapshot.instruction == 0x5A
-    assert model.snapshot.pc == RESET_PC
+    assert model.snapshot.pc == 0x1235
+    assert model.snapshot.execution_state is ExecutionState.DECODE
 
 
 def test_bus_is_deterministic_and_read_only() -> None:
@@ -89,7 +96,14 @@ def test_bus_is_deterministic_and_read_only() -> None:
     assert model.bus_outputs(reset=True) == (RESET_PC, 0x00, False, False)
     assert model.bus_outputs(reset=False) == (RESET_PC, 0x00, False, False)
     model.tick(reset=False, cpu_enable=True)
-    assert model.bus_outputs(reset=False) == (RESET_PC, 0x00, False, True)
+    assert model.bus_outputs(reset=False) == (VECTOR_RESET_LOW, 0x00, False, True)
+    model.tick(reset=False, cpu_enable=True, read_data=0x00)
+    assert model.bus_outputs(reset=False) == (
+        VECTOR_RESET_LOW + 1,
+        0x00,
+        False,
+        True,
+    )
 
 
 def test_repeated_reset_is_identical() -> None:

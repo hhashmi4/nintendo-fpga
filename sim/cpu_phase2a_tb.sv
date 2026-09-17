@@ -8,9 +8,11 @@ module cpu_phase2a_tb;
     logic clk = 1'b0;
     logic reset = 1'b1;
     logic cpu_enable = 1'b0;
+    logic nmi = 1'b0;
+    logic irq = 1'b0;
     logic [15:0] bus_address;
     logic [7:0] bus_write_data;
-    logic [7:0] bus_read_data = 8'h02;
+    logic [7:0] bus_read_data;
     logic bus_write_enable;
     logic bus_valid;
     logic [7:0] debug_a;
@@ -31,6 +33,8 @@ module cpu_phase2a_tb;
         .clk                       (clk),
         .reset                     (reset),
         .cpu_enable                (cpu_enable),
+        .nmi                       (nmi),
+        .irq                       (irq),
         .bus_address               (bus_address),
         .bus_write_data            (bus_write_data),
         .bus_read_data             (bus_read_data),
@@ -52,6 +56,14 @@ module cpu_phase2a_tb;
     );
 
     always #10 clk <= !clk;
+
+    always_comb begin
+        case (bus_address)
+            CPU_VECTOR_RESET_LOW: bus_read_data = 8'h00;
+            CPU_VECTOR_RESET_LOW + 16'd1: bus_read_data = 8'h00;
+            default: bus_read_data = 8'h02;
+        endcase
+    end
 
     task automatic sample_clock;
         @(posedge clk);
@@ -113,10 +125,21 @@ module cpu_phase2a_tb;
 
         cpu_enable = 1'b1;
         sample_clock();
+        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_LOW &&
+                debug_pc == CPU_RESET_PC && bus_valid &&
+                bus_address == CPU_VECTOR_RESET_LOW)
+            else $fatal(1, "first enable did not enter reset-vector low read");
+
+        sample_clock();
+        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_HIGH &&
+                bus_valid && bus_address == CPU_VECTOR_RESET_LOW + 16'd1)
+            else $fatal(1, "reset-vector low byte was not consumed");
+
+        sample_clock();
         assert (debug_execution_state == CPU_STATE_FETCH &&
                 debug_pc == CPU_RESET_PC && bus_valid &&
                 bus_address == CPU_RESET_PC)
-            else $fatal(1, "first enable did not enter FETCH deterministically");
+            else $fatal(1, "reset-vector high byte did not enter FETCH");
 
         // FETCH and every architectural field hold while disabled.
         cpu_enable = 1'b0;
