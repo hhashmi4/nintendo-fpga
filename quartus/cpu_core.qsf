@@ -1,0 +1,13 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY cpu_core
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_alu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_decoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_address_gen.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_core.sv
+
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_cpu/output_files
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"

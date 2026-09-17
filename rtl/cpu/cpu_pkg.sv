@@ -37,58 +37,93 @@ package cpu_pkg;
             (value | CPU_STATUS_UNUSED_MASK) & ~CPU_STATUS_BREAK_MASK;
     endfunction
 
-    // Phase 2E uses explicit micro-operation boundaries. Each state advances
+    // PHP does not expose the normalized internal byte verbatim. NMOS 6502
+    // hardware synthesizes both B and U high for the value written to the
+    // stack while B remains nonpersistent internally.
+    function automatic logic [7:0] cpu_status_for_php(
+        input logic [7:0] value
+    );
+        cpu_status_for_php = cpu_status_normalize(value) |
+                             CPU_STATUS_BREAK_MASK;
+    endfunction
+
+    // Phase 2F uses explicit micro-operation boundaries. Each state advances
     // only on cpu_enable; bus states remain stable between enable pulses.
-    typedef enum logic [3:0] {
-        CPU_STATE_RESET        = 4'd0,
-        CPU_STATE_FETCH        = 4'd1,
-        CPU_STATE_DECODE       = 4'd2,
-        CPU_STATE_OPERAND_LOW  = 4'd3,
-        CPU_STATE_OPERAND_HIGH = 4'd4,
-        CPU_STATE_ADDRESS      = 4'd5,
-        CPU_STATE_POINTER_LOW  = 4'd6,
-        CPU_STATE_POINTER_HIGH = 4'd7,
-        CPU_STATE_MEMORY_READ  = 4'd8,
-        CPU_STATE_MEMORY_WRITE = 4'd9,
-        CPU_STATE_WRITEBACK    = 4'd10,
-        CPU_STATE_TRANSFER     = 4'd11,
-        CPU_STATE_TRAP         = 4'd12,
-        CPU_STATE_ALU_EXECUTE   = 4'd13,
-        CPU_STATE_RMW_WRITE     = 4'd14
+    typedef enum logic [4:0] {
+        CPU_STATE_RESET          = 5'd0,
+        CPU_STATE_FETCH          = 5'd1,
+        CPU_STATE_DECODE         = 5'd2,
+        CPU_STATE_OPERAND_LOW    = 5'd3,
+        CPU_STATE_OPERAND_HIGH   = 5'd4,
+        CPU_STATE_ADDRESS        = 5'd5,
+        CPU_STATE_POINTER_LOW    = 5'd6,
+        CPU_STATE_POINTER_HIGH   = 5'd7,
+        CPU_STATE_MEMORY_READ    = 5'd8,
+        CPU_STATE_MEMORY_WRITE   = 5'd9,
+        CPU_STATE_WRITEBACK      = 5'd10,
+        CPU_STATE_TRANSFER       = 5'd11,
+        CPU_STATE_TRAP           = 5'd12,
+        CPU_STATE_ALU_EXECUTE    = 5'd13,
+        CPU_STATE_RMW_WRITE      = 5'd14,
+        CPU_STATE_BRANCH_DECIDE  = 5'd15,
+        CPU_STATE_STACK_PUSH     = 5'd16,
+        CPU_STATE_STACK_PULL     = 5'd17,
+        CPU_STATE_STACK_READ     = 5'd18,
+        CPU_STATE_JSR_PUSH_HIGH  = 5'd19,
+        CPU_STATE_JSR_PUSH_LOW   = 5'd20,
+        CPU_STATE_RTS_PULL       = 5'd21,
+        CPU_STATE_RTS_PULL_LOW   = 5'd22,
+        CPU_STATE_RTS_PULL_HIGH  = 5'd23,
+        CPU_STATE_RTS_COMPLETE   = 5'd24
     } cpu_execution_state_t;
 
-    typedef enum logic [4:0] {
-        CPU_INSTR_INVALID = 5'd0,
-        CPU_INSTR_LDA     = 5'd1,
-        CPU_INSTR_LDX     = 5'd2,
-        CPU_INSTR_LDY     = 5'd3,
-        CPU_INSTR_STA     = 5'd4,
-        CPU_INSTR_STX     = 5'd5,
-        CPU_INSTR_STY     = 5'd6,
-        CPU_INSTR_TAX     = 5'd7,
-        CPU_INSTR_TAY     = 5'd8,
-        CPU_INSTR_TXA     = 5'd9,
-        CPU_INSTR_TYA     = 5'd10,
-        CPU_INSTR_TSX     = 5'd11,
-        CPU_INSTR_TXS     = 5'd12,
-        CPU_INSTR_ADC     = 5'd13,
-        CPU_INSTR_SBC     = 5'd14,
-        CPU_INSTR_AND     = 5'd15,
-        CPU_INSTR_ORA     = 5'd16,
-        CPU_INSTR_EOR     = 5'd17,
-        CPU_INSTR_CMP     = 5'd18,
-        CPU_INSTR_CPX     = 5'd19,
-        CPU_INSTR_CPY     = 5'd20,
-        CPU_INSTR_INX     = 5'd21,
-        CPU_INSTR_INY     = 5'd22,
-        CPU_INSTR_DEX     = 5'd23,
-        CPU_INSTR_DEY     = 5'd24,
-        CPU_INSTR_INC     = 5'd25,
-        CPU_INSTR_DEC     = 5'd26,
-        CPU_INSTR_ASL     = 5'd27,
-        CPU_INSTR_LSR     = 5'd28,
-        CPU_INSTR_ROL     = 5'd29,
-        CPU_INSTR_ROR     = 5'd30
+    typedef enum logic [5:0] {
+        CPU_INSTR_INVALID = 6'd0,
+        CPU_INSTR_LDA     = 6'd1,
+        CPU_INSTR_LDX     = 6'd2,
+        CPU_INSTR_LDY     = 6'd3,
+        CPU_INSTR_STA     = 6'd4,
+        CPU_INSTR_STX     = 6'd5,
+        CPU_INSTR_STY     = 6'd6,
+        CPU_INSTR_TAX     = 6'd7,
+        CPU_INSTR_TAY     = 6'd8,
+        CPU_INSTR_TXA     = 6'd9,
+        CPU_INSTR_TYA     = 6'd10,
+        CPU_INSTR_TSX     = 6'd11,
+        CPU_INSTR_TXS     = 6'd12,
+        CPU_INSTR_ADC     = 6'd13,
+        CPU_INSTR_SBC     = 6'd14,
+        CPU_INSTR_AND     = 6'd15,
+        CPU_INSTR_ORA     = 6'd16,
+        CPU_INSTR_EOR     = 6'd17,
+        CPU_INSTR_CMP     = 6'd18,
+        CPU_INSTR_CPX     = 6'd19,
+        CPU_INSTR_CPY     = 6'd20,
+        CPU_INSTR_INX     = 6'd21,
+        CPU_INSTR_INY     = 6'd22,
+        CPU_INSTR_DEX     = 6'd23,
+        CPU_INSTR_DEY     = 6'd24,
+        CPU_INSTR_INC     = 6'd25,
+        CPU_INSTR_DEC     = 6'd26,
+        CPU_INSTR_ASL     = 6'd27,
+        CPU_INSTR_LSR     = 6'd28,
+        CPU_INSTR_ROL     = 6'd29,
+        CPU_INSTR_ROR     = 6'd30,
+        CPU_INSTR_JMP     = 6'd31,
+        CPU_INSTR_JSR     = 6'd32,
+        CPU_INSTR_RTS     = 6'd33,
+        CPU_INSTR_BCC     = 6'd34,
+        CPU_INSTR_BCS     = 6'd35,
+        CPU_INSTR_BEQ     = 6'd36,
+        CPU_INSTR_BMI     = 6'd37,
+        CPU_INSTR_BNE     = 6'd38,
+        CPU_INSTR_BPL     = 6'd39,
+        CPU_INSTR_BVC     = 6'd40,
+        CPU_INSTR_BVS     = 6'd41,
+        CPU_INSTR_PHA     = 6'd42,
+        CPU_INSTR_PLA     = 6'd43,
+        CPU_INSTR_PHP     = 6'd44,
+        CPU_INSTR_PLP     = 6'd45
     } cpu_instruction_t;
 
     typedef enum logic [3:0] {
@@ -165,6 +200,9 @@ package cpu_pkg;
         logic             uses_alu;
         logic             is_compare;
         logic             is_rmw;
+        logic             is_branch;
+        logic             is_jump;
+        logic             is_stack;
         logic             valid;
     } cpu_decode_result_t;
 endpackage

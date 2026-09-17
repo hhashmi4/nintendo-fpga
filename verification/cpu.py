@@ -1,4 +1,4 @@
-"""Independent reference models for the Phase 2A through 2E CPU blocks."""
+"""Independent reference models for the Phase 2A through 2F CPU blocks."""
 
 from dataclasses import dataclass, replace
 from enum import IntEnum
@@ -11,6 +11,22 @@ RESET_SP = 0xFD
 RESET_PC = 0x0000
 RESET_STATUS = 0x24
 RESET_INSTRUCTION = 0x00
+STATUS_BREAK_MASK = 0x10
+STATUS_UNUSED_MASK = 0x20
+
+
+def normalize_status(value: int) -> int:
+    """Return the persistent 2A03 status policy: B clear and U set."""
+
+    if not 0 <= value <= 0xFF:
+        raise ValueError("status must be an 8-bit value")
+    return (value | STATUS_UNUSED_MASK) & ~STATUS_BREAK_MASK
+
+
+def status_for_php(value: int) -> int:
+    """Synthesize the PHP stack byte without making B persistent."""
+
+    return normalize_status(value) | STATUS_BREAK_MASK
 
 
 class ExecutionState(IntEnum):
@@ -31,6 +47,16 @@ class ExecutionState(IntEnum):
     TRAP = 12
     ALU_EXECUTE = 13
     RMW_WRITE = 14
+    BRANCH_DECIDE = 15
+    STACK_PUSH = 16
+    STACK_PULL = 17
+    STACK_READ = 18
+    JSR_PUSH_HIGH = 19
+    JSR_PUSH_LOW = 20
+    RTS_PULL = 21
+    RTS_PULL_LOW = 22
+    RTS_PULL_HIGH = 23
+    RTS_COMPLETE = 24
 
 
 class AluOperation(IntEnum):
@@ -85,7 +111,7 @@ class AddressingMode(IntEnum):
 
 
 class Instruction(IntEnum):
-    """Instruction identifiers implemented through the Phase 2E decoder."""
+    """Instruction identifiers implemented through the Phase 2F decoder."""
 
     INVALID = 0
     LDA = 1
@@ -118,6 +144,21 @@ class Instruction(IntEnum):
     LSR = 28
     ROL = 29
     ROR = 30
+    JMP = 31
+    JSR = 32
+    RTS = 33
+    BCC = 34
+    BCS = 35
+    BEQ = 36
+    BMI = 37
+    BNE = 38
+    BPL = 39
+    BVC = 40
+    BVS = 41
+    PHA = 42
+    PLA = 43
+    PHP = 44
+    PLP = 45
 
 
 @dataclass(frozen=True)
@@ -142,6 +183,7 @@ def _opcode(
         AddressingMode.ABSOLUTE,
         AddressingMode.ABSOLUTE_X,
         AddressingMode.ABSOLUTE_Y,
+        AddressingMode.INDIRECT,
     ):
         operand_bytes = 2
     else:
@@ -280,6 +322,25 @@ OPCODE_TABLE = {
     0x76: _opcode(Instruction.ROR, AddressingMode.ZERO_PAGE_X),
     0x6E: _opcode(Instruction.ROR, AddressingMode.ABSOLUTE),
     0x7E: _opcode(Instruction.ROR, AddressingMode.ABSOLUTE_X),
+    # Jumps and subroutines
+    0x4C: _opcode(Instruction.JMP, AddressingMode.ABSOLUTE),
+    0x6C: _opcode(Instruction.JMP, AddressingMode.INDIRECT),
+    0x20: _opcode(Instruction.JSR, AddressingMode.ABSOLUTE),
+    0x60: _opcode(Instruction.RTS, AddressingMode.IMPLIED),
+    # Conditional branches
+    0x90: _opcode(Instruction.BCC, AddressingMode.RELATIVE),
+    0xB0: _opcode(Instruction.BCS, AddressingMode.RELATIVE),
+    0xF0: _opcode(Instruction.BEQ, AddressingMode.RELATIVE),
+    0x30: _opcode(Instruction.BMI, AddressingMode.RELATIVE),
+    0xD0: _opcode(Instruction.BNE, AddressingMode.RELATIVE),
+    0x10: _opcode(Instruction.BPL, AddressingMode.RELATIVE),
+    0x50: _opcode(Instruction.BVC, AddressingMode.RELATIVE),
+    0x70: _opcode(Instruction.BVS, AddressingMode.RELATIVE),
+    # Explicit stack operations
+    0x48: _opcode(Instruction.PHA, AddressingMode.IMPLIED),
+    0x68: _opcode(Instruction.PLA, AddressingMode.IMPLIED),
+    0x08: _opcode(Instruction.PHP, AddressingMode.IMPLIED),
+    0x28: _opcode(Instruction.PLP, AddressingMode.IMPLIED),
 }
 
 
@@ -317,6 +378,27 @@ MEMORY_RMW_INSTRUCTIONS = {
     Instruction.LSR,
     Instruction.ROL,
     Instruction.ROR,
+}
+
+BRANCH_INSTRUCTIONS = {
+    Instruction.BCC,
+    Instruction.BCS,
+    Instruction.BEQ,
+    Instruction.BMI,
+    Instruction.BNE,
+    Instruction.BPL,
+    Instruction.BVC,
+    Instruction.BVS,
+}
+
+CONTROL_STACK_INSTRUCTIONS = BRANCH_INSTRUCTIONS | {
+    Instruction.JMP,
+    Instruction.JSR,
+    Instruction.RTS,
+    Instruction.PHA,
+    Instruction.PLA,
+    Instruction.PHP,
+    Instruction.PLP,
 }
 
 
@@ -483,9 +565,14 @@ def generate_address(
 
 
 class CpuPhase2DModel:
-    """Functional Phase 2D/2E model without RTL microcycle mimicry."""
+    """Functional Phase 2D model and shared base for later CPU phases."""
 
-    def __init__(self, *, initial_pc: int = RESET_PC) -> None:
+    def __init__(
+        self,
+        *,
+        initial_pc: int = RESET_PC,
+        initial_status: int = RESET_STATUS,
+    ) -> None:
         if not 0 <= initial_pc <= 0xFFFF:
             raise ValueError("initial_pc must be a 16-bit value")
         self.a = RESET_A
@@ -493,7 +580,7 @@ class CpuPhase2DModel:
         self.y = RESET_Y
         self.sp = RESET_SP
         self.pc = initial_pc
-        self.status = RESET_STATUS
+        self.status = normalize_status(initial_status)
         self.instruction = RESET_INSTRUCTION
         self.memory = bytearray(0x10000)
         self.writes: list[tuple[int, int]] = []
@@ -521,6 +608,18 @@ class CpuPhase2DModel:
         value = self._read(self.pc)
         self.pc = (self.pc + 1) & 0xFFFF
         return value
+
+    def _push(self, value: int) -> None:
+        """Write at $0100|S, then decrement the wrapping 8-bit S."""
+
+        self._write(0x0100 | self.sp, value)
+        self.sp = (self.sp - 1) & 0xFF
+
+    def _pull(self) -> int:
+        """Increment wrapping 8-bit S, then read from $0100|S."""
+
+        self.sp = (self.sp + 1) & 0xFF
+        return self._read(0x0100 | self.sp)
 
     def _update_nz(self, value: int) -> None:
         self.status &= ~0x82
@@ -586,12 +685,16 @@ class CpuPhase2DModel:
 
         self.instruction = self._fetch_byte()
         spec = OPCODE_TABLE.get(self.instruction)
-        if spec is None:
+        if spec is None or not self._instruction_supported(spec.instruction):
             self.unsupported = True
             return None
 
         operand_low = self._fetch_byte() if spec.operand_bytes else 0
         operand_high = self._fetch_byte() if spec.operand_bytes == 2 else 0
+
+        if spec.instruction in CONTROL_STACK_INSTRUCTIONS:
+            self._execute_control_stack(spec, operand_low, operand_high)
+            return spec
 
         if spec.instruction in (
             Instruction.TAX,
@@ -658,6 +761,99 @@ class CpuPhase2DModel:
             raise RuntimeError("decoder classified an unsupported instruction")
 
         return spec
+
+    def _instruction_supported(self, instruction: Instruction) -> bool:
+        """Keep the historical Phase 2D unsupported-opcode boundary."""
+
+        return instruction <= Instruction.TXS
+
+    def _execute_control_stack(
+        self,
+        spec: OpcodeSpec,
+        operand_low: int,
+        operand_high: int,
+    ) -> None:
+        """Execute Phase 2F behavior independently of RTL microstates."""
+
+        instruction = spec.instruction
+
+        if instruction in BRANCH_INSTRUCTIONS:
+            branch = generate_address(
+                AddressingMode.RELATIVE,
+                base_address=self.pc,
+                operand_byte=operand_low,
+            )
+            self.last_effective_address = branch.branch_target
+            self.last_page_cross = branch.page_cross
+            self.last_page_cross_valid = branch.page_cross_valid
+            conditions = {
+                Instruction.BCC: not bool(self.status & 0x01),
+                Instruction.BCS: bool(self.status & 0x01),
+                Instruction.BEQ: bool(self.status & 0x02),
+                Instruction.BMI: bool(self.status & 0x80),
+                Instruction.BNE: not bool(self.status & 0x02),
+                Instruction.BPL: not bool(self.status & 0x80),
+                Instruction.BVC: not bool(self.status & 0x40),
+                Instruction.BVS: bool(self.status & 0x40),
+            }
+            if conditions[instruction]:
+                self.pc = branch.branch_target
+            return
+
+        if instruction is Instruction.JMP:
+            pointer_or_target = (operand_high << 8) | operand_low
+            if spec.addressing_mode is AddressingMode.ABSOLUTE:
+                self.pc = pointer_or_target
+            elif spec.addressing_mode is AddressingMode.INDIRECT:
+                pointer = generate_address(
+                    AddressingMode.INDIRECT,
+                    base_address=pointer_or_target,
+                )
+                low = self._read(pointer.pointer_low_address)
+                high = self._read(pointer.pointer_high_address)
+                resolved = generate_address(
+                    AddressingMode.INDIRECT,
+                    base_address=pointer_or_target,
+                    pointer_low_byte=low,
+                    pointer_high_byte=high,
+                    pointer_data_valid=True,
+                )
+                self.pc = resolved.effective_address
+            else:
+                raise RuntimeError("JMP used an unsupported addressing mode")
+            self.last_effective_address = self.pc
+            return
+
+        if instruction is Instruction.JSR:
+            target = (operand_high << 8) | operand_low
+            return_address = (self.pc - 1) & 0xFFFF
+            self._push(return_address >> 8)
+            self._push(return_address & 0xFF)
+            self.pc = target
+            self.last_effective_address = target
+            return
+
+        if instruction is Instruction.RTS:
+            low = self._pull()
+            high = self._pull()
+            self.pc = (((high << 8) | low) + 1) & 0xFFFF
+            return
+
+        if instruction is Instruction.PHA:
+            self._push(self.a)
+            return
+        if instruction is Instruction.PHP:
+            self._push(status_for_php(self.status))
+            return
+        if instruction is Instruction.PLA:
+            self.a = self._pull()
+            self._update_nz(self.a)
+            return
+        if instruction is Instruction.PLP:
+            self.status = normalize_status(self._pull())
+            return
+
+        raise RuntimeError("unhandled Phase 2F control/stack instruction")
 
     def _execute_transfer(self, instruction: Instruction) -> None:
         if instruction is Instruction.TAX:
@@ -774,6 +970,18 @@ class CpuPhase2DModel:
 
 class CpuPhase2EModel(CpuPhase2DModel):
     """Named Phase 2E entry point retaining Phase 2D compatibility."""
+
+    def _instruction_supported(self, instruction: Instruction) -> bool:
+        """Keep the historical Phase 2E unsupported-opcode boundary."""
+
+        return instruction <= Instruction.ROR
+
+
+class CpuPhase2FModel(CpuPhase2EModel):
+    """Named Phase 2F entry point for control-flow and stack behavior."""
+
+    def _instruction_supported(self, instruction: Instruction) -> bool:
+        return instruction <= Instruction.PLP
 
 
 def _signed_byte(value: int) -> int:

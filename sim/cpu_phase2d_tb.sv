@@ -100,9 +100,9 @@ module cpu_phase2d_tb;
     logic [7:0] trace_read_data [0:7];
     logic trace_write_enable [0:7];
     int unsigned trace_count = 0;
-    // Sized for the shared Phase 2E instruction enum so enum-valued indices
+    // Sized for the shared Phase 2F instruction enum so enum-valued indices
     // remain width-clean while this regression still exercises IDs 1..12.
-    int unsigned instruction_vector_count [0:30];
+    int unsigned instruction_vector_count [0:45];
 
     cpu_core #(
         .INITIAL_PC (PROGRAM_START)

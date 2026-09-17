@@ -337,12 +337,14 @@ def _expected_operation(
 
 def test_phase2e_opcode_matrix_is_exact_and_matches_rtl() -> None:
     assert len(PHASE2E_OPCODES) == 86
-    assert len(OPCODE_TABLE) == 123
+    # The shared decoder table now also contains the 16 Phase 2F opcodes;
+    # this test continues to verify every Phase 2E entry below.
+    assert len(OPCODE_TABLE) == 139
     assert 0xEB not in OPCODE_TABLE  # unofficial SBC must remain unsupported
 
     rtl = RTL_DECODER.read_text(encoding="utf-8")
     rtl_opcodes = {int(value, 16) for value in re.findall(r"8'h([0-9A-F]{2}):", rtl)}
-    assert len(rtl_opcodes) == 123
+    assert len(rtl_opcodes) == 139
     assert rtl_opcodes == set(OPCODE_TABLE)
 
     for opcode, (instruction, mode) in PHASE2E_OPCODES.items():

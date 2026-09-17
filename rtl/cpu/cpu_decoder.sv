@@ -9,7 +9,7 @@ module cpu_decoder (
     always_comb begin
         decoded = '0;
 
-        // Only official Phase 2D/2E opcodes are recognized. Every other byte
+        // Only official Phase 2D/2E/2F opcodes are recognized. Every other byte
         // retains the invalid, inert default.
         case (opcode)
             // LDA
@@ -167,6 +167,28 @@ module cpu_decoder (
             8'h6E: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_ROR; decoded.addressing_mode = CPU_ADDR_ABSOLUTE;    end
             8'h7E: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_ROR; decoded.addressing_mode = CPU_ADDR_ABSOLUTE_X;  end
 
+            // Jumps and subroutines
+            8'h4C: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_JMP; decoded.addressing_mode = CPU_ADDR_ABSOLUTE; end
+            8'h6C: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_JMP; decoded.addressing_mode = CPU_ADDR_INDIRECT; end
+            8'h20: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_JSR; decoded.addressing_mode = CPU_ADDR_ABSOLUTE; end
+            8'h60: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_RTS; decoded.addressing_mode = CPU_ADDR_IMPLIED;  end
+
+            // Conditional relative branches
+            8'h90: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BCC; decoded.addressing_mode = CPU_ADDR_RELATIVE; end
+            8'hB0: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BCS; decoded.addressing_mode = CPU_ADDR_RELATIVE; end
+            8'hF0: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BEQ; decoded.addressing_mode = CPU_ADDR_RELATIVE; end
+            8'h30: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BMI; decoded.addressing_mode = CPU_ADDR_RELATIVE; end
+            8'hD0: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BNE; decoded.addressing_mode = CPU_ADDR_RELATIVE; end
+            8'h10: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BPL; decoded.addressing_mode = CPU_ADDR_RELATIVE; end
+            8'h50: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BVC; decoded.addressing_mode = CPU_ADDR_RELATIVE; end
+            8'h70: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BVS; decoded.addressing_mode = CPU_ADDR_RELATIVE; end
+
+            // Explicit stack operations
+            8'h48: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_PHA; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'h68: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_PLA; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'h08: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_PHP; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'h28: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_PLP; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+
             default: begin
                 // Unsupported instructions are intentionally invalid.
             end
@@ -256,6 +278,24 @@ module cpu_decoder (
                     decoded.alu_operation = CPU_ALU_ROR;
                 end
 
+                CPU_INSTR_BCC,
+                CPU_INSTR_BCS,
+                CPU_INSTR_BEQ,
+                CPU_INSTR_BMI,
+                CPU_INSTR_BNE,
+                CPU_INSTR_BPL,
+                CPU_INSTR_BVC,
+                CPU_INSTR_BVS: decoded.is_branch = 1'b1;
+
+                CPU_INSTR_JMP,
+                CPU_INSTR_JSR,
+                CPU_INSTR_RTS: decoded.is_jump = 1'b1;
+
+                CPU_INSTR_PHA,
+                CPU_INSTR_PLA,
+                CPU_INSTR_PHP,
+                CPU_INSTR_PLP: decoded.is_stack = 1'b1;
+
                 default: begin
                     // The explicit opcode case prevents this path.
                 end
@@ -267,7 +307,8 @@ module cpu_decoder (
 
                 CPU_ADDR_ABSOLUTE,
                 CPU_ADDR_ABSOLUTE_X,
-                CPU_ADDR_ABSOLUTE_Y: decoded.operand_bytes = 2'd2;
+                CPU_ADDR_ABSOLUTE_Y,
+                CPU_ADDR_INDIRECT: decoded.operand_bytes = 2'd2;
 
                 default: decoded.operand_bytes = 2'd1;
             endcase
