@@ -66,6 +66,15 @@ module ppu_phase3b_tb;
     logic mask_emphasize_green;
     logic mask_emphasize_blue;
     logic rendering_enabled;
+    logic rendering_scanline;
+    logic active_render_period;
+    logic coarse_x_increment_event;
+    logic vertical_increment_event;
+    logic horizontal_copy_event;
+    logic vertical_copy_event;
+    logic automatic_scroll_event;
+    logic [13:0] nametable_fetch_address;
+    logic [13:0] attribute_fetch_address;
 
     int vector_file;
     int scan_result;
@@ -87,6 +96,9 @@ module ppu_phase3b_tb;
     logic old_write_toggle;
     logic [7:0] old_read_buffer;
     logic [7:0] old_io_latch;
+    logic old_automatic_scroll_event;
+    logic old_active_render_period;
+    logic [14:0] old_active_data_increment_address;
 
     ppu_core dut (.*);
 
@@ -236,11 +248,36 @@ module ppu_phase3b_tb;
                      mask_show_background, mask_show_sprites_left,
                      mask_show_background_left, mask_grayscale} == ppumask);
             assert (rendering_enabled == (ppumask[3] || ppumask[4]));
+            assert (rendering_scanline ==
+                    (scanline < 9'd240 || scanline == 9'd261));
+            assert (active_render_period ==
+                    (rendering_enabled && rendering_scanline));
+            assert (coarse_x_increment_event ==
+                    (!reset && ppu_enable && active_render_period &&
+                     (((dot >= 9'd8 && dot <= 9'd256) &&
+                       dot[2:0] == 3'd0) || dot == 9'd328 ||
+                      dot == 9'd336)));
+            assert (vertical_increment_event ==
+                    (!reset && ppu_enable && active_render_period &&
+                     dot == 9'd256));
+            assert (horizontal_copy_event ==
+                    (!reset && ppu_enable && active_render_period &&
+                     dot == 9'd257));
+            assert (vertical_copy_event ==
+                    (!reset && ppu_enable && rendering_enabled &&
+                     scanline == 9'd261 && dot >= 9'd280 && dot <= 9'd304));
+            assert (nametable_fetch_address ==
+                    (14'h2000 | (vram_address[13:0] & 14'h0fff)));
+            assert (attribute_fetch_address ==
+                    (14'h23c0 | (vram_address[13:0] & 14'h0c00) |
+                     ((vram_address[13:0] >> 4) & 14'h0038) |
+                     ((vram_address[13:0] >> 2) & 14'h0007)));
 
             if (values[1] == 0 && !accepted) begin
                 assert (ppuctrl == old_ppuctrl && ppumask == old_ppumask);
                 assert (oam_addr == old_oam_addr);
-                assert (vram_address == old_vram_address);
+                if (!old_automatic_scroll_event)
+                    assert (vram_address == old_vram_address);
                 assert (temp_vram_address == old_temp_vram_address);
                 assert (fine_x == old_fine_x && write_toggle == old_write_toggle);
                 assert (ppu_data_read_buffer == old_read_buffer);
@@ -254,8 +291,10 @@ module ppu_phase3b_tb;
                 assert (oam_addr == old_oam_addr);
             end
             if (accepted && values[14] == 7) begin
-                assert (vram_address == old_vram_address +
-                        (old_ppuctrl[2] ? 15'd32 : 15'd1))
+                assert (vram_address == (old_active_render_period ?
+                        old_active_data_increment_address :
+                        old_vram_address +
+                        (old_ppuctrl[2] ? 15'd32 : 15'd1)))
                     else $fatal(1, "PPUDATA did not increment exactly once");
             end
         end
@@ -481,6 +520,10 @@ module ppu_phase3b_tb;
                 old_write_toggle = write_toggle;
                 old_read_buffer = ppu_data_read_buffer;
                 old_io_latch = ppu_io_latch;
+                old_automatic_scroll_event = automatic_scroll_event;
+                old_active_render_period = active_render_period;
+                old_active_data_increment_address =
+                    dut.registers.active_data_increment_address;
 
                 row_count++;
                 scenario_rows++;

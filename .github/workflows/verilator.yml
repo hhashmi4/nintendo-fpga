@@ -31,5 +31,5 @@ jobs:
       - name: Show Verilator version
         run: verilator --version
 
-      - name: Run Python, lint, and Phase 1-3B RTL simulation tests
+      - name: Run Python, lint, and Phase 1-3D RTL simulation tests
         run: scripts/test.sh

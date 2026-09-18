@@ -4,6 +4,10 @@ module ppu_registers (
     input  logic        clk,
     input  logic        reset,
 
+    input  logic        ppu_enable,
+    input  logic [8:0]  dot,
+    input  logic [8:0]  scanline,
+
     input  logic        cpu_enable,
     input  logic        cpu_bus_valid,
     input  logic        cpu_bus_write,
@@ -58,7 +62,17 @@ module ppu_registers (
     output logic        mask_emphasize_red,
     output logic        mask_emphasize_green,
     output logic        mask_emphasize_blue,
-    output logic        rendering_enabled
+    output logic        rendering_enabled,
+
+    output logic        rendering_scanline,
+    output logic        active_render_period,
+    output logic        coarse_x_increment_event,
+    output logic        vertical_increment_event,
+    output logic        horizontal_copy_event,
+    output logic        vertical_copy_event,
+    output logic        automatic_scroll_event,
+    output logic [13:0] nametable_fetch_address,
+    output logic [13:0] attribute_fetch_address
 );
     localparam logic [2:0] REG_PPUCTRL   = 3'd0;
     localparam logic [2:0] REG_PPUMASK   = 3'd1;
@@ -71,6 +85,28 @@ module ppu_registers (
 
     logic accepted_access;
     logic palette_access;
+    logic [14:0] automatic_vram_address;
+    logic [14:0] active_data_increment_address;
+
+    ppu_scroll scroll (
+        .vram_address                 (vram_address),
+        .temp_vram_address            (temp_vram_address),
+        .ppu_enable                   (ppu_enable),
+        .rendering_enabled            (rendering_enabled),
+        .dot                          (dot),
+        .scanline                     (scanline),
+        .rendering_scanline           (rendering_scanline),
+        .active_render_period         (active_render_period),
+        .coarse_x_increment_event     (coarse_x_increment_event),
+        .vertical_increment_event     (vertical_increment_event),
+        .horizontal_copy_event        (horizontal_copy_event),
+        .vertical_copy_event          (vertical_copy_event),
+        .automatic_scroll_event       (automatic_scroll_event),
+        .automatic_vram_address       (automatic_vram_address),
+        .active_data_increment_address(active_data_increment_address),
+        .nametable_fetch_address      (nametable_fetch_address),
+        .attribute_fetch_address      (attribute_fetch_address)
+    );
 
     always_comb begin
         cpu_register_selected = cpu_address >= 16'h2000 &&
@@ -103,6 +139,21 @@ module ppu_registers (
         mask_emphasize_blue = ppumask[7];
         rendering_enabled = mask_show_background || mask_show_sprites;
 
+        oam_write_data = cpu_write_data;
+        oam_write_enable = accepted_access && cpu_bus_write &&
+                           cpu_register_index == REG_OAMDATA;
+
+        ppu_memory_read_request = accepted_access && !cpu_bus_write &&
+                                  cpu_register_index == REG_PPUDATA;
+        ppu_memory_write_request = accepted_access && cpu_bus_write &&
+                                   cpu_register_index == REG_PPUDATA;
+        ppu_memory_write_data = cpu_write_data;
+    end
+
+    // Keep the read-data mux separate from address/request generation. This
+    // makes the external combinational memory contract explicit and avoids a
+    // false address-to-data combinational loop in integrated lint analysis.
+    always_comb begin
         cpu_read_data = ppu_io_latch;
         if (cpu_register_selected) begin
             case (cpu_register_index)
@@ -119,16 +170,6 @@ module ppu_registers (
                 default: begin end
             endcase
         end
-
-        oam_write_data = cpu_write_data;
-        oam_write_enable = accepted_access && cpu_bus_write &&
-                           cpu_register_index == REG_OAMDATA;
-
-        ppu_memory_read_request = accepted_access && !cpu_bus_write &&
-                                  cpu_register_index == REG_PPUDATA;
-        ppu_memory_write_request = accepted_access && cpu_bus_write &&
-                                   cpu_register_index == REG_PPUDATA;
-        ppu_memory_write_data = cpu_write_data;
     end
 
     always_ff @(posedge clk) begin
@@ -146,6 +187,13 @@ module ppu_registers (
             ppu_data_read_buffer       <= 8'h00;
             ppu_io_latch               <= 8'h00;
         end else begin
+            // Rendering-time scrolling and CPU programming share this one
+            // sequential owner. Automatic operations consume the current PPU
+            // coordinate. A same-edge second $2006 write or $2007 access below
+            // has deterministic priority over this scheduled update.
+            if (automatic_scroll_event)
+                vram_address <= automatic_vram_address;
+
             // The pre-render clear has priority over future sprite event
             // inputs. A status read later in this block has priority over a
             // simultaneous vblank set; exact race behavior is deferred.
@@ -195,8 +243,9 @@ module ppu_registers (
                             end
                         end
                         REG_PPUDATA: begin
-                            vram_address <= vram_address +
-                                            15'(vram_increment);
+                            vram_address <= active_render_period ?
+                                active_data_increment_address :
+                                vram_address + 15'(vram_increment);
                         end
                         default: begin end
                     endcase
@@ -213,8 +262,9 @@ module ppu_registers (
                             ppu_data_read_buffer <= palette_access ?
                                 ppu_memory_buffer_read_data :
                                 ppu_memory_read_data;
-                            vram_address <= vram_address +
-                                            15'(vram_increment);
+                            vram_address <= active_render_period ?
+                                active_data_increment_address :
+                                vram_address + 15'(vram_increment);
                         end
                         default: begin end
                     endcase
