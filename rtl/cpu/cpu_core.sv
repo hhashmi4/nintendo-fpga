@@ -65,6 +65,12 @@ module cpu_core #(
     logic irq_meta, irq_sync;
     logic accept_nmi;
     logic accept_irq;
+    // PLP changes I after the instruction's interrupt poll on NMOS-family
+    // CPUs.  Preserve the pre-pull I value for exactly the following FETCH
+    // boundary.  RTI restores I early enough to use the restored value and
+    // therefore never sets this override.
+    logic plp_irq_poll_override_valid;
+    logic plp_irq_poll_interrupt_disable;
 
     cpu_alu_operation_t alu_operation;
     logic [7:0] alu_operand_a;
@@ -124,7 +130,9 @@ module cpu_core #(
         accept_nmi = debug_execution_state == CPU_STATE_FETCH && nmi_pending;
         accept_irq = debug_execution_state == CPU_STATE_FETCH &&
                      !nmi_pending && irq_sync &&
-                     !debug_status.interrupt_disable;
+                     !(plp_irq_poll_override_valid ?
+                       plp_irq_poll_interrupt_disable :
+                       debug_status.interrupt_disable);
         case (interrupt_source)
             CPU_INTERRUPT_NMI: interrupt_vector_low_address = CPU_VECTOR_NMI_LOW;
             CPU_INTERRUPT_IRQ,
@@ -279,6 +287,8 @@ module cpu_core #(
             return_address <= 16'h0000;
             rts_low_byte <= 8'h00;
             interrupt_source <= CPU_INTERRUPT_RESET;
+            plp_irq_poll_override_valid <= 1'b0;
+            plp_irq_poll_interrupt_disable <= 1'b1;
         end else if (cpu_enable) begin
             case (debug_execution_state)
                 // Seven visible reset cycles: two discarded PC reads, three
@@ -301,6 +311,10 @@ module cpu_core #(
                 end
 
                 CPU_STATE_FETCH: begin
+                    // The saved PLP mask applies to this boundary only,
+                    // whether the boundary accepts an interrupt or fetches
+                    // the next opcode.
+                    plp_irq_poll_override_valid <= 1'b0;
                     if (accept_nmi || accept_irq) begin
                         return_address <= debug_pc;
                         interrupt_source <= accept_nmi ? CPU_INTERRUPT_NMI : CPU_INTERRUPT_IRQ;
@@ -522,8 +536,12 @@ module cpu_core #(
                         debug_a <= bus_read_data;
                         debug_status.negative <= bus_read_data[7];
                         debug_status.zero <= (bus_read_data == 8'h00);
-                    end else if (debug_decoded_instruction == CPU_INSTR_PLP)
+                    end else if (debug_decoded_instruction == CPU_INSTR_PLP) begin
+                        plp_irq_poll_override_valid <= 1'b1;
+                        plp_irq_poll_interrupt_disable <=
+                            debug_status.interrupt_disable;
                         debug_status <= cpu_status_normalize(bus_read_data);
+                    end
                     debug_execution_state <= CPU_STATE_FETCH;
                 end
 

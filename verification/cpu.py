@@ -1079,6 +1079,7 @@ class CpuPhase2GModel(CpuPhase2FModel):
         self.nmi_level = False
         self.irq_level = False
         self.last_interrupt_source = InterruptSource.NONE
+        self._plp_irq_poll_i: bool | None = None
 
     def _instruction_supported(self, instruction: Instruction) -> bool:
         return instruction <= Instruction.RTI
@@ -1098,6 +1099,7 @@ class CpuPhase2GModel(CpuPhase2FModel):
         self.nmi_level = False
         self.irq_level = False
         self.last_interrupt_source = InterruptSource.RESET
+        self._plp_irq_poll_i = None
         # RESET reuses the interrupt stack sequencer with writes inhibited.
         # These three reads decrement S from $00 to its visible $FD value.
         for _ in range(3):
@@ -1120,15 +1122,34 @@ class CpuPhase2GModel(CpuPhase2FModel):
     def service_pending_interrupt(self) -> InterruptSource:
         """Service RESET-external priority at an instruction boundary."""
 
+        interrupt_disabled = (
+            self._plp_irq_poll_i
+            if self._plp_irq_poll_i is not None
+            else bool(self.status & 0x04)
+        )
+        self._plp_irq_poll_i = None
         if self.nmi_pending:
             self.nmi_pending = False
             source = InterruptSource.NMI
-        elif self.irq_level and not (self.status & 0x04):
+        elif self.irq_level and not interrupt_disabled:
             source = InterruptSource.IRQ
         else:
             return InterruptSource.NONE
         self._enter_interrupt(source, self.pc)
         return source
+
+    def execute_one(self) -> OpcodeSpec | None:
+        """Execute with the 2A03 PLP interrupt-polling delay modeled."""
+
+        # If the caller executes an instruction without explicitly sampling
+        # the intervening boundary, that instruction consumes the one-boundary
+        # PLP override.
+        self._plp_irq_poll_i = None
+        old_i = bool(self.status & 0x04)
+        spec = super().execute_one()
+        if spec is not None and spec.instruction is Instruction.PLP:
+            self._plp_irq_poll_i = old_i
+        return spec
 
     def _enter_interrupt(
         self,

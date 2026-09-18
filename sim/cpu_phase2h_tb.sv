@@ -354,8 +354,10 @@ module cpu_phase2h_tb;
 
     task automatic test_hardware_interrupts;
         int unsigned cycles;
-        // PLP clears I, then a held IRQ is sampled at the next boundary.
+        // PLP clears I after its poll, so a held IRQ is admitted only after
+        // one following instruction boundary on NMOS-family hardware.
         memory_model.memory[START] = 8'h28;
+        memory_model.memory[START + 1] = 8'hAA; // TAX
         memory_model.memory[16'h01FE] = 8'h20;
         memory_model.memory[CPU_VECTOR_IRQ_LOW] = HANDLER[7:0];
         memory_model.memory[CPU_VECTOR_IRQ_LOW + 1] = HANDLER[15:8];
@@ -367,9 +369,12 @@ module cpu_phase2h_tb;
         repeat (3) step_cpu(1'b0);
         cpu_enable = 1'b1;
         execute_instruction(cycles);
+        assert (cycles == 2 && debug_pc == START + 2)
+            else $fatal(1, "PLP IRQ polling delay regression");
+        execute_instruction(cycles);
         assert (cycles == 7 && debug_pc == HANDLER);
-        check_read(0, START + 1);
-        check_read(1, START + 1);
+        check_read(0, START + 2);
+        check_read(1, START + 2);
         check_read(5, CPU_VECTOR_IRQ_LOW);
         check_read(6, CPU_VECTOR_IRQ_LOW + 1);
 
@@ -398,11 +403,11 @@ module cpu_phase2h_tb;
         test_stack_push_pull();
         test_brk_rti();
         test_hardware_interrupts();
-        assert (exact_cycle_vectors == 28 && bus_trace_vectors == 28 &&
+        assert (exact_cycle_vectors == 29 && bus_trace_vectors == 29 &&
                 stall_vectors == 2)
             else $fatal(1, "Phase 2H vector accounting mismatch %0d/%0d/%0d",
                         exact_cycle_vectors, bus_trace_vectors, stall_vectors);
-        $display("PASS: Phase 2H cycle timing (28 exact-cycle traces, 2 write stalls)");
+        $display("PASS: Phase 2H cycle timing (29 exact-cycle traces, 2 write stalls)");
         $finish;
     end
 endmodule

@@ -130,7 +130,9 @@ only on an enabled CPU edge, so holding either write state while
 
 PHA/PHP are three cycles: opcode, next-PC dummy read, stack write. PLA/PLP are
 four: opcode, next-PC dummy read, current-stack dummy read with SP increment,
-then the pull.
+then the pull. The Phase 2I audit refined PLP interrupt polling: the IRQ
+decision at its following boundary uses the pre-pull I value, while RTI uses
+the restored I value immediately.
 
 JMP absolute is three cycles. JMP indirect is five and retains the Phase 2C
 NMOS high-byte page-wrap behavior. JSR is six cycles in the NMOS ordering:
@@ -204,10 +206,11 @@ RTL-state names. It verifies:
   interrupt traces;
 - 10,000 deterministic full-address indexed traces using seed `0x2A03`.
 
-The Phase 2H RTL bench checks 28 exact-cycle traces/program fragments: indexed
+The Phase 2H RTL bench checks 29 exact-cycle traces/program fragments: indexed
 read with and without crossing, indexed store, RMW, all three branch timing
-classes, JSR/RTS, PHA/PLA, BRK/RTI, IRQ, NMI, and every reset performed by
-those scenarios. Two explicit stalls hold the original-value and final RMW
+classes, JSR/RTS, PHA/PLA, BRK/RTI, IRQ (including the PLP polling delay),
+NMI, and every reset performed by those scenarios. Two explicit stalls hold
+the original-value and final RMW
 write cycles for four fabric clocks each. Assertions cover bus order, cycle
 count, write data/count, PC/SP outcomes, no bus-idle logical cycles, no
 duplicate writes, and X/Z absence.
