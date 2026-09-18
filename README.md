@@ -229,6 +229,21 @@ The algorithms, dot timing, CPU/render priority, verification evidence,
 synthesis results, and deferred bus-conflict accuracy are documented in
 [`docs/ppu-phase3d-scroll-engine.md`](docs/ppu-phase3d-scroll-engine.md).
 
+## Phase 3E PPU background renderer
+
+- Two-dot NT/attribute/pattern-low/pattern-high fetch scheduling
+- Cartridge CHR and mirrored CIRAM access through the Phase 3C memory system
+- Attribute-quadrant decoding and PPUCTRL-selected pattern addressing
+- Four rolling 16-bit pattern/attribute shifters with MSB-first pixels
+- Fine-X selection, PPUMASK background gating, and left-eight-pixel clipping
+- Pre-render/scanline prefetch plus deterministic CPU/renderer arbitration
+- Full-frame and randomized Python/RTL pixel-stream comparison
+
+The fetch timing, memory latency contract, arbitration policy, shifter bit
+orientation, verification evidence, synthesis results, and deferred sprite/video
+features are documented in
+[`docs/ppu-phase3e-background-renderer.md`](docs/ppu-phase3e-background-renderer.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -262,11 +277,11 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, PPU
-timing/register/memory/scroll, CPU, ALU, address-generator, Phase 2D through Phase 2J
-instruction simulations, and the Phase 2K board-program simulation.
+timing/register/memory/scroll/background, CPU, ALU, address-generator, Phase 2D
+through Phase 2J instruction simulations, and the Phase 2K board-program simulation.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
-`ppu_scroll.fst`, `ppu_phase3d.fst`,
+`ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -311,6 +326,12 @@ Run the standalone integrated Phase 3D PPU-scroll synthesis and timing proof:
 
 ```bash
 ./scripts/build_ppu_phase3d_quartus.sh
+```
+
+Run the standalone integrated Phase 3E PPU-background synthesis and timing proof:
+
+```bash
+./scripts/build_ppu_phase3e_quartus.sh
 ```
 
 Build the SOF and RBF locally:
