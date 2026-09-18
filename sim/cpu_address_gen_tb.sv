@@ -144,6 +144,10 @@ module cpu_address_gen_tb;
                     expected.effective_address =
                         16'(base_value + index_value);
                     expected.effective_address_valid = 1'b1;
+                    expected.indexed_tentative_address = {
+                        8'(base_value >> 8), 8'(low_byte + index_value)
+                    };
+                    expected.indexed_tentative_valid = 1'b1;
                     expected.page_cross = (low_byte + index_value) > 255;
                     expected.page_cross_valid = 1'b1;
                     expected.mode_valid = 1'b1;
@@ -158,6 +162,10 @@ module cpu_address_gen_tb;
                     expected.effective_address =
                         16'(base_value + index_value);
                     expected.effective_address_valid = 1'b1;
+                    expected.indexed_tentative_address = {
+                        8'(base_value >> 8), 8'(low_byte + index_value)
+                    };
+                    expected.indexed_tentative_valid = 1'b1;
                     expected.page_cross = (low_byte + index_value) > 255;
                     expected.page_cross_valid = 1'b1;
                     expected.mode_valid = 1'b1;
@@ -274,6 +282,11 @@ module cpu_address_gen_tb;
                     expected.effective_address =
                         16'(pointer_value + index_value);
                     expected.effective_address_valid = 1'b1;
+                    expected.indexed_tentative_address = {
+                        HIGH_BYTE_SAMPLES[high_sample],
+                        8'(pointer_low + index_value)
+                    };
+                    expected.indexed_tentative_valid = 1'b1;
                     expected.pointer_low_address = 16'h00FF;
                     expected.pointer_high_address = 16'h0000;
                     expected.pointer_addresses_valid = 1'b1;
@@ -300,6 +313,9 @@ module cpu_address_gen_tb;
                 expected = '0;
                 expected.branch_target = 16'(target_value);
                 expected.branch_target_valid = 1'b1;
+                expected.branch_tentative_address = {
+                    requested.base_address[15:8], 8'(target_value)
+                };
                 expected.page_cross = requested.base_address[15:8]
                                     != 8'(target_value >> 8);
                 expected.page_cross_valid = 1'b1;
@@ -324,6 +340,9 @@ module cpu_address_gen_tb;
                 expected = '0;
                 expected.branch_target = 16'(target_value);
                 expected.branch_target_valid = 1'b1;
+                expected.branch_tentative_address = {
+                    requested.base_address[15:8], 8'(target_value)
+                };
                 expected.page_cross = requested.base_address[15:8]
                                     != 8'(target_value >> 8);
                 expected.page_cross_valid = 1'b1;
@@ -340,6 +359,7 @@ module cpu_address_gen_tb;
         expected = '0;
         expected.branch_target = 16'h1005;
         expected.branch_target_valid = 1'b1;
+        expected.branch_tentative_address = 16'h1005;
         expected.page_cross = 1'b0;
         expected.page_cross_valid = 1'b1;
         expected.mode_valid = 1'b1;
@@ -348,12 +368,14 @@ module cpu_address_gen_tb;
 
         requested.operand_byte = 8'hFB;
         expected.branch_target = 16'h0FFB;
+        expected.branch_tentative_address = 16'h10FB;
         expected.page_cross = 1'b1;
         apply_and_check(requested, expected);
 
         requested.base_address = 16'h00FE;
         requested.operand_byte = 8'h05;
         expected.branch_target = 16'h0103;
+        expected.branch_tentative_address = 16'h0003;
         expected.page_cross = 1'b1;
         apply_and_check(requested, expected);
 

@@ -7,7 +7,11 @@ package cpu_pkg;
     localparam logic [7:0]  CPU_RESET_A      = 8'h00;
     localparam logic [7:0]  CPU_RESET_X      = 8'h00;
     localparam logic [7:0]  CPU_RESET_Y      = 8'h00;
-    localparam logic [7:0]  CPU_RESET_SP     = 8'hFD;
+    // The NMOS reset entry initializes S to $00, then performs three
+    // bus-visible stack reads while decrementing it to the programmer-visible
+    // post-reset value $FD.
+    localparam logic [7:0]  CPU_RESET_SP      = 8'h00;
+    localparam logic [7:0]  CPU_POST_RESET_SP = 8'hFD;
     localparam logic [15:0] CPU_RESET_PC     = 16'h0000;
     localparam logic [7:0]  CPU_RESET_STATUS = 8'h24;
     localparam logic [7:0]  CPU_RESET_IR     = 8'h00;
@@ -100,7 +104,21 @@ package cpu_pkg;
         CPU_STATE_RTI_PULL_STATUS       = 6'd34,
         CPU_STATE_RTI_PULL_LOW          = 6'd35,
         CPU_STATE_RTI_PULL_HIGH         = 6'd36,
-        CPU_STATE_RTI_COMPLETE          = 6'd37
+        CPU_STATE_RTI_COMPLETE          = 6'd37,
+        CPU_STATE_INDEX_DUMMY           = 6'd38,
+        CPU_STATE_INDEXED_READ          = 6'd39,
+        CPU_STATE_RMW_DUMMY_WRITE       = 6'd40,
+        CPU_STATE_BRANCH_PAGE           = 6'd41,
+        CPU_STATE_STACK_DUMMY           = 6'd42,
+        CPU_STATE_JSR_DUMMY             = 6'd43,
+        CPU_STATE_JSR_TARGET_HIGH       = 6'd44,
+        CPU_STATE_RTS_STACK_DUMMY       = 6'd45,
+        CPU_STATE_RESET_DUMMY           = 6'd46,
+        CPU_STATE_RESET_STACK_1         = 6'd47,
+        CPU_STATE_RESET_STACK_2         = 6'd48,
+        CPU_STATE_RESET_STACK_3         = 6'd49,
+        CPU_STATE_INTERRUPT_DUMMY       = 6'd50,
+        CPU_STATE_RTI_STACK_DUMMY       = 6'd51
     } cpu_execution_state_t;
 
     typedef enum logic [5:0] {
@@ -210,11 +228,17 @@ package cpu_pkg;
     typedef struct packed {
         logic [15:0] effective_address;
         logic        effective_address_valid;
+        // NMOS indexed modes expose the address formed before a carry is
+        // applied to the high byte. It is used for the observable "oops"
+        // read on stores, crossing reads, and absolute-indexed RMW cycles.
+        logic [15:0] indexed_tentative_address;
+        logic        indexed_tentative_valid;
         logic [15:0] pointer_low_address;
         logic [15:0] pointer_high_address;
         logic        pointer_addresses_valid;
         logic [15:0] branch_target;
         logic        branch_target_valid;
+        logic [15:0] branch_tentative_address;
         logic [7:0]  immediate_value;
         logic        immediate_valid;
         logic        page_cross;

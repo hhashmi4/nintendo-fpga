@@ -1,4 +1,4 @@
-"""Independent reference models for the Phase 2A through 2G CPU blocks."""
+"""Independent reference models for the Phase 2A through 2H CPU blocks."""
 
 from dataclasses import dataclass, replace
 from enum import IntEnum
@@ -7,7 +7,8 @@ from enum import IntEnum
 RESET_A = 0x00
 RESET_X = 0x00
 RESET_Y = 0x00
-RESET_SP = 0xFD
+RESET_SP = 0x00
+POST_RESET_SP = 0xFD
 RESET_PC = 0x0000
 RESET_STATUS = 0x24
 RESET_INSTRUCTION = 0x00
@@ -79,6 +80,20 @@ class ExecutionState(IntEnum):
     RTI_PULL_LOW = 35
     RTI_PULL_HIGH = 36
     RTI_COMPLETE = 37
+    INDEX_DUMMY = 38
+    INDEXED_READ = 39
+    RMW_DUMMY_WRITE = 40
+    BRANCH_PAGE = 41
+    STACK_DUMMY = 42
+    JSR_DUMMY = 43
+    JSR_TARGET_HIGH = 44
+    RTS_STACK_DUMMY = 45
+    RESET_DUMMY = 46
+    RESET_STACK_1 = 47
+    RESET_STACK_2 = 48
+    RESET_STACK_3 = 49
+    INTERRUPT_DUMMY = 50
+    RTI_STACK_DUMMY = 51
 
 
 class InterruptSource(IntEnum):
@@ -447,11 +462,14 @@ class AddressResult:
 
     effective_address: int = 0
     effective_address_valid: bool = False
+    indexed_tentative_address: int = 0
+    indexed_tentative_valid: bool = False
     pointer_low_address: int = 0
     pointer_high_address: int = 0
     pointer_addresses_valid: bool = False
     branch_target: int = 0
     branch_target_valid: bool = False
+    branch_tentative_address: int = 0
     immediate_value: int = 0
     immediate_valid: bool = False
     page_cross: bool = False
@@ -538,6 +556,9 @@ def generate_address(
         return AddressResult(
             effective_address=total & 0xFFFF,
             effective_address_valid=True,
+            indexed_tentative_address=(base_address & 0xFF00)
+            | (total & 0xFF),
+            indexed_tentative_valid=True,
             page_cross=(base_address & 0xFF) + index > 0xFF,
             page_cross_valid=True,
             result_valid=True,
@@ -586,6 +607,9 @@ def generate_address(
                 result,
                 effective_address=total & 0xFFFF,
                 effective_address_valid=True,
+                indexed_tentative_address=(pointer_value & 0xFF00)
+                | (total & 0xFF),
+                indexed_tentative_valid=True,
                 page_cross=(pointer_low_byte + y_index) > 0xFF,
                 page_cross_valid=True,
                 result_valid=True,
@@ -597,6 +621,7 @@ def generate_address(
     return AddressResult(
         branch_target=target,
         branch_target_valid=True,
+        branch_tentative_address=(base_address & 0xFF00) | (target & 0xFF),
         page_cross=(base_address >> 8) != (target >> 8),
         page_cross_valid=True,
         result_valid=True,
@@ -617,7 +642,7 @@ class CpuPhase2DModel:
         self.a = RESET_A
         self.x = RESET_X
         self.y = RESET_Y
-        self.sp = RESET_SP
+        self.sp = POST_RESET_SP
         self.pc = initial_pc
         self.status = normalize_status(initial_status)
         self.instruction = RESET_INSTRUCTION
@@ -1073,6 +1098,11 @@ class CpuPhase2GModel(CpuPhase2FModel):
         self.nmi_level = False
         self.irq_level = False
         self.last_interrupt_source = InterruptSource.RESET
+        # RESET reuses the interrupt stack sequencer with writes inhibited.
+        # These three reads decrement S from $00 to its visible $FD value.
+        for _ in range(3):
+            self._read(0x0100 | self.sp)
+            self.sp = (self.sp - 1) & 0xFF
         low = self._read(VECTOR_RESET_LOW)
         high = self._read(VECTOR_RESET_LOW + 1)
         self.pc = (high << 8) | low
@@ -1277,6 +1307,28 @@ class CpuPhase2AModel:
         elif cpu_enable and self._snapshot.execution_state is ExecutionState.RESET:
             self._snapshot = replace(
                 self._snapshot,
+                execution_state=ExecutionState.RESET_DUMMY,
+            )
+        elif cpu_enable and self._snapshot.execution_state is ExecutionState.RESET_DUMMY:
+            self._snapshot = replace(
+                self._snapshot, execution_state=ExecutionState.RESET_STACK_1
+            )
+        elif cpu_enable and self._snapshot.execution_state is ExecutionState.RESET_STACK_1:
+            self._snapshot = replace(
+                self._snapshot,
+                sp=(self._snapshot.sp - 1) & 0xFF,
+                execution_state=ExecutionState.RESET_STACK_2,
+            )
+        elif cpu_enable and self._snapshot.execution_state is ExecutionState.RESET_STACK_2:
+            self._snapshot = replace(
+                self._snapshot,
+                sp=(self._snapshot.sp - 1) & 0xFF,
+                execution_state=ExecutionState.RESET_STACK_3,
+            )
+        elif cpu_enable and self._snapshot.execution_state is ExecutionState.RESET_STACK_3:
+            self._snapshot = replace(
+                self._snapshot,
+                sp=(self._snapshot.sp - 1) & 0xFF,
                 execution_state=ExecutionState.RESET_VECTOR_LOW,
             )
         elif (
@@ -1295,6 +1347,7 @@ class CpuPhase2AModel:
             self._snapshot = replace(
                 self._snapshot,
                 pc=(read_data << 8) | self._reset_vector_low,
+                sp=POST_RESET_SP,
                 execution_state=ExecutionState.FETCH,
             )
         elif cpu_enable and self._snapshot.execution_state is ExecutionState.FETCH:
@@ -1302,7 +1355,7 @@ class CpuPhase2AModel:
                 self._snapshot,
                 instruction=read_data,
                 pc=(self._snapshot.pc + 1) & 0xFFFF,
-                execution_state=ExecutionState.DECODE,
+                execution_state=ExecutionState.TRAP,
             )
 
     def bus_outputs(self, *, reset: bool) -> tuple[int, int, bool, bool]:
@@ -1315,9 +1368,20 @@ class CpuPhase2AModel:
             address = VECTOR_RESET_LOW
         elif state is ExecutionState.RESET_VECTOR_HIGH:
             address = VECTOR_RESET_LOW + 1
+        elif state in (
+            ExecutionState.RESET_STACK_1,
+            ExecutionState.RESET_STACK_2,
+            ExecutionState.RESET_STACK_3,
+        ):
+            address = 0x0100 | self._snapshot.sp
         else:
             address = self._snapshot.pc
         valid = not reset and state in (
+            ExecutionState.RESET,
+            ExecutionState.RESET_DUMMY,
+            ExecutionState.RESET_STACK_1,
+            ExecutionState.RESET_STACK_2,
+            ExecutionState.RESET_STACK_3,
             ExecutionState.RESET_VECTOR_LOW,
             ExecutionState.RESET_VECTOR_HIGH,
             ExecutionState.FETCH,

@@ -8,6 +8,7 @@ from verification.cpu import (
     RESET_INSTRUCTION,
     RESET_PC,
     RESET_SP,
+    POST_RESET_SP,
     RESET_STATUS,
     RESET_X,
     RESET_Y,
@@ -40,7 +41,7 @@ def test_reset_values_are_independently_defined() -> None:
     state = model.snapshot
 
     assert (state.a, state.x, state.y) == (0x00, 0x00, 0x00)
-    assert state.sp == 0xFD
+    assert state.sp == 0x00
     assert state.pc == 0x0000
     assert state.status == 0x24
     assert state.instruction == 0x00
@@ -73,12 +74,19 @@ def test_reset_vector_and_fetch_sampling_are_enable_gated() -> None:
     model = CpuPhase2AModel()
 
     model.tick(reset=False, cpu_enable=True, read_data=0xA9)
-    assert model.snapshot.execution_state is ExecutionState.RESET_VECTOR_LOW
+    assert model.snapshot.execution_state is ExecutionState.RESET_DUMMY
     assert model.snapshot.instruction == RESET_INSTRUCTION
 
     model.tick(reset=False, cpu_enable=False, read_data=0x5A)
     assert model.snapshot.instruction == RESET_INSTRUCTION
 
+    model.tick(reset=False, cpu_enable=True)
+    assert model.snapshot.execution_state is ExecutionState.RESET_STACK_1
+    model.tick(reset=False, cpu_enable=True)
+    model.tick(reset=False, cpu_enable=True)
+    model.tick(reset=False, cpu_enable=True)
+    assert model.snapshot.execution_state is ExecutionState.RESET_VECTOR_LOW
+    assert model.snapshot.sp == POST_RESET_SP
     model.tick(reset=False, cpu_enable=True, read_data=0x34)
     assert model.snapshot.execution_state is ExecutionState.RESET_VECTOR_HIGH
     model.tick(reset=False, cpu_enable=True, read_data=0x12)
@@ -87,23 +95,18 @@ def test_reset_vector_and_fetch_sampling_are_enable_gated() -> None:
     model.tick(reset=False, cpu_enable=True, read_data=0x5A)
     assert model.snapshot.instruction == 0x5A
     assert model.snapshot.pc == 0x1235
-    assert model.snapshot.execution_state is ExecutionState.DECODE
+    assert model.snapshot.execution_state is ExecutionState.TRAP
 
 
 def test_bus_is_deterministic_and_read_only() -> None:
     model = CpuPhase2AModel()
 
     assert model.bus_outputs(reset=True) == (RESET_PC, 0x00, False, False)
-    assert model.bus_outputs(reset=False) == (RESET_PC, 0x00, False, False)
+    assert model.bus_outputs(reset=False) == (RESET_PC, 0x00, False, True)
     model.tick(reset=False, cpu_enable=True)
-    assert model.bus_outputs(reset=False) == (VECTOR_RESET_LOW, 0x00, False, True)
+    assert model.bus_outputs(reset=False) == (RESET_PC, 0x00, False, True)
     model.tick(reset=False, cpu_enable=True, read_data=0x00)
-    assert model.bus_outputs(reset=False) == (
-        VECTOR_RESET_LOW + 1,
-        0x00,
-        False,
-        True,
-    )
+    assert model.bus_outputs(reset=False) == (0x0100, 0x00, False, True)
 
 
 def test_repeated_reset_is_identical() -> None:

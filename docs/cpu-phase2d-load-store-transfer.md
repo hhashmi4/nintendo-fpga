@@ -2,7 +2,9 @@
 
 > Historical phase note: Phase 2G removes the verification-only `INITIAL_PC`
 > boot path and starts every execution test through the bus-visible reset
-> vector. Phase 2D instruction behavior and coverage remain unchanged.
+> vector. Phase 2H supersedes the functional step counts and adds the indexed
+> tentative reads, conditional page penalties, and fixed store timing. Phase
+> 2D instruction semantics and opcode coverage remain unchanged.
 
 Phase 2D turns the architectural shell into a functional instruction engine
 for the first official Ricoh 2A03 instruction subset. It implements only

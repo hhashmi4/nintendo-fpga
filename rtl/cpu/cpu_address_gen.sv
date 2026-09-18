@@ -81,6 +81,10 @@ module cpu_address_gen (
                                      + {9'b0, request.x_index});
                 response.effective_address       = word_sum_wrapped;
                 response.effective_address_valid = 1'b1;
+                response.indexed_tentative_address = {
+                    request.base_address[15:8], byte_sum[7:0]
+                };
+                response.indexed_tentative_valid = 1'b1;
                 response.page_cross              = byte_sum[8];
                 response.page_cross_valid        = 1'b1;
                 response.mode_valid              = 1'b1;
@@ -94,6 +98,10 @@ module cpu_address_gen (
                                      + {9'b0, request.y_index});
                 response.effective_address       = word_sum_wrapped;
                 response.effective_address_valid = 1'b1;
+                response.indexed_tentative_address = {
+                    request.base_address[15:8], byte_sum[7:0]
+                };
+                response.indexed_tentative_valid = 1'b1;
                 response.page_cross              = byte_sum[8];
                 response.page_cross_valid        = 1'b1;
                 response.mode_valid              = 1'b1;
@@ -147,6 +155,10 @@ module cpu_address_gen (
                                          + {9'b0, request.y_index});
                     response.effective_address       = word_sum_wrapped;
                     response.effective_address_valid = 1'b1;
+                    response.indexed_tentative_address = {
+                        request.pointer_high_byte, byte_sum[7:0]
+                    };
+                    response.indexed_tentative_valid = 1'b1;
                     response.page_cross              = byte_sum[8];
                     response.page_cross_valid        = 1'b1;
                     response.result_valid            = 1'b1;
@@ -164,6 +176,9 @@ module cpu_address_gen (
                 );
                 response.branch_target = relative_target_wrapped;
                 response.branch_target_valid = 1'b1;
+                response.branch_tentative_address = {
+                    request.base_address[15:8], relative_target_wrapped[7:0]
+                };
                 response.page_cross = request.base_address[15:8]
                                     != relative_target_wrapped[15:8];
                 response.page_cross_valid = 1'b1;

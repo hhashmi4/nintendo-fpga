@@ -231,9 +231,10 @@ module cpu_phase2f_tb;
                 CPU_STATE_FETCH,
                 CPU_STATE_OPERAND_LOW,
                 CPU_STATE_OPERAND_HIGH,
-                CPU_STATE_ADDRESS,
                 CPU_STATE_BRANCH_DECIDE,
-                CPU_STATE_JSR_PUSH_LOW,
+                CPU_STATE_BRANCH_PAGE,
+                CPU_STATE_POINTER_HIGH,
+                CPU_STATE_JSR_TARGET_HIGH,
                 CPU_STATE_RTS_COMPLETE,
                 CPU_STATE_RESET_VECTOR_HIGH
             }) else $fatal(1, "PC changed outside an intentional state");
@@ -261,13 +262,7 @@ module cpu_phase2f_tb;
             else $fatal(1, "reset left bus or write log active");
         reset = 1'b0;
         cpu_enable = 1'b1;
-        step_cpu(1'b0);
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_LOW)
-            else $fatal(1, "CPU did not begin reset-vector fetch");
-        step_cpu(1'b0);
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_HIGH)
-            else $fatal(1, "CPU did not fetch reset-vector low byte");
-        step_cpu(1'b0);
+        repeat (7) step_cpu(1'b0);
         memory_model.memory[CPU_VECTOR_RESET_LOW] = saved_vector_low;
         memory_model.memory[CPU_VECTOR_RESET_LOW + 16'd1] = saved_vector_high;
         assert (debug_execution_state == CPU_STATE_FETCH)
@@ -366,11 +361,18 @@ module cpu_phase2f_tb;
                 debug_page_cross ==
                     (branch_base[15:8] != branch_target[15:8]))
             else $fatal(1, "branch target metadata mismatch");
-        assert (enabled_steps == 5 && trace_count == 2 &&
+        assert (enabled_steps == (taken ?
+                    ((branch_base[15:8] != branch_target[15:8]) ? 4 : 3) : 2) &&
+                trace_count == enabled_steps &&
                 memory_write_count == 0)
             else $fatal(1, "branch sequencing mismatch");
         check_trace_read(0, branch_address);
         check_trace_read(1, branch_address + 16'd1);
+        if (taken) begin
+            check_trace_read(2, branch_base);
+            if (branch_base[15:8] != branch_target[15:8])
+                check_trace_read(3, {branch_base[15:8], branch_target[7:0]});
+        end
         directed_vector_count++;
     endtask
 
@@ -381,9 +383,9 @@ module cpu_phase2f_tb;
         memory_model.memory[PROGRAM_START + 16'd2] = target[15:8];
         reset_core();
         execute_current_instruction(1'b1, enabled_steps);
-        assert (debug_pc == target && debug_sp == CPU_RESET_SP &&
+        assert (debug_pc == target && debug_sp == CPU_POST_RESET_SP &&
                 debug_status == CPU_RESET_STATUS &&
-                enabled_steps == 5 && trace_count == 3 &&
+                enabled_steps == 3 && trace_count == 3 &&
                 memory_write_count == 0)
             else $fatal(1, "JMP absolute mismatch");
         check_trace_read(0, PROGRAM_START);
@@ -405,7 +407,7 @@ module cpu_phase2f_tb;
         memory_model.memory[expected_high_address] = target[15:8];
         reset_core();
         execute_current_instruction(1'b1, enabled_steps);
-        assert (debug_pc == target && enabled_steps == 8 &&
+        assert (debug_pc == target && enabled_steps == 5 &&
                 trace_count == 5 && memory_write_count == 0)
             else $fatal(1, "JMP indirect mismatch");
         check_trace_read(0, PROGRAM_START);
@@ -437,11 +439,12 @@ module cpu_phase2f_tb;
         assert (debug_sp == (sp - 8'd1) &&
                 debug_status == before_status &&
                 debug_pc == instruction_pc + 16'd1 &&
-                enabled_steps == 3 && trace_count == 2 &&
+                enabled_steps == 3 && trace_count == 3 &&
                 memory_write_count == 1)
             else $fatal(1, "PHA architectural mismatch");
         check_trace_read(0, instruction_pc);
-        check_trace_write(1, {8'h01, sp}, value);
+        check_trace_read(1, instruction_pc + 16'd1);
+        check_trace_write(2, {8'h01, sp}, value);
         directed_vector_count++;
     endtask
 
@@ -468,11 +471,13 @@ module cpu_phase2f_tb;
         assert (debug_a == value && debug_sp == (sp + 8'd1) &&
                 debug_status == expected_status &&
                 debug_pc == instruction_pc + 16'd1 &&
-                enabled_steps == 4 && trace_count == 2 &&
+                enabled_steps == 4 && trace_count == 4 &&
                 memory_write_count == 0)
             else $fatal(1, "PLA architectural mismatch");
         check_trace_read(0, instruction_pc);
-        check_trace_read(1, {8'h01, sp + 8'd1});
+        check_trace_read(1, instruction_pc + 16'd1);
+        check_trace_read(2, {8'h01, sp});
+        check_trace_read(3, {8'h01, sp + 8'd1});
         directed_vector_count++;
     endtask
 
@@ -498,11 +503,12 @@ module cpu_phase2f_tb;
             else $fatal(1, "PHP setup/PLP normalization mismatch");
         execute_current_instruction(1'b1, enabled_steps);
         assert (debug_sp == (sp - 8'd1) && debug_status == normalized &&
-                enabled_steps == 3 && trace_count == 2 &&
+                enabled_steps == 3 && trace_count == 3 &&
                 memory_write_count == 1)
             else $fatal(1, "PHP architectural mismatch");
         check_trace_read(0, instruction_pc);
-        check_trace_write(1, {8'h01, sp},
+        check_trace_read(1, instruction_pc + 16'd1);
+        check_trace_write(2, {8'h01, sp},
                           cpu_status_for_php(stack_status));
         assert (last_write_data[5:4] == 2'b11)
             else $fatal(1, "PHP did not synthesize U/B high");
@@ -528,11 +534,13 @@ module cpu_phase2f_tb;
         assert (debug_sp == (sp + 8'd1) &&
                 debug_status == cpu_status_normalize(stack_status) &&
                 debug_status.unused && !debug_status.break_command &&
-                enabled_steps == 4 && trace_count == 2 &&
+                enabled_steps == 4 && trace_count == 4 &&
                 memory_write_count == 0)
             else $fatal(1, "PLP architectural/status mismatch");
         check_trace_read(0, instruction_pc);
-        check_trace_read(1, {8'h01, sp + 8'd1});
+        check_trace_read(1, instruction_pc + 16'd1);
+        check_trace_read(2, {8'h01, sp});
+        check_trace_read(3, {8'h01, sp + 8'd1});
         directed_vector_count++;
     endtask
 
@@ -558,14 +566,15 @@ module cpu_phase2f_tb;
         before_status = debug_status;
         execute_current_instruction(1'b1, enabled_steps);
         assert (debug_pc == target && debug_sp == (sp - 8'd2) &&
-                debug_status == before_status && enabled_steps == 7 &&
-                trace_count == 5 && memory_write_count == 2)
+                debug_status == before_status && enabled_steps == 6 &&
+                trace_count == 6 && memory_write_count == 2)
             else $fatal(1, "JSR architectural mismatch");
         check_trace_read(0, instruction_pc);
         check_trace_read(1, instruction_pc + 16'd1);
-        check_trace_read(2, instruction_pc + 16'd2);
+        check_trace_read(2, {8'h01, sp});
         check_trace_write(3, {8'h01, sp}, return_address[15:8]);
         check_trace_write(4, {8'h01, sp - 8'd1}, return_address[7:0]);
+        check_trace_read(5, instruction_pc + 16'd2);
         directed_vector_count++;
     endtask
 
@@ -590,12 +599,15 @@ module cpu_phase2f_tb;
         execute_current_instruction(1'b1, enabled_steps);
         assert (debug_pc == (stored_return + 16'd1) &&
                 debug_sp == (sp + 8'd2) && debug_status == before_status &&
-                enabled_steps == 6 && trace_count == 3 &&
+                enabled_steps == 6 && trace_count == 6 &&
                 memory_write_count == 0)
             else $fatal(1, "RTS architectural mismatch");
         check_trace_read(0, instruction_pc);
-        check_trace_read(1, {8'h01, sp + 8'd1});
-        check_trace_read(2, {8'h01, sp + 8'd2});
+        check_trace_read(1, instruction_pc + 16'd1);
+        check_trace_read(2, {8'h01, sp});
+        check_trace_read(3, {8'h01, sp + 8'd1});
+        check_trace_read(4, {8'h01, sp + 8'd2});
+        check_trace_read(5, stored_return);
         directed_vector_count++;
     endtask
 
@@ -615,7 +627,7 @@ module cpu_phase2f_tb;
         execute_setup(2);
         execute_current_instruction(1'b0, enabled_steps);
         assert (debug_pc == 16'h9000 && debug_sp == 8'hFB &&
-                enabled_steps == 7)
+                enabled_steps == 6)
             else $fatal(1, "round-trip JSR failed");
         execute_current_instruction(1'b0, enabled_steps);
         assert (debug_pc == instruction_pc + 16'd3 && debug_sp == 8'hFD &&
@@ -630,7 +642,7 @@ module cpu_phase2f_tb;
         case (target_state)
             CPU_STATE_OPERAND_LOW,
             CPU_STATE_BRANCH_DECIDE: begin
-                append_byte(cursor, 8'hB0);
+                append_byte(cursor, 8'h90);
                 append_byte(cursor, 8'h05);
             end
 
@@ -729,7 +741,6 @@ module cpu_phase2f_tb;
         logic [15:0] trapped_pc;
         memory_model.memory[PROGRAM_START] = 8'h02; // Still unsupported.
         reset_core();
-        step_cpu(1'b0);
         step_cpu(1'b0);
         assert (debug_execution_state == CPU_STATE_TRAP &&
                 !bus_valid && !bus_write_enable && memory_write_count == 0)

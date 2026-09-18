@@ -92,8 +92,8 @@ module cpu_phase2a_tb;
                 debug_decoded_instruction == CPU_INSTR_INVALID &&
                 debug_addressing_mode == CPU_ADDR_IMPLIED)
             else $fatal(1, "execution reset value mismatch");
-        assert ({bus_valid, bus_write_enable} == 2'b00 &&
-                bus_address == CPU_RESET_PC && bus_write_data == 8'h00)
+        assert (!bus_write_enable && bus_address == CPU_RESET_PC &&
+                bus_write_data == 8'h00 && bus_valid == !reset)
             else $fatal(1, "bus reset outputs are not deterministic");
     endtask
 
@@ -125,16 +125,29 @@ module cpu_phase2a_tb;
 
         cpu_enable = 1'b1;
         sample_clock();
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_LOW &&
-                debug_pc == CPU_RESET_PC && bus_valid &&
-                bus_address == CPU_VECTOR_RESET_LOW)
-            else $fatal(1, "first enable did not enter reset-vector low read");
+        assert (debug_execution_state == CPU_STATE_RESET_DUMMY &&
+                debug_pc == CPU_RESET_PC && bus_valid)
+            else $fatal(1, "first reset dummy cycle mismatch");
 
         sample_clock();
-        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_HIGH &&
-                bus_valid && bus_address == CPU_VECTOR_RESET_LOW + 16'd1)
-            else $fatal(1, "reset-vector low byte was not consumed");
+        assert (debug_execution_state == CPU_STATE_RESET_STACK_1)
+            else $fatal(1, "second reset dummy cycle mismatch");
 
+        sample_clock();
+        assert (debug_execution_state == CPU_STATE_RESET_STACK_2)
+            else $fatal(1, "first reset stack read mismatch");
+        sample_clock();
+        assert (debug_execution_state == CPU_STATE_RESET_STACK_3)
+            else $fatal(1, "second reset stack read mismatch");
+        sample_clock();
+        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_LOW &&
+                debug_sp == CPU_POST_RESET_SP &&
+                bus_address == CPU_VECTOR_RESET_LOW)
+            else $fatal(1, "third reset stack read mismatch");
+        sample_clock();
+        assert (debug_execution_state == CPU_STATE_RESET_VECTOR_HIGH &&
+                bus_address == CPU_VECTOR_RESET_LOW + 16'd1)
+            else $fatal(1, "reset-vector low byte was not consumed");
         sample_clock();
         assert (debug_execution_state == CPU_STATE_FETCH &&
                 debug_pc == CPU_RESET_PC && bus_valid &&
@@ -149,7 +162,8 @@ module cpu_phase2a_tb;
                     debug_pc == CPU_RESET_PC &&
                     debug_instruction == CPU_RESET_IR &&
                     debug_a == CPU_RESET_A && debug_x == CPU_RESET_X &&
-                    debug_y == CPU_RESET_Y && debug_sp == CPU_RESET_SP &&
+                    debug_y == CPU_RESET_Y &&
+                    debug_sp == CPU_POST_RESET_SP &&
                     debug_status == CPU_RESET_STATUS &&
                     bus_valid && bus_address == CPU_RESET_PC)
                 else $fatal(1, "state changed while cpu_enable was low");
@@ -159,16 +173,16 @@ module cpu_phase2a_tb;
         // introducing any architectural side effect or memory write.
         cpu_enable = 1'b1;
         sample_clock();
-        assert (debug_execution_state == CPU_STATE_DECODE &&
+        assert (debug_execution_state == CPU_STATE_TRAP &&
                 debug_instruction == 8'h02 && debug_pc == 16'h0001)
             else $fatal(1, "opcode fetch did not advance PC exactly once");
 
         cpu_enable = 1'b0;
         repeat (3) begin
             sample_clock();
-            assert (debug_execution_state == CPU_STATE_DECODE &&
+            assert (debug_execution_state == CPU_STATE_TRAP &&
                     debug_pc == 16'h0001 && debug_instruction == 8'h02)
-                else $fatal(1, "decode advanced without cpu_enable");
+                else $fatal(1, "trap advanced without cpu_enable");
         end
 
         cpu_enable = 1'b1;

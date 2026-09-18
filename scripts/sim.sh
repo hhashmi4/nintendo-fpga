@@ -13,7 +13,8 @@ mkdir -p \
     build/verilator/cpu_phase2d \
     build/verilator/cpu_phase2e \
     build/verilator/cpu_phase2f \
-    build/verilator/cpu_phase2g
+    build/verilator/cpu_phase2g \
+    build/verilator/cpu_phase2h
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
@@ -23,6 +24,7 @@ CPU_PHASE2D_WAVEFORM="build/sim/cpu_phase2d.fst"
 CPU_PHASE2E_WAVEFORM="build/sim/cpu_phase2e.fst"
 CPU_PHASE2F_WAVEFORM="build/sim/cpu_phase2f.fst"
 CPU_PHASE2G_WAVEFORM="build/sim/cpu_phase2g.fst"
+CPU_PHASE2H_WAVEFORM="build/sim/cpu_phase2h.fst"
 rm -f \
     "$PLATFORM_WAVEFORM" \
     "$CPU_WAVEFORM" \
@@ -31,7 +33,8 @@ rm -f \
     "$CPU_PHASE2D_WAVEFORM" \
     "$CPU_PHASE2E_WAVEFORM" \
     "$CPU_PHASE2F_WAVEFORM" \
-    "$CPU_PHASE2G_WAVEFORM"
+    "$CPU_PHASE2G_WAVEFORM" \
+    "$CPU_PHASE2H_WAVEFORM"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -218,6 +221,30 @@ if [[ ! -s "$CPU_PHASE2G_WAVEFORM" ]]; then
     exit 1
 fi
 
+PHASE2H_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
+    rtl/cpu/cpu_decoder.sv
+    rtl/cpu/cpu_address_gen.sv
+    rtl/cpu/cpu_core.sv
+)
+
+verilator --binary --timing --trace-fst --Wall -Wno-fatal \
+    --assert \
+    --Mdir build/verilator/cpu_phase2h \
+    --top-module cpu_phase2h_tb \
+    -o cpu_phase2h_tb \
+    "${PHASE2H_RTL_FILES[@]}" \
+    sim/cpu_test_memory.sv \
+    sim/cpu_phase2h_tb.sv
+
+build/verilator/cpu_phase2h/cpu_phase2h_tb
+
+if [[ ! -s "$CPU_PHASE2H_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $CPU_PHASE2H_WAVEFORM" >&2
+    exit 1
+fi
+
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
@@ -226,3 +253,4 @@ echo "Phase 2D waveform: $ROOT_DIR/$CPU_PHASE2D_WAVEFORM"
 echo "Phase 2E waveform: $ROOT_DIR/$CPU_PHASE2E_WAVEFORM"
 echo "Phase 2F waveform: $ROOT_DIR/$CPU_PHASE2F_WAVEFORM"
 echo "Phase 2G waveform: $ROOT_DIR/$CPU_PHASE2G_WAVEFORM"
+echo "Phase 2H waveform: $ROOT_DIR/$CPU_PHASE2H_WAVEFORM"

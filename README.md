@@ -4,10 +4,10 @@ FPGA-based Nintendo Entertainment System project targeting the Terasic
 DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
 platform foundation, the Phase 2A CPU architectural shell, the Phase 2B
 reusable ALU, the Phase 2C address generator, the Phase 2D load/store/transfer
-subset, the Phase 2E arithmetic/logic subset, and the Phase 2F control-flow/
-stack subset, and Phase 2G reset/interrupt sequencing. No complete CPU
-instruction set, PPU, APU, mapper, controller,
-or game-execution logic exists yet.
+subset, the Phase 2E arithmetic/logic subset, the Phase 2F control-flow/stack
+subset, Phase 2G reset/interrupt sequencing, and Phase 2H cycle/bus timing. No
+complete CPU instruction set, PPU, APU, mapper, controller, or game-execution
+logic exists yet.
 
 ## Phase 1 foundation
 
@@ -98,11 +98,23 @@ and exact coverage are documented in
 - Synchronized edge-latched NMI and synchronized level-sensitive masked IRQ
 - Shared high/low/status stack-entry states for NMI, IRQ, and BRK
 - Official BRK and RTI with explicit B/U status-byte representation
-- 86 directed RTL vectors, 14 enable stalls, and eight reset-priority checks
+- 86 directed RTL vectors, 21 enable stalls, and eight reset-priority checks
 
 The priority policy, vector ordering, status representation, functional step
 counts, and verification coverage are documented in
 [`docs/cpu-phase2g-interrupts-reset.md`](docs/cpu-phase2g-interrupts-reset.md).
+
+## Phase 2H CPU cycle and bus timing
+
+- Machine-readable timing metadata for all 141 implemented official opcodes
+- NMOS indexed tentative reads, conditional page repair, and 2/3/4-cycle branches
+- Original-value plus modified-value writes for memory RMW instructions
+- Canonical stack, JSR/RTS, BRK/RTI, interrupt, and seven-cycle reset sequences
+- Independent exhaustive page/branch timing checks and exact RTL bus traces
+
+The timing sources, cycle matrix, bus sequences, exact coverage, and remaining
+edge limitations are documented in
+[`docs/cpu-phase2h-cycle-timing.md`](docs/cpu-phase2h-cycle-timing.md).
 
 ## Development environment
 
@@ -137,10 +149,11 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-ALU, address-generator, and Phase 2D through Phase 2G instruction simulations.
+ALU, address-generator, and Phase 2D through Phase 2H instruction simulations.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`, `cpu_address_gen.fst`, `cpu_phase2d.fst`,
-`cpu_phase2e.fst`, `cpu_phase2f.fst`, and `cpu_phase2g.fst`.
+`cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
+`cpu_phase2h.fst`.
 
 Individual checks are also available:
 
