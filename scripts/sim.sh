@@ -16,7 +16,8 @@ mkdir -p \
     build/verilator/cpu_phase2g \
     build/verilator/cpu_phase2h \
     build/verilator/cpu_phase2i \
-    build/verilator/cpu_phase2j
+    build/verilator/cpu_phase2j \
+    build/verilator/cpu_board_diag
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
@@ -29,6 +30,7 @@ CPU_PHASE2G_WAVEFORM="build/sim/cpu_phase2g.fst"
 CPU_PHASE2H_WAVEFORM="build/sim/cpu_phase2h.fst"
 CPU_PHASE2I_WAVEFORM="build/sim/cpu_phase2i.fst"
 CPU_PHASE2J_WAVEFORM="build/sim/cpu_phase2j.fst"
+CPU_BOARD_DIAG_WAVEFORM="build/sim/cpu_board_diag.fst"
 rm -f \
     "$PLATFORM_WAVEFORM" \
     "$CPU_WAVEFORM" \
@@ -40,7 +42,8 @@ rm -f \
     "$CPU_PHASE2G_WAVEFORM" \
     "$CPU_PHASE2H_WAVEFORM" \
     "$CPU_PHASE2I_WAVEFORM" \
-    "$CPU_PHASE2J_WAVEFORM"
+    "$CPU_PHASE2J_WAVEFORM" \
+    "$CPU_BOARD_DIAG_WAVEFORM"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -299,6 +302,33 @@ if [[ ! -s "$CPU_PHASE2J_WAVEFORM" ]]; then
     exit 1
 fi
 
+CPU_BOARD_DIAG_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
+    rtl/cpu/cpu_decoder.sv
+    rtl/cpu/cpu_address_gen.sv
+    rtl/cpu/cpu_core.sv
+    rtl/diagnostic/cpu_board_diag_pkg.sv
+    rtl/diagnostic/cpu_board_diag_memory.sv
+    rtl/diagnostic/cpu_board_diag.sv
+)
+
+verilator --binary --timing --trace-fst --Wall -Wno-fatal \
+    -Wno-BLKSEQ -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
+    --assert -Irtl/diagnostic \
+    --Mdir build/verilator/cpu_board_diag \
+    --top-module cpu_board_diag_tb \
+    -o cpu_board_diag_tb \
+    "${CPU_BOARD_DIAG_RTL_FILES[@]}" \
+    sim/cpu_board_diag_tb.sv
+
+build/verilator/cpu_board_diag/cpu_board_diag_tb
+
+if [[ ! -s "$CPU_BOARD_DIAG_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $CPU_BOARD_DIAG_WAVEFORM" >&2
+    exit 1
+fi
+
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
@@ -310,3 +340,4 @@ echo "Phase 2G waveform: $ROOT_DIR/$CPU_PHASE2G_WAVEFORM"
 echo "Phase 2H waveform: $ROOT_DIR/$CPU_PHASE2H_WAVEFORM"
 echo "Phase 2I waveform: $ROOT_DIR/$CPU_PHASE2I_WAVEFORM"
 echo "Phase 2J waveform: $ROOT_DIR/$CPU_PHASE2J_WAVEFORM"
+echo "Phase 2K board diagnostic waveform: $ROOT_DIR/$CPU_BOARD_DIAG_WAVEFORM"
