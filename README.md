@@ -5,7 +5,8 @@ DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
 platform foundation, the Phase 2A CPU architectural shell, the Phase 2B
 reusable ALU, the Phase 2C address generator, the Phase 2D load/store/transfer
 subset, the Phase 2E arithmetic/logic subset, the Phase 2F control-flow/stack
-subset, Phase 2G reset/interrupt sequencing, and Phase 2H cycle/bus timing. No
+subset, Phase 2G reset/interrupt sequencing, Phase 2H cycle/bus timing, and
+the Phase 2I Ricoh 2A03 compatibility audit. No
 complete CPU instruction set, PPU, APU, mapper, controller, or game-execution
 logic exists yet.
 
@@ -116,6 +117,18 @@ The timing sources, cycle matrix, bus sequences, exact coverage, and remaining
 edge limitations are documented in
 [`docs/cpu-phase2h-cycle-timing.md`](docs/cpu-phase2h-cycle-timing.md).
 
+## Phase 2I Ricoh 2A03 audit
+
+- Exhaustive proof that ADC/SBC remain binary with D clear or set
+- Explicit B/U stack-byte policy and seven-cycle reset re-audit
+- Edge-latched NMI, level IRQ, priority, and corrected PLP IRQ polling delay
+- Re-audited indirect-JMP wrapping, NMOS RMW writes, and page penalties
+- Honest official-opcode inventory: 141 of 151 official bytes currently decode
+
+The sources, 6502/2A03 comparison, exact coverage, compatibility assessment,
+and deferred edge cases are documented in
+[`docs/cpu-phase2i-2a03-audit.md`](docs/cpu-phase2i-2a03-audit.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -149,11 +162,11 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-ALU, address-generator, and Phase 2D through Phase 2H instruction simulations.
+ALU, address-generator, and Phase 2D through Phase 2I instruction simulations.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`, `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
-`cpu_phase2h.fst`.
+`cpu_phase2h.fst`, and `cpu_phase2i.fst`.
 
 Individual checks are also available:
 
