@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 mkdir -p \
     build/sim \
     build/verilator/platform \
+    build/verilator/ppu \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -20,6 +21,8 @@ mkdir -p \
     build/verilator/cpu_board_diag
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
+PPU_WAVEFORM="build/sim/ppu_timing.fst"
+PPU_REFERENCE="build/sim/ppu_timing_reference.txt"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -33,6 +36,8 @@ CPU_PHASE2J_WAVEFORM="build/sim/cpu_phase2j.fst"
 CPU_BOARD_DIAG_WAVEFORM="build/sim/cpu_board_diag.fst"
 rm -f \
     "$PLATFORM_WAVEFORM" \
+    "$PPU_WAVEFORM" \
+    "$PPU_REFERENCE" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -66,6 +71,23 @@ build/verilator/platform/platform_foundation_tb
 
 if [[ ! -s "$PLATFORM_WAVEFORM" ]]; then
     echo "ERROR: simulation did not generate a non-empty $PLATFORM_WAVEFORM" >&2
+    exit 1
+fi
+
+python3 scripts/generate_ppu_timing_vectors.py "$PPU_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/ppu \
+    --top-module ppu_timing_tb \
+    -o ppu_timing_tb \
+    rtl/ppu/ppu_timing.sv \
+    sim/ppu_timing_tb.sv
+
+build/verilator/ppu/ppu_timing_tb
+
+if [[ ! -s "$PPU_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $PPU_WAVEFORM" >&2
     exit 1
 fi
 
@@ -330,6 +352,7 @@ if [[ ! -s "$CPU_BOARD_DIAG_WAVEFORM" ]]; then
 fi
 
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
+echo "PPU timing waveform: $ROOT_DIR/$PPU_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"
