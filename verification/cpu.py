@@ -94,6 +94,7 @@ class ExecutionState(IntEnum):
     RESET_STACK_3 = 49
     INTERRUPT_DUMMY = 50
     RTI_STACK_DUMMY = 51
+    IMPLIED = 52
 
 
 class InterruptSource(IntEnum):
@@ -158,7 +159,7 @@ class AddressingMode(IntEnum):
 
 
 class Instruction(IntEnum):
-    """Instruction identifiers implemented through the Phase 2G decoder."""
+    """Instruction identifiers implemented by the completed official core."""
 
     INVALID = 0
     LDA = 1
@@ -208,6 +209,15 @@ class Instruction(IntEnum):
     PLP = 45
     BRK = 46
     RTI = 47
+    BIT = 48
+    CLC = 49
+    SEC = 50
+    CLI = 51
+    SEI = 52
+    CLV = 53
+    CLD = 54
+    SED = 55
+    NOP = 56
 
 
 @dataclass(frozen=True)
@@ -393,6 +403,17 @@ OPCODE_TABLE = {
     # Software interrupt and interrupt return
     0x00: _opcode(Instruction.BRK, AddressingMode.IMPLIED),
     0x40: _opcode(Instruction.RTI, AddressingMode.IMPLIED),
+    # BIT, flag controls, and the sole official NOP encoding
+    0x24: _opcode(Instruction.BIT, AddressingMode.ZERO_PAGE),
+    0x2C: _opcode(Instruction.BIT, AddressingMode.ABSOLUTE),
+    0x18: _opcode(Instruction.CLC, AddressingMode.IMPLIED),
+    0x38: _opcode(Instruction.SEC, AddressingMode.IMPLIED),
+    0x58: _opcode(Instruction.CLI, AddressingMode.IMPLIED),
+    0x78: _opcode(Instruction.SEI, AddressingMode.IMPLIED),
+    0xB8: _opcode(Instruction.CLV, AddressingMode.IMPLIED),
+    0xD8: _opcode(Instruction.CLD, AddressingMode.IMPLIED),
+    0xF8: _opcode(Instruction.SED, AddressingMode.IMPLIED),
+    0xEA: _opcode(Instruction.NOP, AddressingMode.IMPLIED),
 }
 
 
@@ -453,6 +474,16 @@ CONTROL_STACK_INSTRUCTIONS = BRANCH_INSTRUCTIONS | {
     Instruction.PLP,
     Instruction.BRK,
     Instruction.RTI,
+}
+
+FLAG_INSTRUCTIONS = {
+    Instruction.CLC,
+    Instruction.SEC,
+    Instruction.CLI,
+    Instruction.SEI,
+    Instruction.CLV,
+    Instruction.CLD,
+    Instruction.SED,
 }
 
 
@@ -774,6 +805,10 @@ class CpuPhase2DModel:
             self._execute_transfer(spec.instruction)
             return spec
 
+        if spec.instruction in FLAG_INSTRUCTIONS or spec.instruction is Instruction.NOP:
+            self._execute_implied(spec.instruction)
+            return spec
+
         if spec.addressing_mode in (
             AddressingMode.IMPLIED,
             AddressingMode.ACCUMULATOR,
@@ -816,6 +851,11 @@ class CpuPhase2DModel:
             self._write(self.last_effective_address, self.x)
         elif spec.instruction is Instruction.STY:
             self._write(self.last_effective_address, self.y)
+        elif spec.instruction is Instruction.BIT:
+            self.status &= ~0xC2
+            self.status |= value & 0xC0
+            if (self.a & value) == 0:
+                self.status |= 0x02
         elif spec.instruction in INSTRUCTION_ALU_OPERATION:
             self._execute_alu_instruction(
                 spec.instruction,
@@ -828,6 +868,26 @@ class CpuPhase2DModel:
             raise RuntimeError("decoder classified an unsupported instruction")
 
         return spec
+
+    def _execute_implied(self, instruction: Instruction) -> None:
+        """Apply one official flag control or the official inert NOP."""
+
+        updates = {
+            Instruction.CLC: (0x01, False),
+            Instruction.SEC: (0x01, True),
+            Instruction.CLI: (0x04, False),
+            Instruction.SEI: (0x04, True),
+            Instruction.CLV: (0x40, False),
+            Instruction.CLD: (0x08, False),
+            Instruction.SED: (0x08, True),
+        }
+        if instruction is Instruction.NOP:
+            return
+        mask, value = updates[instruction]
+        if value:
+            self.status |= mask
+        else:
+            self.status &= ~mask
 
     def _instruction_supported(self, instruction: Instruction) -> bool:
         """Keep the historical Phase 2D unsupported-opcode boundary."""
@@ -1079,7 +1139,7 @@ class CpuPhase2GModel(CpuPhase2FModel):
         self.nmi_level = False
         self.irq_level = False
         self.last_interrupt_source = InterruptSource.NONE
-        self._plp_irq_poll_i: bool | None = None
+        self._irq_poll_i: bool | None = None
 
     def _instruction_supported(self, instruction: Instruction) -> bool:
         return instruction <= Instruction.RTI
@@ -1099,7 +1159,7 @@ class CpuPhase2GModel(CpuPhase2FModel):
         self.nmi_level = False
         self.irq_level = False
         self.last_interrupt_source = InterruptSource.RESET
-        self._plp_irq_poll_i = None
+        self._irq_poll_i = None
         # RESET reuses the interrupt stack sequencer with writes inhibited.
         # These three reads decrement S from $00 to its visible $FD value.
         for _ in range(3):
@@ -1123,11 +1183,11 @@ class CpuPhase2GModel(CpuPhase2FModel):
         """Service RESET-external priority at an instruction boundary."""
 
         interrupt_disabled = (
-            self._plp_irq_poll_i
-            if self._plp_irq_poll_i is not None
+            self._irq_poll_i
+            if self._irq_poll_i is not None
             else bool(self.status & 0x04)
         )
-        self._plp_irq_poll_i = None
+        self._irq_poll_i = None
         if self.nmi_pending:
             self.nmi_pending = False
             source = InterruptSource.NMI
@@ -1139,16 +1199,20 @@ class CpuPhase2GModel(CpuPhase2FModel):
         return source
 
     def execute_one(self) -> OpcodeSpec | None:
-        """Execute with the 2A03 PLP interrupt-polling delay modeled."""
+        """Execute with NMOS delayed-I interrupt polling modeled."""
 
         # If the caller executes an instruction without explicitly sampling
         # the intervening boundary, that instruction consumes the one-boundary
-        # PLP override.
-        self._plp_irq_poll_i = None
+        # PLP/CLI/SEI override.
+        self._irq_poll_i = None
         old_i = bool(self.status & 0x04)
         spec = super().execute_one()
-        if spec is not None and spec.instruction is Instruction.PLP:
-            self._plp_irq_poll_i = old_i
+        if spec is not None and spec.instruction in {
+            Instruction.PLP,
+            Instruction.CLI,
+            Instruction.SEI,
+        }:
+            self._irq_poll_i = old_i
         return spec
 
     def _enter_interrupt(
@@ -1182,6 +1246,13 @@ class CpuPhase2GModel(CpuPhase2FModel):
         low = self._read(vector_low)
         high = self._read(vector_low + 1)
         self.pc = (high << 8) | low
+
+
+class CpuPhase2JModel(CpuPhase2GModel):
+    """Completed official-opcode 2A03 model used for final qualification."""
+
+    def _instruction_supported(self, instruction: Instruction) -> bool:
+        return instruction <= Instruction.NOP
 
 
 def _signed_byte(value: int) -> int:

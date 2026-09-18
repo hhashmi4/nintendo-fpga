@@ -65,12 +65,12 @@ module cpu_core #(
     logic irq_meta, irq_sync;
     logic accept_nmi;
     logic accept_irq;
-    // PLP changes I after the instruction's interrupt poll on NMOS-family
-    // CPUs.  Preserve the pre-pull I value for exactly the following FETCH
-    // boundary.  RTI restores I early enough to use the restored value and
-    // therefore never sets this override.
-    logic plp_irq_poll_override_valid;
-    logic plp_irq_poll_interrupt_disable;
+    // PLP, CLI, and SEI change I after their instruction-boundary interrupt
+    // poll on NMOS-family CPUs. Preserve the pre-instruction I value for
+    // exactly the following FETCH boundary. RTI restores I early enough to
+    // use the restored value and therefore never sets this override.
+    logic irq_poll_override_valid;
+    logic irq_poll_interrupt_disable;
 
     cpu_alu_operation_t alu_operation;
     logic [7:0] alu_operand_a;
@@ -130,8 +130,8 @@ module cpu_core #(
         accept_nmi = debug_execution_state == CPU_STATE_FETCH && nmi_pending;
         accept_irq = debug_execution_state == CPU_STATE_FETCH &&
                      !nmi_pending && irq_sync &&
-                     !(plp_irq_poll_override_valid ?
-                       plp_irq_poll_interrupt_disable :
+                     !(irq_poll_override_valid ?
+                       irq_poll_interrupt_disable :
                        debug_status.interrupt_disable);
         case (interrupt_source)
             CPU_INTERRUPT_NMI: interrupt_vector_low_address = CPU_VECTOR_NMI_LOW;
@@ -215,7 +215,12 @@ module cpu_core #(
 
     task automatic complete_read_operand(input logic [7:0] value);
         begin
-            if (instruction_is_load) begin
+            if (debug_decoded_instruction == CPU_INSTR_BIT) begin
+                debug_status.negative <= value[7];
+                debug_status.overflow <= value[6];
+                debug_status.zero <= ((debug_a & value) == 8'h00);
+                debug_execution_state <= CPU_STATE_FETCH;
+            end else if (instruction_is_load) begin
                 case (debug_decoded_instruction)
                     CPU_INSTR_LDA: debug_a <= value;
                     CPU_INSTR_LDX: debug_x <= value;
@@ -249,7 +254,8 @@ module cpu_core #(
         begin
             if (instruction_is_store)
                 debug_execution_state <= CPU_STATE_MEMORY_WRITE;
-            else if (instruction_is_load || instruction_uses_alu)
+            else if (instruction_is_load || instruction_uses_alu ||
+                     debug_decoded_instruction == CPU_INSTR_BIT)
                 debug_execution_state <= CPU_STATE_MEMORY_READ;
             else
                 debug_execution_state <= CPU_STATE_TRAP;
@@ -287,8 +293,8 @@ module cpu_core #(
             return_address <= 16'h0000;
             rts_low_byte <= 8'h00;
             interrupt_source <= CPU_INTERRUPT_RESET;
-            plp_irq_poll_override_valid <= 1'b0;
-            plp_irq_poll_interrupt_disable <= 1'b1;
+            irq_poll_override_valid <= 1'b0;
+            irq_poll_interrupt_disable <= 1'b1;
         end else if (cpu_enable) begin
             case (debug_execution_state)
                 // Seven visible reset cycles: two discarded PC reads, three
@@ -311,10 +317,10 @@ module cpu_core #(
                 end
 
                 CPU_STATE_FETCH: begin
-                    // The saved PLP mask applies to this boundary only,
+                    // A saved PLP/CLI/SEI mask applies to this boundary only,
                     // whether the boundary accepts an interrupt or fetches
                     // the next opcode.
-                    plp_irq_poll_override_valid <= 1'b0;
+                    irq_poll_override_valid <= 1'b0;
                     if (accept_nmi || accept_irq) begin
                         return_address <= debug_pc;
                         interrupt_source <= accept_nmi ? CPU_INTERRUPT_NMI : CPU_INTERRUPT_IRQ;
@@ -360,6 +366,8 @@ module cpu_core #(
                                  (decoded.addressing_mode == CPU_ADDR_IMPLIED ||
                                   decoded.addressing_mode == CPU_ADDR_ACCUMULATOR))
                             debug_execution_state <= CPU_STATE_ALU_EXECUTE;
+                        else if (decoded.addressing_mode == CPU_ADDR_IMPLIED)
+                            debug_execution_state <= CPU_STATE_IMPLIED;
                         else
                             debug_execution_state <= CPU_STATE_OPERAND_LOW;
                     end
@@ -488,6 +496,33 @@ module cpu_core #(
                     debug_execution_state <= CPU_STATE_FETCH;
                 end
 
+                CPU_STATE_IMPLIED: begin
+                    case (debug_decoded_instruction)
+                        CPU_INSTR_CLC: debug_status.carry <= 1'b0;
+                        CPU_INSTR_SEC: debug_status.carry <= 1'b1;
+                        CPU_INSTR_CLI: begin
+                            irq_poll_override_valid <= 1'b1;
+                            irq_poll_interrupt_disable <=
+                                debug_status.interrupt_disable;
+                            debug_status.interrupt_disable <= 1'b0;
+                        end
+                        CPU_INSTR_SEI: begin
+                            irq_poll_override_valid <= 1'b1;
+                            irq_poll_interrupt_disable <=
+                                debug_status.interrupt_disable;
+                            debug_status.interrupt_disable <= 1'b1;
+                        end
+                        CPU_INSTR_CLV: debug_status.overflow <= 1'b0;
+                        CPU_INSTR_CLD: debug_status.decimal <= 1'b0;
+                        CPU_INSTR_SED: debug_status.decimal <= 1'b1;
+                        CPU_INSTR_NOP: begin end
+                        default: debug_execution_state <= CPU_STATE_TRAP;
+                    endcase
+                    if (debug_decoded_instruction >= CPU_INSTR_CLC &&
+                        debug_decoded_instruction <= CPU_INSTR_NOP)
+                        debug_execution_state <= CPU_STATE_FETCH;
+                end
+
                 CPU_STATE_ALU_EXECUTE: begin
                     apply_alu_flags();
                     if (!alu_result_valid)
@@ -537,8 +572,8 @@ module cpu_core #(
                         debug_status.negative <= bus_read_data[7];
                         debug_status.zero <= (bus_read_data == 8'h00);
                     end else if (debug_decoded_instruction == CPU_INSTR_PLP) begin
-                        plp_irq_poll_override_valid <= 1'b1;
-                        plp_irq_poll_interrupt_disable <=
+                        irq_poll_override_valid <= 1'b1;
+                        irq_poll_interrupt_disable <=
                             debug_status.interrupt_disable;
                         debug_status <= cpu_status_normalize(bus_read_data);
                     end
@@ -604,7 +639,7 @@ module cpu_core #(
         if (!reset) begin
             case (debug_execution_state)
                 CPU_STATE_RESET, CPU_STATE_RESET_DUMMY, CPU_STATE_FETCH,
-                CPU_STATE_TRANSFER, CPU_STATE_ALU_EXECUTE,
+                CPU_STATE_TRANSFER, CPU_STATE_ALU_EXECUTE, CPU_STATE_IMPLIED,
                 CPU_STATE_STACK_DUMMY, CPU_STATE_RTS_PULL,
                 CPU_STATE_RTI_PULL, CPU_STATE_INTERRUPT_DUMMY,
                 CPU_STATE_BRK_PADDING: begin bus_address = debug_pc; bus_valid = 1'b1; end

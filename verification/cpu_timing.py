@@ -55,6 +55,7 @@ READ_INSTRUCTIONS = {
     Instruction.CMP,
     Instruction.CPX,
     Instruction.CPY,
+    Instruction.BIT,
 }
 STORE_INSTRUCTIONS = {Instruction.STA, Instruction.STX, Instruction.STY}
 REGISTER_IMPLIED = {
@@ -68,6 +69,14 @@ REGISTER_IMPLIED = {
     Instruction.INY,
     Instruction.DEX,
     Instruction.DEY,
+    Instruction.CLC,
+    Instruction.SEC,
+    Instruction.CLI,
+    Instruction.SEI,
+    Instruction.CLV,
+    Instruction.CLD,
+    Instruction.SED,
+    Instruction.NOP,
 }
 
 

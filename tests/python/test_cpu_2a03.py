@@ -257,12 +257,11 @@ def test_page_cross_penalties_are_restricted_to_read_and_branch_classes() -> Non
             assert page_cross(0xA500 | low, index) is (low + index > 0xFF)
 
 
-def test_official_opcode_audit_is_explicit_about_ten_deferred_bytes() -> None:
-    expected_missing = {0x18, 0x24, 0x2C, 0x38, 0x58, 0x78, 0xB8, 0xD8, 0xEA, 0xF8}
+def test_official_opcode_audit_is_complete_after_phase2j() -> None:
     assert len(OFFICIAL_NMOS6502_OPCODES) == 151
-    assert len(OPCODE_TABLE) == 141
-    assert MISSING_OFFICIAL_OPCODES == expected_missing
-    assert set(OPCODE_TABLE) <= OFFICIAL_NMOS6502_OPCODES
+    assert len(OPCODE_TABLE) == 151
+    assert MISSING_OFFICIAL_OPCODES == set()
+    assert set(OPCODE_TABLE) == OFFICIAL_NMOS6502_OPCODES
     assert len(UNOFFICIAL_OPCODES) == 105
 
     rtl_text = Path("rtl/cpu/cpu_decoder.sv").read_text(encoding="utf-8")

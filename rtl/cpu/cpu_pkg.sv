@@ -118,7 +118,8 @@ package cpu_pkg;
         CPU_STATE_RESET_STACK_2         = 6'd48,
         CPU_STATE_RESET_STACK_3         = 6'd49,
         CPU_STATE_INTERRUPT_DUMMY       = 6'd50,
-        CPU_STATE_RTI_STACK_DUMMY       = 6'd51
+        CPU_STATE_RTI_STACK_DUMMY       = 6'd51,
+        CPU_STATE_IMPLIED               = 6'd52
     } cpu_execution_state_t;
 
     typedef enum logic [5:0] {
@@ -169,7 +170,16 @@ package cpu_pkg;
         CPU_INSTR_PHP     = 6'd44,
         CPU_INSTR_PLP     = 6'd45,
         CPU_INSTR_BRK     = 6'd46,
-        CPU_INSTR_RTI     = 6'd47
+        CPU_INSTR_RTI     = 6'd47,
+        CPU_INSTR_BIT     = 6'd48,
+        CPU_INSTR_CLC     = 6'd49,
+        CPU_INSTR_SEC     = 6'd50,
+        CPU_INSTR_CLI     = 6'd51,
+        CPU_INSTR_SEI     = 6'd52,
+        CPU_INSTR_CLV     = 6'd53,
+        CPU_INSTR_CLD     = 6'd54,
+        CPU_INSTR_SED     = 6'd55,
+        CPU_INSTR_NOP     = 6'd56
     } cpu_instruction_t;
 
     typedef enum logic [2:0] {

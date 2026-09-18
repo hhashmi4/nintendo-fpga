@@ -9,9 +9,8 @@ module cpu_decoder (
     always_comb begin
         decoded = '0;
 
-        // Only official opcodes implemented through Phase 2G are recognized.
-        // Every other byte
-        // retains the invalid, inert default.
+        // All 151 official NMOS 6502 opcode bytes are recognized. Every
+        // unofficial byte retains the invalid, inert trap default.
         case (opcode)
             // LDA
             8'hA9: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_LDA; decoded.addressing_mode = CPU_ADDR_IMMEDIATE;          end
@@ -193,6 +192,21 @@ module cpu_decoder (
             // Software interrupt and interrupt return
             8'h00: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BRK; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
             8'h40: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_RTI; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+
+            // BIT tests A against memory without modifying A.
+            8'h24: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BIT; decoded.addressing_mode = CPU_ADDR_ZERO_PAGE; end
+            8'h2C: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_BIT; decoded.addressing_mode = CPU_ADDR_ABSOLUTE;  end
+
+            // Official one-byte flag controls and NOP. Unofficial NOP
+            // encodings deliberately remain invalid.
+            8'h18: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_CLC; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'h38: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_SEC; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'h58: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_CLI; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'h78: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_SEI; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'hB8: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_CLV; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'hD8: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_CLD; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'hF8: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_SED; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
+            8'hEA: begin decoded.valid = 1'b1; decoded.instruction = CPU_INSTR_NOP; decoded.addressing_mode = CPU_ADDR_IMPLIED; end
 
             default: begin
                 // Unsupported instructions are intentionally invalid.
