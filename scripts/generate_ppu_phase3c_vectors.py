@@ -74,6 +74,9 @@ class IntegratedMemoryReference:
         memory_buffer_read_data = buffer_read(self.memory, address, buffer_address)
         reg_inputs = replace(
             inputs,
+            ppu_enable=ppu_enable,
+            dot=self.timing.dot,
+            scanline=self.timing.scanline,
             memory_read_data=memory_read_data,
             memory_buffer_read_data=memory_buffer_read_data,
             vblank_start_event=(

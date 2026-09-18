@@ -11,6 +11,8 @@ mkdir -p \
     build/verilator/ppu_phase3b \
     build/verilator/ppu_memory \
     build/verilator/ppu_phase3c \
+    build/verilator/ppu_scroll \
+    build/verilator/ppu_phase3d \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -32,6 +34,10 @@ PPU_MEMORY_WAVEFORM="build/sim/ppu_memory.fst"
 PPU_MEMORY_REFERENCE="build/sim/ppu_memory_reference.txt"
 PPU_PHASE3C_WAVEFORM="build/sim/ppu_phase3c.fst"
 PPU_PHASE3C_REFERENCE="build/sim/ppu_phase3c_reference.txt"
+PPU_SCROLL_WAVEFORM="build/sim/ppu_scroll.fst"
+PPU_SCROLL_REFERENCE="build/sim/ppu_scroll_reference.txt"
+PPU_PHASE3D_WAVEFORM="build/sim/ppu_phase3d.fst"
+PPU_PHASE3D_REFERENCE="build/sim/ppu_phase3d_reference.txt"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -53,6 +59,10 @@ rm -f \
     "$PPU_MEMORY_REFERENCE" \
     "$PPU_PHASE3C_WAVEFORM" \
     "$PPU_PHASE3C_REFERENCE" \
+    "$PPU_SCROLL_WAVEFORM" \
+    "$PPU_SCROLL_REFERENCE" \
+    "$PPU_PHASE3D_WAVEFORM" \
+    "$PPU_PHASE3D_REFERENCE" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -114,6 +124,7 @@ verilator --binary --timing --trace-fst --Wall \
     --top-module ppu_phase3b_tb \
     -o ppu_phase3b_tb \
     rtl/ppu/ppu_timing.sv \
+    rtl/ppu/ppu_scroll.sv \
     rtl/ppu/ppu_registers.sv \
     rtl/ppu/ppu_core.sv \
     sim/ppu_phase3b_tb.sv
@@ -150,6 +161,7 @@ verilator --binary --timing --trace-fst --Wall \
     --top-module ppu_phase3c_tb \
     -o ppu_phase3c_tb \
     rtl/ppu/ppu_timing.sv \
+    rtl/ppu/ppu_scroll.sv \
     rtl/ppu/ppu_registers.sv \
     rtl/ppu/ppu_core.sv \
     rtl/ppu/ppu_memory.sv \
@@ -160,6 +172,45 @@ build/verilator/ppu_phase3c/ppu_phase3c_tb
 
 if [[ ! -s "$PPU_PHASE3C_WAVEFORM" ]]; then
     echo "ERROR: simulation did not generate a non-empty $PPU_PHASE3C_WAVEFORM" >&2
+    exit 1
+fi
+
+python3 scripts/generate_ppu_scroll_vectors.py "$PPU_SCROLL_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/ppu_scroll \
+    --top-module ppu_scroll_tb \
+    -o ppu_scroll_tb \
+    rtl/ppu/ppu_scroll.sv \
+    sim/ppu_scroll_tb.sv
+
+build/verilator/ppu_scroll/ppu_scroll_tb
+
+if [[ ! -s "$PPU_SCROLL_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $PPU_SCROLL_WAVEFORM" >&2
+    exit 1
+fi
+
+python3 scripts/generate_ppu_phase3d_vectors.py "$PPU_PHASE3D_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/ppu_phase3d \
+    --top-module ppu_phase3d_tb \
+    -o ppu_phase3d_tb \
+    rtl/ppu/ppu_timing.sv \
+    rtl/ppu/ppu_scroll.sv \
+    rtl/ppu/ppu_registers.sv \
+    rtl/ppu/ppu_core.sv \
+    rtl/ppu/ppu_memory.sv \
+    rtl/ppu/ppu_memory_core.sv \
+    sim/ppu_phase3d_tb.sv
+
+build/verilator/ppu_phase3d/ppu_phase3d_tb
+
+if [[ ! -s "$PPU_PHASE3D_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $PPU_PHASE3D_WAVEFORM" >&2
     exit 1
 fi
 
@@ -428,6 +479,8 @@ echo "PPU timing waveform: $ROOT_DIR/$PPU_WAVEFORM"
 echo "PPU Phase 3B waveform: $ROOT_DIR/$PPU_PHASE3B_WAVEFORM"
 echo "PPU memory waveform: $ROOT_DIR/$PPU_MEMORY_WAVEFORM"
 echo "PPU Phase 3C waveform: $ROOT_DIR/$PPU_PHASE3C_WAVEFORM"
+echo "PPU scroll waveform: $ROOT_DIR/$PPU_SCROLL_WAVEFORM"
+echo "PPU Phase 3D waveform: $ROOT_DIR/$PPU_PHASE3D_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

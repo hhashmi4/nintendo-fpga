@@ -7,6 +7,12 @@ before its accepting edge and then applied atomically by :meth:`clock`.
 
 from dataclasses import dataclass
 
+from verification.ppu_scroll import (
+    active_data_increment,
+    active_render_period,
+    apply_automatic_scroll,
+)
+
 
 PPU_REGISTER_FIRST = 0x2000
 PPU_REGISTER_LAST = 0x3FFF
@@ -38,6 +44,9 @@ class PpuBusInputs:
     oam_read_data: int = 0
     memory_read_data: int = 0
     memory_buffer_read_data: int = 0
+    ppu_enable: bool = False
+    dot: int = 0
+    scanline: int = 0
 
 
 @dataclass(frozen=True)
@@ -143,6 +152,17 @@ class PpuRegisterModel:
             self.reset()
             return observation
 
+        pre_edge_v = self.v
+        rendering = self.rendering_enabled
+        self.v, _ = apply_automatic_scroll(
+            self.v,
+            self.t,
+            ppu_enable=inputs.ppu_enable,
+            rendering_enabled=rendering,
+            scanline=inputs.scanline,
+            dot=inputs.dot,
+        )
+
         # The pre-render clear owns all status flags on its event edge.  This
         # deterministic ordering intentionally does not claim later NMI-race
         # compatibility.
@@ -191,7 +211,11 @@ class PpuRegisterModel:
                     self.v = self.t
                     self.w = False
             elif register == PPUDATA:
-                self.v = (self.v + self.vram_increment) & 0x7FFF
+                self.v = (
+                    active_data_increment(pre_edge_v)
+                    if active_render_period(rendering, inputs.scanline)
+                    else (pre_edge_v + self.vram_increment) & 0x7FFF
+                )
             return observation
 
         if register == PPUSTATUS:
@@ -207,5 +231,9 @@ class PpuRegisterModel:
                 if observation.memory_address >= 0x3F00
                 else inputs.memory_read_data
             ) & 0xFF
-            self.v = (self.v + self.vram_increment) & 0x7FFF
+            self.v = (
+                active_data_increment(pre_edge_v)
+                if active_render_period(rendering, inputs.scanline)
+                else (pre_edge_v + self.vram_increment) & 0x7FFF
+            )
         return observation

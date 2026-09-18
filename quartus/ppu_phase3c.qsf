@@ -3,6 +3,7 @@ set_global_assignment -name DEVICE 5CSEMA5F31C6
 set_global_assignment -name TOP_LEVEL_ENTITY ppu_memory_core
 
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_timing.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_scroll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_registers.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_core.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_memory.sv
@@ -95,3 +96,12 @@ set_instance_assignment -name VIRTUAL_PIN ON -to mask_emphasize_red
 set_instance_assignment -name VIRTUAL_PIN ON -to mask_emphasize_green
 set_instance_assignment -name VIRTUAL_PIN ON -to mask_emphasize_blue
 set_instance_assignment -name VIRTUAL_PIN ON -to rendering_enabled
+set_instance_assignment -name VIRTUAL_PIN ON -to rendering_scanline
+set_instance_assignment -name VIRTUAL_PIN ON -to active_render_period
+set_instance_assignment -name VIRTUAL_PIN ON -to coarse_x_increment_event
+set_instance_assignment -name VIRTUAL_PIN ON -to vertical_increment_event
+set_instance_assignment -name VIRTUAL_PIN ON -to horizontal_copy_event
+set_instance_assignment -name VIRTUAL_PIN ON -to vertical_copy_event
+set_instance_assignment -name VIRTUAL_PIN ON -to automatic_scroll_event
+set_instance_assignment -name VIRTUAL_PIN ON -to nametable_fetch_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to attribute_fetch_address[*]

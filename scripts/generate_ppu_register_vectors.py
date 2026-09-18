@@ -49,6 +49,9 @@ class IntegratedReference:
         rendering = self.registers.rendering_enabled
         reg_inputs = replace(
             inputs,
+            ppu_enable=ppu_enable,
+            dot=self.timing.dot,
+            scanline=self.timing.scanline,
             vblank_start_event=self.timing.vblank_start(ppu_enable)
             and not inputs.reset,
             status_clear_event=self.timing.vblank_end(ppu_enable)

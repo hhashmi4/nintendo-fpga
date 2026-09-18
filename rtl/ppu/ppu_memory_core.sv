@@ -84,7 +84,16 @@ module ppu_memory_core (
     output logic        mask_emphasize_red,
     output logic        mask_emphasize_green,
     output logic        mask_emphasize_blue,
-    output logic        rendering_enabled
+    output logic        rendering_enabled,
+    output logic        rendering_scanline,
+    output logic        active_render_period,
+    output logic        coarse_x_increment_event,
+    output logic        vertical_increment_event,
+    output logic        horizontal_copy_event,
+    output logic        vertical_copy_event,
+    output logic        automatic_scroll_event,
+    output logic [13:0] nametable_fetch_address,
+    output logic [13:0] attribute_fetch_address
 );
     logic [7:0] memory_read_data;
     logic [7:0] memory_buffer_read_data;
@@ -158,7 +167,16 @@ module ppu_memory_core (
         .mask_emphasize_red          (mask_emphasize_red),
         .mask_emphasize_green        (mask_emphasize_green),
         .mask_emphasize_blue         (mask_emphasize_blue),
-        .rendering_enabled           (rendering_enabled)
+        .rendering_enabled           (rendering_enabled),
+        .rendering_scanline          (rendering_scanline),
+        .active_render_period        (active_render_period),
+        .coarse_x_increment_event    (coarse_x_increment_event),
+        .vertical_increment_event    (vertical_increment_event),
+        .horizontal_copy_event       (horizontal_copy_event),
+        .vertical_copy_event         (vertical_copy_event),
+        .automatic_scroll_event      (automatic_scroll_event),
+        .nametable_fetch_address     (nametable_fetch_address),
+        .attribute_fetch_address     (attribute_fetch_address)
     );
 
     ppu_memory memory (

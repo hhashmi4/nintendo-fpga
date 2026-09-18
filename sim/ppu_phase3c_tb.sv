@@ -79,6 +79,15 @@ module ppu_phase3c_tb;
     logic mask_emphasize_green;
     logic mask_emphasize_blue;
     logic rendering_enabled;
+    logic rendering_scanline;
+    logic active_render_period;
+    logic coarse_x_increment_event;
+    logic vertical_increment_event;
+    logic horizontal_copy_event;
+    logic vertical_copy_event;
+    logic automatic_scroll_event;
+    logic [13:0] nametable_fetch_address;
+    logic [13:0] attribute_fetch_address;
 
     // Fake CHR-RAM cartridge exists only in this simulation testbench.
     logic [7:0] chr_memory [0:8191];
@@ -107,6 +116,9 @@ module ppu_phase3c_tb;
     logic old_write_toggle;
     logic [7:0] old_read_buffer;
     logic [7:0] old_io_latch;
+    logic old_automatic_scroll_event;
+    logic old_active_render_period;
+    logic [14:0] old_active_data_increment_address;
 
     ppu_memory_core dut (.*);
 
@@ -151,9 +163,9 @@ module ppu_phase3c_tb;
                     assert (ppudata_writes == 14_969);
                     assert (active_stalls == 37_683);
                     assert (ppu_ticks == 81_457);
-                    assert (region_counts[0] == 15_818);
-                    assert (region_counts[1] == 13_569);
-                    assert (region_counts[2] == 435);
+                    assert (region_counts[0] == 14_979);
+                    assert (region_counts[1] == 14_444);
+                    assert (region_counts[2] == 399);
                     assert (mode_counts[0] == 7_461);
                     assert (mode_counts[1] == 7_471);
                     assert (mode_counts[2] == 7_455);
@@ -250,6 +262,30 @@ module ppu_phase3c_tb;
                      mask_show_background, mask_show_sprites_left,
                      mask_show_background_left, mask_grayscale} == ppumask);
             assert (rendering_enabled == (ppumask[3] || ppumask[4]));
+            assert (rendering_scanline ==
+                    (scanline < 9'd240 || scanline == 9'd261));
+            assert (active_render_period ==
+                    (rendering_enabled && rendering_scanline));
+            assert (coarse_x_increment_event ==
+                    (!reset && ppu_enable && active_render_period &&
+                     (((dot >= 9'd8 && dot <= 9'd256) &&
+                       dot[2:0] == 3'd0) || dot == 9'd328 ||
+                      dot == 9'd336)));
+            assert (vertical_increment_event ==
+                    (!reset && ppu_enable && active_render_period &&
+                     dot == 9'd256));
+            assert (horizontal_copy_event ==
+                    (!reset && ppu_enable && active_render_period &&
+                     dot == 9'd257));
+            assert (vertical_copy_event ==
+                    (!reset && ppu_enable && rendering_enabled &&
+                     scanline == 9'd261 && dot >= 9'd280 && dot <= 9'd304));
+            assert (nametable_fetch_address ==
+                    (14'h2000 | (vram_address[13:0] & 14'h0fff)));
+            assert (attribute_fetch_address ==
+                    (14'h23c0 | (vram_address[13:0] & 14'h0c00) |
+                     ((vram_address[13:0] >> 4) & 14'h0038) |
+                     ((vram_address[13:0] >> 2) & 14'h0007)));
 
             write_destinations = int'(chr_write) + int'(ciram_write_enable) +
                                  int'(palette_write_enable);
@@ -297,15 +333,18 @@ module ppu_phase3c_tb;
             if (values[1] == 0 && !accepted) begin
                 assert (ppuctrl == old_ppuctrl && ppumask == old_ppumask);
                 assert (oam_addr == old_oam_addr);
-                assert (vram_address == old_vram_address);
+                if (!old_automatic_scroll_event)
+                    assert (vram_address == old_vram_address);
                 assert (temp_vram_address == old_temp_vram_address);
                 assert (fine_x == old_fine_x && write_toggle == old_write_toggle);
                 assert (ppu_data_read_buffer == old_read_buffer);
                 assert (ppu_io_latch == old_io_latch);
             end
             if (accepted && values[10] == 7) begin
-                assert (vram_address == old_vram_address +
-                        (old_ppuctrl[2] ? 15'd32 : 15'd1))
+                assert (vram_address == (old_active_render_period ?
+                        old_active_data_increment_address :
+                        old_vram_address +
+                        (old_ppuctrl[2] ? 15'd32 : 15'd1)))
                     else $fatal(1, "integrated PPUDATA did not increment once");
             end
         end
@@ -373,6 +412,10 @@ module ppu_phase3c_tb;
                 old_write_toggle = write_toggle;
                 old_read_buffer = ppu_data_read_buffer;
                 old_io_latch = ppu_io_latch;
+                old_automatic_scroll_event = automatic_scroll_event;
+                old_active_render_period = active_render_period;
+                old_active_data_increment_address =
+                    dut.core.registers.active_data_increment_address;
 
                 row_count++;
                 scenario_rows++;
