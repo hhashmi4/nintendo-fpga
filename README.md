@@ -7,7 +7,9 @@ reusable ALU, the Phase 2C address generator, the Phase 2D load/store/transfer
 subset, the Phase 2E arithmetic/logic subset, the Phase 2F control-flow/stack
 subset, Phase 2G reset/interrupt sequencing, Phase 2H cycle/bus timing, the
 Phase 2I Ricoh 2A03 compatibility audit, and the Phase 2J completed official
-CPU qualification. All 151 official opcode bytes are implemented. No PPU,
+CPU qualification. Phase 2K adds a separate CPU-integrated DE1-SoC diagnostic
+image without changing the stable Phase 1 image. All 151 official opcode bytes
+are implemented. No PPU,
 APU, NES memory map, DMA, mapper, controller, or game-execution system exists
 yet.
 
@@ -154,6 +156,21 @@ standalone CPU synthesizes to an estimated 717 ALMs, 1,097 ALUTs, and 191
 registers; the unchanged board diagnostic remains at 43 ALMs and closes 50 MHz
 timing with non-negative slack at every analyzed corner.
 
+## Phase 2K DE1-SoC CPU validation
+
+- Dedicated `cpu_board_diag_top`; the Phase 1 `de1_soc_top` remains unchanged
+- Same `CLOCK_50` clock and reset synchronizer, with enable-only run/debug modes
+- Flat diagnostic RAM/ROM and bus-visible zero-page, stack, vector, and RMW traffic
+- Hardware-generated IRQ, NMI, and multi-cycle `cpu_enable` stall tests
+- Deterministic `$A5` PASS signature, section-specific failures, LEDs, and six HEX digits
+- Self-checking RTL reaches the actual `$83F0`/`$4C` PASS loop in 518 enabled cycles
+- CPU-integrated image fits in 3,244 ALMs and closes 50 MHz timing
+- Volatile programming completed; physical LED/HEX observation is still required
+
+The architecture, program, result codes, synthesis data, programming record,
+and observation checklist are documented in
+[`docs/cpu-phase2k-board-validation.md`](docs/cpu-phase2k-board-validation.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -187,11 +204,13 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-ALU, address-generator, and Phase 2D through Phase 2J instruction simulations.
+ALU, address-generator, Phase 2D through Phase 2J instruction simulations, and
+the Phase 2K board-program simulation.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`, `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
-`cpu_phase2h.fst`, `cpu_phase2i.fst`, and `cpu_phase2j.fst`.
+`cpu_phase2h.fst`, `cpu_phase2i.fst`, `cpu_phase2j.fst`, and
+`cpu_board_diag.fst`.
 
 Individual checks are also available:
 
@@ -215,11 +234,18 @@ Build the SOF and RBF locally:
 ./scripts/build_quartus.sh
 ```
 
+Build the separate CPU-integrated Phase 2K image:
+
+```bash
+./scripts/build_cpu_board_diag_quartus.sh
+```
+
 Generated artifacts remain under ignored build paths. Deployment is explicit
 and never runs in CI:
 
 ```bash
 ./scripts/deploy.sh
+./scripts/deploy_cpu_board_diag.sh
 ```
 
 Deployment first reruns the complete software verification suite, then builds,
