@@ -9,8 +9,9 @@ subset, Phase 2G reset/interrupt sequencing, Phase 2H cycle/bus timing, the
 Phase 2I Ricoh 2A03 compatibility audit, and the Phase 2J completed official
 CPU qualification. Phase 2K adds a separate CPU-integrated DE1-SoC diagnostic
 image without changing the stable Phase 1 image. All 151 official opcode bytes
-are implemented. Phase 3A adds the standalone NTSC PPU timing foundation. No
-PPU renderer or register interface, APU, NES memory map, DMA, mapper,
+are implemented. Phase 3A adds the standalone NTSC PPU timing foundation, and
+Phase 3B adds the CPU-facing PPU registers and internal scroll/address state.
+No PPU renderer or memory, APU, complete NES memory map, DMA, mapper,
 controller, or game-execution system exists yet.
 
 ## Phase 1 foundation
@@ -184,6 +185,20 @@ The timing convention, enable contract, verification evidence, synthesis data,
 and deliberately deferred PPU features are documented in
 [`docs/ppu-phase3a-timing.md`](docs/ppu-phase3a-timing.md).
 
+## Phase 3B PPU register interface
+
+- `$2000-$2007` register decode mirrored exhaustively through `$3FFF`
+- PPUCTRL/PPUMASK/PPUSTATUS state and deterministic digital open-bus behavior
+- Canonical `v/t/x/w` PPUSCROLL and PPUADDR programming sequences
+- Abstract OAMDATA and buffered PPUDATA interfaces for later memory phases
+- PPUMASK-driven Phase 3A odd-frame timing and timing-driven status vblank
+- Independent Python model and 208,249-cycle RTL/reference comparison
+
+The CPU transaction contract, register semantics, memory abstraction,
+integration proof, verification evidence, synthesis data, and deferred PPU
+features are documented in
+[`docs/ppu-phase3b-register-interface.md`](docs/ppu-phase3b-register-interface.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -217,10 +232,10 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, PPU
-timing, CPU, ALU, address-generator, Phase 2D through Phase 2J instruction
-simulations, and the Phase 2K board-program simulation.
+timing/register, CPU, ALU, address-generator, Phase 2D through Phase 2J
+instruction simulations, and the Phase 2K board-program simulation.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
-`ppu_timing.fst`, `cpu_phase2a.fst`, `cpu_alu.fst`,
+`ppu_timing.fst`, `ppu_phase3b.fst`, `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
 `cpu_phase2h.fst`, `cpu_phase2i.fst`, `cpu_phase2j.fst`, and
@@ -246,6 +261,12 @@ Run the standalone Phase 3A PPU timing-core synthesis and timing proof:
 
 ```bash
 ./scripts/build_ppu_quartus.sh
+```
+
+Run the standalone integrated Phase 3B PPU synthesis and timing proof:
+
+```bash
+./scripts/build_ppu_phase3b_quartus.sh
 ```
 
 Build the SOF and RBF locally:
@@ -278,7 +299,7 @@ before use.
 - `rtl/platform` — clock, reset, and NES timing-enable foundation
 - `rtl/diagnostic` — removable hardware diagnostic
 - `rtl/cpu` — CPU state, ALU, addressing, decoder, and shared instruction sequencer
-- `rtl/ppu` — standalone PPU timing foundation
+- `rtl/ppu` — PPU timing, CPU register interface, and integrated core
 - `rtl/apu` — reserved for later phases
 - `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
 - `sim` — self-checking SystemVerilog testbenches

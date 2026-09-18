@@ -22,6 +22,12 @@ verilator --lint-only --Wall \
     --top-module ppu_timing \
     rtl/ppu/ppu_timing.sv
 
+verilator --lint-only --Wall \
+    --top-module ppu_core \
+    rtl/ppu/ppu_timing.sv \
+    rtl/ppu/ppu_registers.sv \
+    rtl/ppu/ppu_core.sv
+
 CPU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
     rtl/cpu/cpu_alu.sv
