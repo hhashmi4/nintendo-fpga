@@ -18,6 +18,10 @@ verilator --lint-only --Wall -Wno-fatal \
     --top-module de1_soc_top \
     "${PLATFORM_RTL_FILES[@]}"
 
+verilator --lint-only --Wall \
+    --top-module ppu_timing \
+    rtl/ppu/ppu_timing.sv
+
 CPU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
     rtl/cpu/cpu_alu.sv

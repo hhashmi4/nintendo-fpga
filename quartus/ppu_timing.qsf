@@ -1,0 +1,32 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY ppu_timing
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_timing.sv
+set_global_assignment -name SDC_FILE ../constraints/ppu_timing.sdc
+
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_ppu/output_files
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
+
+# Give the standalone proof a real global-clock-capable board pin. Every other
+# top-level port is virtual because this core is not a deployable board image.
+set_location_assignment PIN_AF14 -to clk
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk
+set_instance_assignment -name VIRTUAL_PIN ON -to reset
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to rendering_enabled
+set_instance_assignment -name VIRTUAL_PIN ON -to dot[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to scanline[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to frame_odd
+set_instance_assignment -name VIRTUAL_PIN ON -to visible_pixel
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_y[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to vblank
+set_instance_assignment -name VIRTUAL_PIN ON -to frame_start
+set_instance_assignment -name VIRTUAL_PIN ON -to frame_end
+set_instance_assignment -name VIRTUAL_PIN ON -to scanline_start
+set_instance_assignment -name VIRTUAL_PIN ON -to vblank_start
+set_instance_assignment -name VIRTUAL_PIN ON -to vblank_end
+set_instance_assignment -name VIRTUAL_PIN ON -to pre_render
+set_instance_assignment -name VIRTUAL_PIN ON -to post_render
