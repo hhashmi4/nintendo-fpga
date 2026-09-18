@@ -28,6 +28,14 @@ verilator --lint-only --Wall \
     rtl/ppu/ppu_registers.sv \
     rtl/ppu/ppu_core.sv
 
+verilator --lint-only --Wall \
+    --top-module ppu_memory_core \
+    rtl/ppu/ppu_timing.sv \
+    rtl/ppu/ppu_registers.sv \
+    rtl/ppu/ppu_core.sv \
+    rtl/ppu/ppu_memory.sv \
+    rtl/ppu/ppu_memory_core.sv
+
 CPU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
     rtl/cpu/cpu_alu.sv

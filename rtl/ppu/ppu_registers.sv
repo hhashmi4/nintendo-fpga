@@ -103,6 +103,21 @@ module ppu_registers (
         mask_emphasize_blue = ppumask[7];
         rendering_enabled = mask_show_background || mask_show_sprites;
 
+        oam_write_data = cpu_write_data;
+        oam_write_enable = accepted_access && cpu_bus_write &&
+                           cpu_register_index == REG_OAMDATA;
+
+        ppu_memory_read_request = accepted_access && !cpu_bus_write &&
+                                  cpu_register_index == REG_PPUDATA;
+        ppu_memory_write_request = accepted_access && cpu_bus_write &&
+                                   cpu_register_index == REG_PPUDATA;
+        ppu_memory_write_data = cpu_write_data;
+    end
+
+    // Keep the read-data mux separate from address/request generation. This
+    // makes the external combinational memory contract explicit and avoids a
+    // false address-to-data combinational loop in integrated lint analysis.
+    always_comb begin
         cpu_read_data = ppu_io_latch;
         if (cpu_register_selected) begin
             case (cpu_register_index)
@@ -119,16 +134,6 @@ module ppu_registers (
                 default: begin end
             endcase
         end
-
-        oam_write_data = cpu_write_data;
-        oam_write_enable = accepted_access && cpu_bus_write &&
-                           cpu_register_index == REG_OAMDATA;
-
-        ppu_memory_read_request = accepted_access && !cpu_bus_write &&
-                                  cpu_register_index == REG_PPUDATA;
-        ppu_memory_write_request = accepted_access && cpu_bus_write &&
-                                   cpu_register_index == REG_PPUDATA;
-        ppu_memory_write_data = cpu_write_data;
     end
 
     always_ff @(posedge clk) begin
