@@ -5,10 +5,11 @@ DE1-SoC and its Intel Cyclone V SoC FPGA. The repository implements the Phase 1
 platform foundation, the Phase 2A CPU architectural shell, the Phase 2B
 reusable ALU, the Phase 2C address generator, the Phase 2D load/store/transfer
 subset, the Phase 2E arithmetic/logic subset, the Phase 2F control-flow/stack
-subset, Phase 2G reset/interrupt sequencing, Phase 2H cycle/bus timing, and
-the Phase 2I Ricoh 2A03 compatibility audit. No
-complete CPU instruction set, PPU, APU, mapper, controller, or game-execution
-logic exists yet.
+subset, Phase 2G reset/interrupt sequencing, Phase 2H cycle/bus timing, the
+Phase 2I Ricoh 2A03 compatibility audit, and the Phase 2J completed official
+CPU qualification. All 151 official opcode bytes are implemented. No PPU,
+APU, NES memory map, DMA, mapper, controller, or game-execution system exists
+yet.
 
 ## Phase 1 foundation
 
@@ -107,7 +108,7 @@ counts, and verification coverage are documented in
 
 ## Phase 2H CPU cycle and bus timing
 
-- Machine-readable timing metadata for all 141 implemented official opcodes
+- Machine-readable timing metadata for every official opcode
 - NMOS indexed tentative reads, conditional page repair, and 2/3/4-cycle branches
 - Original-value plus modified-value writes for memory RMW instructions
 - Canonical stack, JSR/RTS, BRK/RTI, interrupt, and seven-cycle reset sequences
@@ -123,11 +124,35 @@ edge limitations are documented in
 - Explicit B/U stack-byte policy and seven-cycle reset re-audit
 - Edge-latched NMI, level IRQ, priority, and corrected PLP IRQ polling delay
 - Re-audited indirect-JMP wrapping, NMOS RMW writes, and page penalties
-- Honest official-opcode inventory: 141 of 151 official bytes currently decode
+- Audit baseline identified the final ten official bytes completed in Phase 2J
 
 The sources, 6502/2A03 comparison, exact coverage, compatibility assessment,
 and deferred edge cases are documented in
 [`docs/cpu-phase2i-2a03-audit.md`](docs/cpu-phase2i-2a03-audit.md).
+
+## Phase 2J completed official CPU
+
+- BIT zp/abs, CLC, SEC, CLI, SEI, CLV, CLD, SED, and official NOP
+- 56 official mnemonics and all 151 official opcode bytes
+- Old-I interrupt polling after CLI/SEI, matching the existing PLP mechanism
+- Machine-readable JSON and generated Markdown opcode/cycle/flag matrix
+- Verification-only flat 64 KiB program runner
+- Klaus Dormann's open functional test passed on RTL with decimal tests disabled
+- All 105 unofficial opcode bytes retain the deterministic trap policy
+
+The final architecture, exact coverage, external-test method, synthesis data,
+and Phase 3 boundary are documented in
+[`docs/cpu-phase2j-final-verification.md`](docs/cpu-phase2j-final-verification.md).
+The full opcode artifacts are
+[`docs/cpu-official-opcodes.json`](docs/cpu-official-opcodes.json) and
+[`docs/cpu-official-opcode-matrix.md`](docs/cpu-official-opcode-matrix.md).
+
+The final local qualification comprises 467 Python tests, 2,382 focused Phase
+2J RTL vectors, the complete retained RTL/exhaustive regression, and the Klaus
+Dormann open functional test running to its stable success loop on RTL. The
+standalone CPU synthesizes to an estimated 717 ALMs, 1,097 ALUTs, and 191
+registers; the unchanged board diagnostic remains at 43 ALMs and closes 50 MHz
+timing with non-negative slack at every analyzed corner.
 
 ## Development environment
 
@@ -162,11 +187,11 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, CPU,
-ALU, address-generator, and Phase 2D through Phase 2I instruction simulations.
+ALU, address-generator, and Phase 2D through Phase 2J instruction simulations.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`, `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
-`cpu_phase2h.fst`, and `cpu_phase2i.fst`.
+`cpu_phase2h.fst`, `cpu_phase2i.fst`, and `cpu_phase2j.fst`.
 
 Individual checks are also available:
 

@@ -55,7 +55,7 @@ def test_phase2g_opcode_matrix_matches_rtl() -> None:
     assert OPCODE_TABLE[0x00].addressing_mode is AddressingMode.IMPLIED
     assert OPCODE_TABLE[0x40].instruction is Instruction.RTI
     assert OPCODE_TABLE[0x40].addressing_mode is AddressingMode.IMPLIED
-    assert len(OPCODE_TABLE) == 141
+    assert len(OPCODE_TABLE) == 151
 
     rtl_text = Path("rtl/cpu/cpu_decoder.sv").read_text(encoding="utf-8")
     rtl_opcodes = {

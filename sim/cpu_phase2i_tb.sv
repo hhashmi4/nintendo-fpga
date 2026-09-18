@@ -421,16 +421,7 @@ module cpu_phase2i_tb;
                 memory_write_count == writes_before && !bus_write_enable)
             else $fatal(1, "unofficial opcode did not trap inertly");
 
-        // NOP is one of ten still-deferred official bytes; it also traps and
-        // is reported as an explicit compatibility limitation.
-        memory_model.memory[START] = 8'hEA;
-        reset_core(START);
-        writes_before = memory_write_count;
-        step_cpu(1'b1);
-        assert (debug_execution_state == CPU_STATE_TRAP &&
-                memory_write_count == writes_before && !bus_write_enable)
-            else $fatal(1, "deferred official opcode did not trap inertly");
-        bus_audit_vectors += 2;
+        bus_audit_vectors++;
     endtask
 
     initial begin
@@ -447,11 +438,11 @@ module cpu_phase2i_tb;
         test_page_cross_classes();
         test_unsupported_policy();
         assert (decimal_vectors == 32 && status_vectors == 64 &&
-                interrupt_vectors == 3 && bus_audit_vectors == 125)
+                interrupt_vectors == 3 && bus_audit_vectors == 123)
             else $fatal(1, "Phase 2I vector accounting mismatch %0d/%0d/%0d/%0d",
                         decimal_vectors, status_vectors, interrupt_vectors,
                         bus_audit_vectors);
-        $display("PASS: Phase 2I Ricoh 2A03 audit (32 decimal, 64 status, 3 interrupt, 125 bus/reset vectors)");
+        $display("PASS: Phase 2I Ricoh 2A03 audit (32 decimal, 64 status, 3 interrupt, 123 bus/reset vectors)");
         $finish;
     end
 endmodule

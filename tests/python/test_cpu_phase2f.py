@@ -77,7 +77,7 @@ def _branch_condition(opcode: int, status: int) -> bool:
 
 def test_phase2f_opcode_matrix_matches_rtl() -> None:
     assert len(PHASE2F_OPCODES) == 16
-    assert len(OPCODE_TABLE) == 141
+    assert len(OPCODE_TABLE) == 151
 
     rtl_text = Path("rtl/cpu/cpu_decoder.sv").read_text(encoding="utf-8")
     rtl_opcodes = {int(value, 16) for value in re.findall(r"8'h([0-9A-Fa-f]{2}):", rtl_text)}

@@ -15,7 +15,7 @@ from verification.cpu_timing import (
 
 
 def test_cycle_table_covers_every_implemented_official_opcode() -> None:
-    assert len(OPCODE_TABLE) == 141
+    assert len(OPCODE_TABLE) == 151
     assert set(CYCLE_TABLE) == set(OPCODE_TABLE)
     for opcode, timing in CYCLE_TABLE.items():
         decoded = OPCODE_TABLE[opcode]
