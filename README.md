@@ -14,9 +14,10 @@ Phase 3B adds the CPU-facing PPU registers and internal scroll/address state.
 Phase 3C adds the complete logical PPU memory map, cartridge CHR interface,
 mirrored 2 KiB nametable CIRAM, and palette RAM. Phase 3D adds cycle-accurate
 rendering-time scroll/address updates and future background-fetch addresses.
-No PPU renderer, APU, complete
-NES system memory map, DMA, mapper,
-controller, or game-execution system exists yet.
+Phase 3E adds the background fetch/shifter pipeline and logical background
+pixels. Phase 3F adds real primary/secondary OAM and cycle-scheduled sprite
+evaluation. Sprite pattern rendering, APU, DMA, mapper, video output,
+controller, and a complete game-execution system do not exist yet.
 
 ## Phase 1 foundation
 
@@ -244,6 +245,21 @@ orientation, verification evidence, synthesis results, and deferred sprite/video
 features are documented in
 [`docs/ppu-phase3e-background-renderer.md`](docs/ppu-phase3e-background-renderer.md).
 
+## Phase 3F PPU sprite evaluation
+
+- Synthesizable 256-byte primary OAM behind real `$2003/$2004` accesses
+- Two-dot 32-byte secondary-OAM clearing during visible dots 1-64
+- Odd-read/even-process sprite evaluation during dots 65-256
+- First-eight OAM priority, original-index metadata, and sprite-zero selection
+- Exhaustive 8x8/8x16 range verification with eight-bit Y arithmetic
+- Documented diagonal `n/m` sprite-overflow bug and PPUSTATUS integration
+- Stable eight-slot handoff interface for Phase 3G sprite fetches
+
+The storage architecture, cycle timing, collision policy, overflow fidelity,
+verification evidence, synthesis results, and deferred sprite renderer are
+documented in
+[`docs/ppu-phase3f-sprite-evaluation.md`](docs/ppu-phase3f-sprite-evaluation.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -277,11 +293,12 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, PPU
-timing/register/memory/scroll/background, CPU, ALU, address-generator, Phase 2D
+timing/register/memory/scroll/background/OAM, CPU, ALU, address-generator, Phase 2D
 through Phase 2J instruction simulations, and the Phase 2K board-program simulation.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
+`ppu_oam.fst`, `ppu_phase3f.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -332,6 +349,13 @@ Run the standalone integrated Phase 3E PPU-background synthesis and timing proof
 
 ```bash
 ./scripts/build_ppu_phase3e_quartus.sh
+```
+
+Run the standalone integrated Phase 3F PPU sprite-evaluation synthesis and
+timing proof:
+
+```bash
+./scripts/build_ppu_phase3f_quartus.sh
 ```
 
 Build the SOF and RBF locally:
