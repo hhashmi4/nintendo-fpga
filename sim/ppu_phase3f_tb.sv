@@ -12,7 +12,6 @@ module ppu_phase3f_tb;
     logic [7:0] cpu_read_data;
     logic cpu_register_selected;
     logic [2:0] cpu_register_index;
-    logic sprite_zero_hit_set = 1'b0;
     logic [7:0] oam_addr;
     logic [7:0] oam_write_data;
     logic oam_write_enable;
@@ -137,6 +136,16 @@ module ppu_phase3f_tb;
     logic sprite_is_zero;
     logic [2:0] sprite_slot;
     logic [5:0] sprite_original_index;
+    logic final_pixel_valid;
+    logic [7:0] final_pixel_x;
+    logic [7:0] final_pixel_y;
+    logic [13:0] final_palette_address;
+    logic [5:0] final_nes_color;
+    logic [2:0] final_color_emphasis;
+    logic [1:0] final_pixel_source;
+    logic sprite_zero_hit_event;
+    logic [2:0] final_winning_sprite_slot;
+    logic final_winning_sprite_zero;
     logic [2:0] secondary_read_slot;
     logic [7:0] secondary_read_y;
     logic [7:0] secondary_read_tile;
@@ -244,7 +253,10 @@ module ppu_phase3f_tb;
         sprite_x, sprite_y, sprite_pattern, sprite_palette,
         sprite_palette_index, sprite_opaque,
         sprite_priority_behind_background, sprite_is_zero, sprite_slot,
-        sprite_original_index,
+        sprite_original_index, final_pixel_valid, final_pixel_x,
+        final_pixel_y, final_palette_address, final_nes_color,
+        final_color_emphasis, final_pixel_source, sprite_zero_hit_event,
+        final_winning_sprite_slot, final_winning_sprite_zero,
         sprite_evaluation_relative_row, sprite_height
     };
 

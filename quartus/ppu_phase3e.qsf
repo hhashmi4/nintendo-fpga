@@ -129,3 +129,5 @@ set_instance_assignment -name VIRTUAL_PIN ON -to bg_pattern[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to bg_palette[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to bg_opaque
 set_instance_assignment -name VIRTUAL_PIN ON -to bg_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_palette_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_palette_read_data[*]

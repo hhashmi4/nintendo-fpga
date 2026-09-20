@@ -4,7 +4,7 @@ create_clock -name clk -period 20.000 [get_ports {clk}]
 
 set_false_path -from [get_ports {
     reset ppu_enable cpu_enable cpu_bus_valid cpu_bus_write cpu_address[*]
-    cpu_write_data[*] sprite_zero_hit_set mirroring_mode[*] chr_read_data[*]
+    cpu_write_data[*] mirroring_mode[*] chr_read_data[*]
     secondary_read_slot[*]
 }]
 

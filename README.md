@@ -17,9 +17,11 @@ rendering-time scroll/address updates and future background-fetch addresses.
 Phase 3E adds the background fetch/shifter pipeline and logical background
 pixels. Phase 3F adds real primary/secondary OAM and cycle-scheduled sprite
 evaluation. Phase 3G adds cartridge-facing sprite pattern fetches, flip logic,
-X counters, shifters, and logical sprite candidates. Final background/sprite
-mixing, APU, DMA, mapper, video output, controller, and a complete
-game-execution system do not exist yet.
+X counters, shifters, and logical sprite candidates. Phase 3H mixes background
+and sprite candidates, reads palette RAM, emits final six-bit NES colors plus
+emphasis metadata, and implements sprite-zero hit. RGB conversion, APU, DMA,
+mapper, video output, controller, and a complete game-execution system do not
+exist yet.
 
 ## Phase 1 foundation
 
@@ -277,6 +279,20 @@ verification evidence, synthesis results, and Phase 3H boundary are documented
 in
 [`docs/ppu-phase3g-sprite-renderer.md`](docs/ppu-phase3g-sprite-renderer.md).
 
+## Phase 3H PPU pixel mixer
+
+- Explicit universal/background/sprite transparency and priority selection
+- Exact background and sprite palette-address generation through Phase 3C RAM
+- Six-bit NES color output, PPUMASK grayscale, and emphasis metadata
+- Sprite-zero-hit event with original-OAM identity, left masks, and X=255 rule
+- Existing PPUSTATUS latch integration without changing vblank or overflow
+- Stall-safe 256x240 logical pixel stream for future VGA or HDMI modules
+- Full-frame integrated RTL/reference comparison across all 61,440 pixels
+
+The mixer rules, palette lookup, status behavior, video boundary, verification,
+synthesis results, and deferred RGB/video work are documented in
+[`docs/ppu-phase3h-pixel-mixer.md`](docs/ppu-phase3h-pixel-mixer.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -310,12 +326,14 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, PPU
-timing/register/memory/scroll/background/OAM, CPU, ALU, address-generator, Phase 2D
-through Phase 2J instruction simulations, and the Phase 2K board-program simulation.
+timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
+address-generator, Phase 2D through Phase 2J instruction simulations, and the
+Phase 2K board-program simulation.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
 `ppu_oam.fst`, `ppu_phase3f.fst`,
+`ppu_sprite_renderer.fst`, `ppu_phase3g.fst`, `ppu_phase3h.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -380,6 +398,13 @@ timing proof:
 
 ```bash
 ./scripts/build_ppu_phase3g_quartus.sh
+```
+
+Run the standalone integrated Phase 3H PPU pixel-mixer synthesis and timing
+proof:
+
+```bash
+./scripts/build_ppu_phase3h_quartus.sh
 ```
 
 Build the SOF and RBF locally:

@@ -42,6 +42,8 @@ module ppu_background_core (
     output logic [4:0]  palette_index,
     output logic        ciram_write_enable,
     output logic        palette_write_enable,
+    input  logic [13:0] pixel_palette_address,
+    output logic [7:0]  pixel_palette_read_data,
 
     output logic [8:0]  dot,
     output logic [8:0]  scanline,
@@ -304,6 +306,8 @@ module ppu_background_core (
         .access_read_data             (memory_read_data),
         .buffer_read_address          (ppu_memory_buffer_address),
         .buffer_read_data             (memory_buffer_read_data),
+        .pixel_palette_address        (pixel_palette_address),
+        .pixel_palette_read_data      (pixel_palette_read_data),
         .chr_addr                     (chr_addr),
         .chr_read                     (chr_read),
         .chr_write                    (chr_write),

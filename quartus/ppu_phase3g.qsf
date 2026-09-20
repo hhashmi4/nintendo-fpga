@@ -27,7 +27,6 @@ set_instance_assignment -name VIRTUAL_PIN ON -to cpu_write_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_read_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_register_selected
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_register_index[*]
-set_instance_assignment -name VIRTUAL_PIN ON -to sprite_zero_hit_set
 set_instance_assignment -name VIRTUAL_PIN ON -to oam_addr[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to oam_write_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to oam_write_enable
@@ -152,7 +151,9 @@ set_instance_assignment -name VIRTUAL_PIN ON -to cpu_oam_collision
 
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_address.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_renderer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_pixel_mixer.sv
 set_global_assignment -name SDC_FILE ../constraints/ppu_phase3g.sdc
+set_global_assignment -name SDC_FILE ../constraints/ppu_phase3h.sdc
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_ppu_phase3g/output_files
 
 set_instance_assignment -name VIRTUAL_PIN ON -to sprite_memory_request
@@ -182,3 +183,13 @@ set_instance_assignment -name VIRTUAL_PIN ON -to sprite_priority_behind_backgrou
 set_instance_assignment -name VIRTUAL_PIN ON -to sprite_is_zero
 set_instance_assignment -name VIRTUAL_PIN ON -to sprite_slot[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to sprite_original_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to final_pixel_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to final_pixel_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to final_pixel_y[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to final_palette_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to final_nes_color[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to final_color_emphasis[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to final_pixel_source[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_zero_hit_event
+set_instance_assignment -name VIRTUAL_PIN ON -to final_winning_sprite_slot[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to final_winning_sprite_zero

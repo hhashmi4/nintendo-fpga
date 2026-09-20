@@ -38,6 +38,8 @@ module ppu_phase3e_tb;
     logic [4:0] palette_index;
     logic ciram_write_enable;
     logic palette_write_enable;
+    logic [13:0] pixel_palette_address = 14'h3f00;
+    logic [7:0] pixel_palette_read_data;
     logic [8:0] dot;
     logic [8:0] scanline;
     logic frame_odd;
@@ -196,6 +198,7 @@ module ppu_phase3e_tb;
                                  logical_nametable, nametable_offset,
                                  physical_ciram_page, ciram_address,
                                  palette_index, pixel_y, timing_vblank,
+                                 pixel_palette_read_data,
                                  frame_start, scanline_start, vblank_start,
                                  vblank_end, pre_render, post_render,
                                  status_sprite_zero_hit,

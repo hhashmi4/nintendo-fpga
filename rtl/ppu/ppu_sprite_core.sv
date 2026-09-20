@@ -1,8 +1,8 @@
 `timescale 1ns/1ps
 
-// Phase 3G production integration. Earlier phase tops retain their abstract
-// OAM ports for focused regression; this wrapper composes real OAM,
-// background rendering, sprite fetch/rendering, and PPU memory arbitration.
+// Phase 3H production integration. Earlier phase tops retain their focused
+// interfaces; this wrapper composes background and sprite rendering, final
+// palette selection, real OAM, and PPU memory arbitration.
 module ppu_sprite_core (
     input  logic        clk,
     input  logic        reset,
@@ -15,7 +15,6 @@ module ppu_sprite_core (
     output logic [7:0]  cpu_read_data,
     output logic        cpu_register_selected,
     output logic [2:0]  cpu_register_index,
-    input  logic        sprite_zero_hit_set,
     output logic [7:0]  oam_addr,
     output logic [7:0]  oam_write_data,
     output logic        oam_write_enable,
@@ -147,6 +146,17 @@ module ppu_sprite_core (
     output logic [2:0]  sprite_slot,
     output logic [5:0]  sprite_original_index,
 
+    output logic        final_pixel_valid,
+    output logic [7:0]  final_pixel_x,
+    output logic [7:0]  final_pixel_y,
+    output logic [13:0] final_palette_address,
+    output logic [5:0]  final_nes_color,
+    output logic [2:0]  final_color_emphasis,
+    output logic [1:0]  final_pixel_source,
+    output logic        sprite_zero_hit_event,
+    output logic [2:0]  final_winning_sprite_slot,
+    output logic        final_winning_sprite_zero,
+
     input  logic [2:0]  secondary_read_slot,
     output logic [7:0]  secondary_read_y,
     output logic [7:0]  secondary_read_tile,
@@ -183,6 +193,7 @@ module ppu_sprite_core (
     logic [7:0] renderer_read_x;
     logic [5:0] renderer_read_sprite_index;
     logic renderer_read_valid;
+    logic [7:0] pixel_palette_read_data;
 
     assign cpu_oam_access = !reset && cpu_enable && cpu_bus_valid &&
                             cpu_address >= 16'h2000 &&
@@ -190,9 +201,56 @@ module ppu_sprite_core (
                             cpu_address[2:0] == REG_OAMDATA;
 
     ppu_background_core background_core (
+        .sprite_zero_hit_set (sprite_zero_hit_event),
         .sprite_overflow_set (sprite_overflow_set),
         .oam_read_data       (oam_read_data_internal),
+        .pixel_palette_address   (final_palette_address),
+        .pixel_palette_read_data (pixel_palette_read_data),
         .*
+    );
+
+    ppu_pixel_mixer pixel_mixer (
+        .clk                               (clk),
+        .reset                             (reset),
+        .ppu_enable                        (ppu_enable),
+        .visible_pixel                     (visible_pixel),
+        .pixel_x                           (pixel_x),
+        .pixel_y                           (pixel_y),
+        .background_enabled                (mask_show_background),
+        .sprites_enabled                   (mask_show_sprites),
+        .show_background_left              (mask_show_background_left),
+        .show_sprites_left                 (mask_show_sprites_left),
+        .grayscale                         (mask_grayscale),
+        .emphasis                          ({mask_emphasize_blue,
+                                             mask_emphasize_green,
+                                             mask_emphasize_red}),
+        .bg_pixel_valid                    (bg_pixel_valid),
+        .bg_x                              (bg_x),
+        .bg_y                              (bg_y),
+        .bg_pattern                        (bg_pattern),
+        .bg_palette                        (bg_palette),
+        .bg_opaque                         (bg_opaque),
+        .sprite_pixel_valid                (sprite_pixel_valid),
+        .sprite_x                          (sprite_x),
+        .sprite_y                          (sprite_y),
+        .sprite_pattern                    (sprite_pattern),
+        .sprite_palette                    (sprite_palette),
+        .sprite_opaque                     (sprite_opaque),
+        .sprite_priority_behind_background (sprite_priority_behind_background),
+        .sprite_is_zero                    (sprite_is_zero),
+        .sprite_slot                       (sprite_slot),
+        .sprite_original_index             (sprite_original_index),
+        .palette_address                   (final_palette_address),
+        .palette_read_data                 (pixel_palette_read_data),
+        .final_pixel_valid                 (final_pixel_valid),
+        .final_pixel_x                     (final_pixel_x),
+        .final_pixel_y                     (final_pixel_y),
+        .nes_color                         (final_nes_color),
+        .color_emphasis                    (final_color_emphasis),
+        .pixel_source                      (final_pixel_source),
+        .sprite_zero_hit_event             (sprite_zero_hit_event),
+        .winning_sprite_slot               (final_winning_sprite_slot),
+        .winning_sprite_zero               (final_winning_sprite_zero)
     );
 
     ppu_sprite_renderer sprite_renderer (

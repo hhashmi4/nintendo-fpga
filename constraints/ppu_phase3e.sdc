@@ -5,7 +5,8 @@ create_clock -name clk -period 20.000 [get_ports {clk}]
 set_false_path -from [get_ports {
     reset ppu_enable cpu_enable cpu_bus_valid cpu_bus_write cpu_address[*]
     cpu_write_data[*] sprite_zero_hit_set sprite_overflow_set oam_read_data[*]
-    mirroring_mode[*] chr_read_data[*]
+    mirroring_mode[*] chr_read_data[*] sprite_memory_request
+    sprite_memory_address[*] pixel_palette_address[*]
 }]
 
 set_false_path -to [get_ports {
@@ -37,7 +38,8 @@ set_false_path -to [get_ports {
     next_tile_pattern_low[*] next_tile_pattern_high[*] pattern_low_shift[*]
     pattern_high_shift[*] attribute_low_shift[*] attribute_high_shift[*]
     bg_pixel_valid bg_x[*] bg_y[*] bg_pattern[*] bg_palette[*] bg_opaque
-    bg_index[*]
+    bg_index[*] sprite_memory_grant sprite_memory_read_data[*]
+    renderer_owner_conflict pixel_palette_read_data[*]
 }]
 
 derive_clock_uncertainty

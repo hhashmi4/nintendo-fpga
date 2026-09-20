@@ -16,6 +16,11 @@ module ppu_memory (
     input  logic [13:0] buffer_read_address,
     output logic [7:0]  buffer_read_data,
 
+    // Independent rendering-time palette read. This is a second read-only
+    // view of the existing Phase 3C palette array, not a second palette RAM.
+    input  logic [13:0] pixel_palette_address,
+    output logic [7:0]  pixel_palette_read_data,
+
     // Cartridge-owned CHR space. No CHR storage is instantiated here.
     output logic [12:0] chr_addr,
     output logic        chr_read,
@@ -59,6 +64,7 @@ module ppu_memory (
     logic [1:0] buffer_region;
     logic [10:0] ciram_read_address;
     logic [7:0] ciram_read_data;
+    logic [4:0] pixel_palette_index;
 
     function automatic logic [1:0] decode_region(input logic [13:0] address);
         if (address < 14'h2000) decode_region = REGION_CHR;
@@ -109,6 +115,12 @@ module ppu_memory (
         );
         ciram_address = {physical_ciram_page, nametable_offset};
         palette_index = normalize_palette(access_address[4:0]);
+        pixel_palette_index =
+            normalize_palette(pixel_palette_address[4:0]);
+        pixel_palette_read_data = 8'h00;
+        if (pixel_palette_address >= 14'h3f00 &&
+            pixel_palette_address <= 14'h3f1f)
+            pixel_palette_read_data = palette_ram[pixel_palette_index];
 
         buffer_region = decode_region(buffer_read_address);
         buffer_nametable_address = normalize_nametable(buffer_read_address);
