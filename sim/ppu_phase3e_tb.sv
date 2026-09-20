@@ -92,6 +92,11 @@ module ppu_phase3e_tb;
     logic [13:0] renderer_memory_address;
     logic renderer_memory_grant;
     logic renderer_cpu_collision;
+    logic sprite_memory_request = 1'b0;
+    logic [13:0] sprite_memory_address = 14'h0000;
+    logic sprite_memory_grant;
+    logic [7:0] sprite_memory_read_data;
+    logic renderer_owner_conflict;
     logic [2:0] background_fetch_phase;
     logic [2:0] background_fetch_type;
     logic background_fetch_complete;
@@ -171,6 +176,9 @@ module ppu_phase3e_tb;
                                  renderer_memory_address,
                                  renderer_memory_grant,
                                  renderer_cpu_collision,
+                                 sprite_memory_grant,
+                                 sprite_memory_read_data,
+                                 renderer_owner_conflict,
                                  memory_region, chr_addr, chr_read, chr_write,
                                  ciram_write_enable, palette_write_enable,
                                  dot, scanline, frame_odd, vram_address,

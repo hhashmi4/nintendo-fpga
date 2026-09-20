@@ -16,8 +16,10 @@ mirrored 2 KiB nametable CIRAM, and palette RAM. Phase 3D adds cycle-accurate
 rendering-time scroll/address updates and future background-fetch addresses.
 Phase 3E adds the background fetch/shifter pipeline and logical background
 pixels. Phase 3F adds real primary/secondary OAM and cycle-scheduled sprite
-evaluation. Sprite pattern rendering, APU, DMA, mapper, video output,
-controller, and a complete game-execution system do not exist yet.
+evaluation. Phase 3G adds cartridge-facing sprite pattern fetches, flip logic,
+X counters, shifters, and logical sprite candidates. Final background/sprite
+mixing, APU, DMA, mapper, video output, controller, and a complete
+game-execution system do not exist yet.
 
 ## Phase 1 foundation
 
@@ -260,6 +262,21 @@ verification evidence, synthesis results, and deferred sprite renderer are
 documented in
 [`docs/ppu-phase3f-sprite-evaluation.md`](docs/ppu-phase3f-sprite-evaluation.md).
 
+## Phase 3G PPU sprite renderer
+
+- Eight two-dot-access sprite fetch groups across dots 257-320
+- Exhaustively verified 8x8/8x16 CHR addressing and vertical flipping
+- Cartridge-facing low/high pattern fetches with horizontal-flip loading
+- Eight X counters and pattern-shifter pairs with `ppu_enable` stall safety
+- First-opaque OAM-order selection with palette, priority, and sprite-zero metadata
+- PPUMASK sprite enable and independent left-eight-pixel clipping
+- Full-frame primary-OAM-to-logical-pixel RTL/reference comparison
+
+The fetch cadence, CHR formulas, shifter orientation, arbitration policy,
+verification evidence, synthesis results, and Phase 3H boundary are documented
+in
+[`docs/ppu-phase3g-sprite-renderer.md`](docs/ppu-phase3g-sprite-renderer.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -356,6 +373,13 @@ timing proof:
 
 ```bash
 ./scripts/build_ppu_phase3f_quartus.sh
+```
+
+Run the standalone integrated Phase 3G PPU sprite-renderer synthesis and
+timing proof:
+
+```bash
+./scripts/build_ppu_phase3g_quartus.sh
 ```
 
 Build the SOF and RBF locally:

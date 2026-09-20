@@ -1,8 +1,8 @@
 `timescale 1ns/1ps
 
-// Phase 3F production integration. Earlier phase tops retain their abstract
-// OAM ports for focused regression; this wrapper closes that boundary with
-// real primary/secondary OAM and feeds evaluator overflow into PPUSTATUS.
+// Phase 3G production integration. Earlier phase tops retain their abstract
+// OAM ports for focused regression; this wrapper composes real OAM,
+// background rendering, sprite fetch/rendering, and PPU memory arbitration.
 module ppu_sprite_core (
     input  logic        clk,
     input  logic        reset,
@@ -98,6 +98,11 @@ module ppu_sprite_core (
     output logic [13:0] renderer_memory_address,
     output logic        renderer_memory_grant,
     output logic        renderer_cpu_collision,
+    output logic        sprite_memory_request,
+    output logic [13:0] sprite_memory_address,
+    output logic        sprite_memory_grant,
+    output logic [7:0]  sprite_memory_read_data,
+    output logic        renderer_owner_conflict,
     output logic [2:0]  background_fetch_phase,
     output logic [2:0]  background_fetch_type,
     output logic        background_fetch_complete,
@@ -118,6 +123,29 @@ module ppu_sprite_core (
     output logic [1:0]  bg_palette,
     output logic        bg_opaque,
     output logic [3:0]  bg_index,
+
+    output logic [2:0]  sprite_fetch_slot,
+    output logic [2:0]  sprite_fetch_phase,
+    output logic [2:0]  sprite_fetch_type,
+    output logic        sprite_fetch_complete,
+    output logic        sprite_slot_load,
+    output logic [3:0]  sprite_fetch_relative_row,
+    output logic [3:0]  sprite_fetch_selected_row,
+    output logic [12:0] sprite_pattern_low_address,
+    output logic [12:0] sprite_pattern_high_address,
+    output logic [7:0]  sprite_decrement_mask,
+    output logic [7:0]  sprite_shift_mask,
+    output logic        sprite_pixel_valid,
+    output logic [7:0]  sprite_x,
+    output logic [7:0]  sprite_y,
+    output logic [1:0]  sprite_pattern,
+    output logic [1:0]  sprite_palette,
+    output logic [3:0]  sprite_palette_index,
+    output logic        sprite_opaque,
+    output logic        sprite_priority_behind_background,
+    output logic        sprite_is_zero,
+    output logic [2:0]  sprite_slot,
+    output logic [5:0]  sprite_original_index,
 
     input  logic [2:0]  secondary_read_slot,
     output logic [7:0]  secondary_read_y,
@@ -148,6 +176,13 @@ module ppu_sprite_core (
 
     logic [7:0] oam_read_data_internal;
     logic cpu_oam_access;
+    logic [2:0] renderer_read_slot;
+    logic [7:0] renderer_read_y;
+    logic [7:0] renderer_read_tile;
+    logic [7:0] renderer_read_attributes;
+    logic [7:0] renderer_read_x;
+    logic [5:0] renderer_read_sprite_index;
+    logic renderer_read_valid;
 
     assign cpu_oam_access = !reset && cpu_enable && cpu_bus_valid &&
                             cpu_address >= 16'h2000 &&
@@ -158,6 +193,56 @@ module ppu_sprite_core (
         .sprite_overflow_set (sprite_overflow_set),
         .oam_read_data       (oam_read_data_internal),
         .*
+    );
+
+    ppu_sprite_renderer sprite_renderer (
+        .clk                               (clk),
+        .reset                             (reset),
+        .ppu_enable                        (ppu_enable),
+        .dot                               (dot),
+        .scanline                          (scanline),
+        .visible_pixel                     (visible_pixel),
+        .pixel_x                           (pixel_x),
+        .pixel_y                           (pixel_y),
+        .rendering_enabled                 (rendering_enabled),
+        .sprites_enabled                   (mask_show_sprites),
+        .show_sprites_left                 (mask_show_sprites_left),
+        .sprite_size_16                    (sprite_size_16),
+        .sprite_pattern_table              (sprite_pattern_table),
+        .nametable_fetch_address           (nametable_fetch_address),
+        .secondary_read_slot               (renderer_read_slot),
+        .secondary_read_y                  (renderer_read_y),
+        .secondary_read_tile               (renderer_read_tile),
+        .secondary_read_attributes         (renderer_read_attributes),
+        .secondary_read_x                  (renderer_read_x),
+        .secondary_read_sprite_index       (renderer_read_sprite_index),
+        .secondary_read_valid              (renderer_read_valid),
+        .memory_request                    (sprite_memory_request),
+        .memory_address                    (sprite_memory_address),
+        .memory_grant                      (sprite_memory_grant),
+        .memory_read_data                  (sprite_memory_read_data),
+        .fetch_slot                        (sprite_fetch_slot),
+        .fetch_phase                       (sprite_fetch_phase),
+        .fetch_type                        (sprite_fetch_type),
+        .fetch_complete                    (sprite_fetch_complete),
+        .slot_load_event                   (sprite_slot_load),
+        .fetch_relative_row                (sprite_fetch_relative_row),
+        .fetch_selected_row                (sprite_fetch_selected_row),
+        .fetch_pattern_low_address         (sprite_pattern_low_address),
+        .fetch_pattern_high_address        (sprite_pattern_high_address),
+        .sprite_decrement_mask             (sprite_decrement_mask),
+        .sprite_shift_mask                 (sprite_shift_mask),
+        .sprite_pixel_valid                (sprite_pixel_valid),
+        .sprite_x                          (sprite_x),
+        .sprite_y                          (sprite_y),
+        .sprite_pattern                    (sprite_pattern),
+        .sprite_palette                    (sprite_palette),
+        .sprite_palette_index              (sprite_palette_index),
+        .sprite_opaque                     (sprite_opaque),
+        .sprite_priority_behind_background (sprite_priority_behind_background),
+        .sprite_is_zero                    (sprite_is_zero),
+        .sprite_slot                       (sprite_slot),
+        .sprite_original_index             (sprite_original_index)
     );
 
     ppu_oam oam (
@@ -182,6 +267,13 @@ module ppu_sprite_core (
         .secondary_read_x            (secondary_read_x),
         .secondary_read_sprite_index (secondary_read_sprite_index),
         .secondary_read_valid        (secondary_read_valid),
+        .renderer_read_slot          (renderer_read_slot),
+        .renderer_read_y             (renderer_read_y),
+        .renderer_read_tile          (renderer_read_tile),
+        .renderer_read_attributes    (renderer_read_attributes),
+        .renderer_read_x             (renderer_read_x),
+        .renderer_read_sprite_index  (renderer_read_sprite_index),
+        .renderer_read_valid         (renderer_read_valid),
         .selected_sprite_count       (selected_sprite_count),
         .sprite_zero_in_secondary    (sprite_zero_in_secondary),
         .sprite_overflow_set         (sprite_overflow_set),

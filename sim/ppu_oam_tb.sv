@@ -22,6 +22,13 @@ module ppu_oam_tb;
     logic [7:0] secondary_read_x;
     logic [5:0] secondary_read_sprite_index;
     logic secondary_read_valid;
+    logic [2:0] renderer_read_slot = 3'd0;
+    logic [7:0] renderer_read_y;
+    logic [7:0] renderer_read_tile;
+    logic [7:0] renderer_read_attributes;
+    logic [7:0] renderer_read_x;
+    logic [5:0] renderer_read_sprite_index;
+    logic renderer_read_valid;
     logic [3:0] selected_sprite_count;
     logic sprite_zero_in_secondary;
     logic sprite_overflow_set;
@@ -115,7 +122,11 @@ module ppu_oam_tb;
                                  secondary_read_y, secondary_read_tile,
                                  secondary_read_attributes, secondary_read_x,
                                  secondary_read_sprite_index,
-                                 secondary_read_valid}));
+                                 secondary_read_valid,
+                                 renderer_read_y, renderer_read_tile,
+                                 renderer_read_attributes, renderer_read_x,
+                                 renderer_read_sprite_index,
+                                 renderer_read_valid}));
             assert (int'(selected_sprite_count) == values[23]);
             assert (int'(sprite_zero_in_secondary) == values[24]);
             assert (int'(sprite_overflow_set) == values[25]);

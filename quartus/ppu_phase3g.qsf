@@ -1,0 +1,184 @@
+set_global_assignment -name TOP_LEVEL_ENTITY ppu_sprite_core
+# Phase 3G extends the fully constrained Phase 3F integrated PPU project.
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_timing.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_scroll.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_registers.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_memory.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_background.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_background_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_range.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_oam.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_core.sv
+set_global_assignment -name SDC_FILE ../constraints/ppu_phase3f.sdc
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
+set_location_assignment PIN_AF14 -to clk
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk
+set_instance_assignment -name VIRTUAL_PIN ON -to reset
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_bus_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_bus_write
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_register_selected
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_register_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_zero_hit_set
+set_instance_assignment -name VIRTUAL_PIN ON -to oam_addr[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to oam_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to oam_write_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to mirroring_mode[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_addr[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_read
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_write
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_memory_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_memory_buffer_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_memory_read_request
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_memory_write_request
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_memory_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to memory_region[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to normalized_nametable_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to logical_nametable[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to nametable_offset[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to physical_ciram_page
+set_instance_assignment -name VIRTUAL_PIN ON -to ciram_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to palette_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ciram_write_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to palette_write_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to dot[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to scanline[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to frame_odd
+set_instance_assignment -name VIRTUAL_PIN ON -to visible_pixel
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_y[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to timing_vblank
+set_instance_assignment -name VIRTUAL_PIN ON -to frame_start
+set_instance_assignment -name VIRTUAL_PIN ON -to frame_end
+set_instance_assignment -name VIRTUAL_PIN ON -to scanline_start
+set_instance_assignment -name VIRTUAL_PIN ON -to vblank_start
+set_instance_assignment -name VIRTUAL_PIN ON -to vblank_end
+set_instance_assignment -name VIRTUAL_PIN ON -to pre_render
+set_instance_assignment -name VIRTUAL_PIN ON -to post_render
+set_instance_assignment -name VIRTUAL_PIN ON -to ppuctrl[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppumask[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to status_vblank
+set_instance_assignment -name VIRTUAL_PIN ON -to status_sprite_zero_hit
+set_instance_assignment -name VIRTUAL_PIN ON -to status_sprite_overflow
+set_instance_assignment -name VIRTUAL_PIN ON -to vram_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to temp_vram_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to fine_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to write_toggle
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_data_read_buffer[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_io_latch[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to nmi_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_master_slave
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_size_16
+set_instance_assignment -name VIRTUAL_PIN ON -to background_pattern_table
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_pattern_table
+set_instance_assignment -name VIRTUAL_PIN ON -to vram_increment[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to base_nametable[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to mask_grayscale
+set_instance_assignment -name VIRTUAL_PIN ON -to rendering_enabled
+set_instance_assignment -name VIRTUAL_PIN ON -to mask_show_background
+set_instance_assignment -name VIRTUAL_PIN ON -to mask_show_background_left
+set_instance_assignment -name VIRTUAL_PIN ON -to mask_show_sprites_left
+set_instance_assignment -name VIRTUAL_PIN ON -to mask_show_sprites
+set_instance_assignment -name VIRTUAL_PIN ON -to mask_emphasize_red
+set_instance_assignment -name VIRTUAL_PIN ON -to mask_emphasize_green
+set_instance_assignment -name VIRTUAL_PIN ON -to mask_emphasize_blue
+set_instance_assignment -name VIRTUAL_PIN ON -to rendering_scanline
+set_instance_assignment -name VIRTUAL_PIN ON -to active_render_period
+set_instance_assignment -name VIRTUAL_PIN ON -to coarse_x_increment_event
+set_instance_assignment -name VIRTUAL_PIN ON -to vertical_increment_event
+set_instance_assignment -name VIRTUAL_PIN ON -to horizontal_copy_event
+set_instance_assignment -name VIRTUAL_PIN ON -to vertical_copy_event
+set_instance_assignment -name VIRTUAL_PIN ON -to automatic_scroll_event
+set_instance_assignment -name VIRTUAL_PIN ON -to nametable_fetch_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to attribute_fetch_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to renderer_memory_request
+set_instance_assignment -name VIRTUAL_PIN ON -to renderer_memory_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to renderer_memory_grant
+set_instance_assignment -name VIRTUAL_PIN ON -to renderer_cpu_collision
+set_instance_assignment -name VIRTUAL_PIN ON -to background_fetch_phase[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to background_fetch_type[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to background_fetch_complete
+set_instance_assignment -name VIRTUAL_PIN ON -to background_tile_load
+set_instance_assignment -name VIRTUAL_PIN ON -to background_shift
+set_instance_assignment -name VIRTUAL_PIN ON -to next_tile_id[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to next_tile_attribute[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to next_tile_pattern_low[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to next_tile_pattern_high[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pattern_low_shift[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pattern_high_shift[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to attribute_low_shift[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to attribute_high_shift[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to bg_pixel_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to bg_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to bg_y[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to bg_pattern[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to bg_palette[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to bg_opaque
+set_instance_assignment -name VIRTUAL_PIN ON -to bg_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_read_slot[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_read_y[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_read_tile[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_read_attributes[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_read_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_read_sprite_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_read_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to selected_sprite_count[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_zero_in_secondary
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_overflow_set
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_evaluation_phase[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_evaluation_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_evaluation_byte[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_evaluation_relative_row[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_height[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to primary_oam_read_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to primary_oam_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_clear_write
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_evaluation_write
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_write_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to secondary_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_evaluation_done
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_oam_write_commit
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_oam_collision
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_address.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_renderer.sv
+set_global_assignment -name SDC_FILE ../constraints/ppu_phase3g.sdc
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_ppu_phase3g/output_files
+
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_memory_request
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_memory_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_memory_grant
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_memory_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to renderer_owner_conflict
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_fetch_slot[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_fetch_phase[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_fetch_type[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_fetch_complete
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_slot_load
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_fetch_relative_row[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_fetch_selected_row[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_pattern_low_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_pattern_high_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_decrement_mask[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_shift_mask[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_pixel_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_y[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_pattern[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_palette[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_palette_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_opaque
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_priority_behind_background
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_is_zero
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_slot[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to sprite_original_index[*]

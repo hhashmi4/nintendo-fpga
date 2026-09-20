@@ -99,6 +99,11 @@ module ppu_background_core (
     output logic [13:0] renderer_memory_address,
     output logic        renderer_memory_grant,
     output logic        renderer_cpu_collision,
+    input  logic        sprite_memory_request,
+    input  logic [13:0] sprite_memory_address,
+    output logic        sprite_memory_grant,
+    output logic [7:0]  sprite_memory_read_data,
+    output logic        renderer_owner_conflict,
     output logic [2:0]  background_fetch_phase,
     output logic [2:0]  background_fetch_type,
     output logic        background_fetch_complete,
@@ -127,19 +132,42 @@ module ppu_background_core (
     logic memory_access_write;
     logic [13:0] memory_access_address;
     logic [7:0] memory_access_write_data;
+    logic background_memory_request;
+    logic [13:0] background_memory_address;
+    logic background_memory_grant;
 
     always_comb begin
         cpu_memory_access = ppu_memory_read_request ||
                             ppu_memory_write_request;
+        renderer_memory_request = background_memory_request ||
+                                  sprite_memory_request;
+        // Preserve the Phase 3E observable address when neither renderer is
+        // requesting.  The sprite address replaces it only while the sprite
+        // client is the active renderer owner.
+        renderer_memory_address = sprite_memory_request &&
+                                  !background_memory_request ?
+                                  sprite_memory_address :
+                                  background_memory_address;
         renderer_memory_grant = renderer_memory_request &&
                                 !cpu_memory_access;
         renderer_cpu_collision = renderer_memory_request &&
                                  cpu_memory_access;
+        renderer_owner_conflict = background_memory_request &&
+                                  sprite_memory_request;
+        // Background wins only if a programming error creates overlap.  The
+        // architectural windows are disjoint and the assertion below proves
+        // this condition absent in normal operation.
+        background_memory_grant = background_memory_request &&
+                                  !cpu_memory_access;
+        sprite_memory_grant = sprite_memory_request &&
+                              !cpu_memory_access &&
+                              !background_memory_request;
+        sprite_memory_read_data = memory_read_data;
 
         memory_access_valid = cpu_memory_access || renderer_memory_request;
         memory_access_write = ppu_memory_write_request;
         memory_access_address = cpu_memory_access ? ppu_memory_address :
-                                                   renderer_memory_address;
+                                renderer_memory_address;
         memory_access_write_data = ppu_memory_write_data;
     end
 
@@ -239,9 +267,9 @@ module ppu_background_core (
         .coarse_y_bit_1              (vram_address[6]),
         .nametable_fetch_address     (nametable_fetch_address),
         .attribute_fetch_address     (attribute_fetch_address),
-        .renderer_memory_request     (renderer_memory_request),
-        .renderer_memory_address     (renderer_memory_address),
-        .renderer_memory_grant       (renderer_memory_grant),
+        .renderer_memory_request     (background_memory_request),
+        .renderer_memory_address     (background_memory_address),
+        .renderer_memory_grant       (background_memory_grant),
         .renderer_memory_read_data   (memory_read_data),
         .fetch_phase                 (background_fetch_phase),
         .fetch_type                  (background_fetch_type),
@@ -291,4 +319,14 @@ module ppu_background_core (
         .ciram_write_enable           (ciram_write_enable),
         .palette_write_enable         (palette_write_enable)
     );
+
+`ifndef SYNTHESIS
+    always_ff @(posedge clk) begin
+        if (!reset) begin
+            assert (!renderer_owner_conflict);
+            assert (!(memory_access_write && !cpu_memory_access));
+            assert (!(background_memory_grant && sprite_memory_grant));
+        end
+    end
+`endif
 endmodule
