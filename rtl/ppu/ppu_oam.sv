@@ -25,6 +25,16 @@ module ppu_oam (
     output logic [5:0] secondary_read_sprite_index,
     output logic       secondary_read_valid,
 
+    // Independent read-only view consumed by the dots 257-320 renderer.
+    // Keeping this separate preserves the Phase 3F debug/readback slot port.
+    input  logic [2:0] renderer_read_slot,
+    output logic [7:0] renderer_read_y,
+    output logic [7:0] renderer_read_tile,
+    output logic [7:0] renderer_read_attributes,
+    output logic [7:0] renderer_read_x,
+    output logic [5:0] renderer_read_sprite_index,
+    output logic       renderer_read_valid,
+
     output logic [3:0] selected_sprite_count = 4'd0,
     output logic       sprite_zero_in_secondary = 1'b0,
     output logic       sprite_overflow_set,
@@ -67,6 +77,7 @@ module ppu_oam (
     logic [7:0] evaluator_address;
     logic evaluated_in_range;
     logic [4:0] secondary_slot_base;
+    logic [4:0] renderer_slot_base;
 
     assign visible_scanline = scanline < 9'd240;
     assign evaluation_window = rendering_enabled && visible_scanline &&
@@ -123,6 +134,7 @@ module ppu_oam (
     end
 
     assign secondary_slot_base = {secondary_read_slot, 2'b00};
+    assign renderer_slot_base = {renderer_read_slot, 2'b00};
     always_comb begin
         secondary_read_y = secondary_oam[secondary_slot_base];
         secondary_read_tile = secondary_oam[secondary_slot_base + 5'd1];
@@ -132,6 +144,16 @@ module ppu_oam (
             secondary_sprite_index[secondary_read_slot];
         secondary_read_valid = {1'b0, secondary_read_slot} <
                                selected_sprite_count;
+
+        renderer_read_y = secondary_oam[renderer_slot_base];
+        renderer_read_tile = secondary_oam[renderer_slot_base + 5'd1];
+        renderer_read_attributes =
+            secondary_oam[renderer_slot_base + 5'd2];
+        renderer_read_x = secondary_oam[renderer_slot_base + 5'd3];
+        renderer_read_sprite_index =
+            secondary_sprite_index[renderer_read_slot];
+        renderer_read_valid = {1'b0, renderer_read_slot} <
+                              selected_sprite_count;
     end
 
     always_ff @(posedge clk) begin

@@ -90,6 +90,11 @@ module ppu_phase3f_tb;
     logic [13:0] renderer_memory_address;
     logic renderer_memory_grant;
     logic renderer_cpu_collision;
+    logic sprite_memory_request;
+    logic [13:0] sprite_memory_address;
+    logic sprite_memory_grant;
+    logic [7:0] sprite_memory_read_data;
+    logic renderer_owner_conflict;
     logic [2:0] background_fetch_phase;
     logic [2:0] background_fetch_type;
     logic background_fetch_complete;
@@ -110,6 +115,28 @@ module ppu_phase3f_tb;
     logic [1:0] bg_palette;
     logic bg_opaque;
     logic [3:0] bg_index;
+    logic [2:0] sprite_fetch_slot;
+    logic [2:0] sprite_fetch_phase;
+    logic [2:0] sprite_fetch_type;
+    logic sprite_fetch_complete;
+    logic sprite_slot_load;
+    logic [3:0] sprite_fetch_relative_row;
+    logic [3:0] sprite_fetch_selected_row;
+    logic [12:0] sprite_pattern_low_address;
+    logic [12:0] sprite_pattern_high_address;
+    logic [7:0] sprite_decrement_mask;
+    logic [7:0] sprite_shift_mask;
+    logic sprite_pixel_valid;
+    logic [7:0] sprite_x;
+    logic [7:0] sprite_y;
+    logic [1:0] sprite_pattern;
+    logic [1:0] sprite_palette;
+    logic [3:0] sprite_palette_index;
+    logic sprite_opaque;
+    logic sprite_priority_behind_background;
+    logic sprite_is_zero;
+    logic [2:0] sprite_slot;
+    logic [5:0] sprite_original_index;
     logic [2:0] secondary_read_slot;
     logic [7:0] secondary_read_y;
     logic [7:0] secondary_read_tile;
@@ -200,12 +227,24 @@ module ppu_phase3f_tb;
         nametable_fetch_address, attribute_fetch_address,
         renderer_memory_request, renderer_memory_address,
         renderer_memory_grant, renderer_cpu_collision,
+        sprite_memory_request, sprite_memory_address,
+        sprite_memory_grant, sprite_memory_read_data,
+        renderer_owner_conflict,
         background_fetch_phase, background_fetch_type,
         background_fetch_complete, background_tile_load, background_shift,
         next_tile_id, next_tile_attribute, next_tile_pattern_low,
         next_tile_pattern_high, pattern_low_shift, pattern_high_shift,
         attribute_low_shift, attribute_high_shift, bg_pixel_valid, bg_x,
         bg_y, bg_pattern, bg_palette, bg_opaque, bg_index,
+        sprite_fetch_slot, sprite_fetch_phase, sprite_fetch_type,
+        sprite_fetch_complete, sprite_slot_load,
+        sprite_fetch_relative_row, sprite_fetch_selected_row,
+        sprite_pattern_low_address, sprite_pattern_high_address,
+        sprite_decrement_mask, sprite_shift_mask, sprite_pixel_valid,
+        sprite_x, sprite_y, sprite_pattern, sprite_palette,
+        sprite_palette_index, sprite_opaque,
+        sprite_priority_behind_background, sprite_is_zero, sprite_slot,
+        sprite_original_index,
         sprite_evaluation_relative_row, sprite_height
     };
 
