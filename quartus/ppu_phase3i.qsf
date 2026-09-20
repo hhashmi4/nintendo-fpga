@@ -1,0 +1,5 @@
+# Phase 3I retains the complete Phase 3H production PPU and adds the
+# VBlank/NMI outputs to a dedicated synthesis revision.
+source ppu_phase3h.qsf
+set_global_assignment -name SDC_FILE ../constraints/ppu_phase3i.sdc
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_ppu_phase3i/output_files

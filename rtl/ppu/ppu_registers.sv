@@ -48,6 +48,9 @@ module ppu_registers (
     output logic [7:0]  ppu_io_latch = 8'h00,
 
     output logic        nmi_enable,
+    output logic        ppu_nmi_level,
+    output logic        ppu_nmi_event = 1'b0,
+    output logic        ppu_nmi_suppressed = 1'b0,
     output logic        ppu_master_slave,
     output logic        sprite_size_16,
     output logic        background_pattern_table,
@@ -84,9 +87,19 @@ module ppu_registers (
     localparam logic [2:0] REG_PPUDATA   = 3'd7;
 
     logic accepted_access;
+    logic accepted_status_read;
+    logic accepted_control_write;
     logic palette_access;
     logic [14:0] automatic_vram_address;
     logic [14:0] active_data_increment_address;
+    logic suppress_next_vblank = 1'b0;
+    logic nmi_activation_pending = 1'b0;
+    logic vblank_set_allowed;
+    logic next_status_vblank;
+    logic next_nmi_enable;
+    logic next_nmi_condition;
+    logic ordinary_nmi_activation;
+    logic immediate_nmi_activation;
 
     ppu_scroll scroll (
         .vram_address                 (vram_address),
@@ -114,6 +127,10 @@ module ppu_registers (
         cpu_register_index = cpu_address[2:0];
         accepted_access = !reset && cpu_enable && cpu_bus_valid &&
                           cpu_register_selected;
+        accepted_status_read = accepted_access && !cpu_bus_write &&
+                               cpu_register_index == REG_PPUSTATUS;
+        accepted_control_write = accepted_access && cpu_bus_write &&
+                                 cpu_register_index == REG_PPUCTRL;
 
         ppu_memory_address = vram_address[13:0];
         palette_access = ppu_memory_address >= 14'h3f00;
@@ -122,6 +139,37 @@ module ppu_registers (
                                     ppu_memory_address;
 
         nmi_enable = ppuctrl[7];
+        ppu_nmi_level = status_vblank && nmi_enable;
+
+        // The accepted CPU transaction and internal status events are reduced
+        // to explicit next-state values here. This avoids relying on ordering
+        // between nonblocking assignments for the VBlank/NMI boundary races.
+        vblank_set_allowed = vblank_start_event &&
+                             !accepted_status_read &&
+                             !suppress_next_vblank;
+        next_status_vblank = status_vblank;
+        if (status_clear_event)
+            next_status_vblank = 1'b0;
+        else if (vblank_set_allowed)
+            next_status_vblank = 1'b1;
+        if (accepted_status_read)
+            next_status_vblank = 1'b0;
+
+        next_nmi_enable = accepted_control_write ?
+                          cpu_write_data[7] : nmi_enable;
+        next_nmi_condition = next_status_vblank && next_nmi_enable;
+
+        // A VBlank-created activation is held for one enabled PPU tick so an
+        // accepted $2002 read at 241:2 can model the documented short-pulse
+        // suppression case. Enabling NMI during an established VBlank is not
+        // delayed and creates an immediate event on its accepting fabric edge.
+        ordinary_nmi_activation = vblank_set_allowed &&
+                                  !ppu_nmi_level &&
+                                  next_nmi_condition;
+        immediate_nmi_activation = !vblank_start_event &&
+                                   accepted_control_write &&
+                                   !ppu_nmi_level &&
+                                   next_nmi_condition;
         ppu_master_slave = ppuctrl[6];
         sprite_size_16 = ppuctrl[5];
         background_pattern_table = ppuctrl[4];
@@ -186,7 +234,44 @@ module ppu_registers (
             write_toggle               <= 1'b0;
             ppu_data_read_buffer       <= 8'h00;
             ppu_io_latch               <= 8'h00;
+            suppress_next_vblank       <= 1'b0;
+            nmi_activation_pending     <= 1'b0;
+            ppu_nmi_event              <= 1'b0;
+            ppu_nmi_suppressed         <= 1'b0;
         end else begin
+            // Event outputs are active-high one-fabric-clock pulses. Ordinary
+            // VBlank activation waits through the next enabled PPU tick; CPU
+            // register writes remain governed solely by cpu_enable.
+            ppu_nmi_event      <= 1'b0;
+            ppu_nmi_suppressed <= 1'b0;
+
+            // A status read while the timing generator presents 241:0 blocks
+            // the following 241:1 flag set. Reads at 241:1 block it directly.
+            if (vblank_start_event)
+                suppress_next_vblank <= 1'b0;
+            else if (accepted_status_read &&
+                     scanline == 9'd241 && dot == 9'd0)
+                suppress_next_vblank <= 1'b1;
+
+            if (vblank_start_event && !vblank_set_allowed &&
+                next_nmi_enable)
+                ppu_nmi_suppressed <= 1'b1;
+
+            if (status_clear_event || accepted_status_read ||
+                !next_nmi_condition) begin
+                if (nmi_activation_pending && accepted_status_read)
+                    ppu_nmi_suppressed <= 1'b1;
+                nmi_activation_pending <= 1'b0;
+            end else if (ordinary_nmi_activation) begin
+                nmi_activation_pending <= 1'b1;
+            end else if (immediate_nmi_activation) begin
+                nmi_activation_pending <= 1'b0;
+                ppu_nmi_event <= 1'b1;
+            end else if (nmi_activation_pending && ppu_enable) begin
+                nmi_activation_pending <= 1'b0;
+                ppu_nmi_event <= 1'b1;
+            end
+
             // Rendering-time scrolling and CPU programming share this one
             // sequential owner. Automatic operations consume the current PPU
             // coordinate. A same-edge second $2006 write or $2007 access below
@@ -195,14 +280,14 @@ module ppu_registers (
                 vram_address <= automatic_vram_address;
 
             // The pre-render clear has priority over future sprite event
-            // inputs. A status read later in this block has priority over a
-            // simultaneous vblank set; exact race behavior is deferred.
+            // inputs. Boundary suppression and an accepted status read have
+            // explicit priority over the VBlank set.
             if (status_clear_event) begin
                 status_vblank          <= 1'b0;
                 status_sprite_zero_hit <= 1'b0;
                 status_sprite_overflow <= 1'b0;
             end else begin
-                if (vblank_start_event) status_vblank <= 1'b1;
+                if (vblank_set_allowed) status_vblank <= 1'b1;
                 if (sprite_zero_hit_set) status_sprite_zero_hit <= 1'b1;
                 if (sprite_overflow_set) status_sprite_overflow <= 1'b1;
             end
@@ -272,4 +357,27 @@ module ppu_registers (
             end
         end
     end
+
+`ifdef VERILATOR
+    logic nmi_event_seen_for_level = 1'b0;
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            nmi_event_seen_for_level <= 1'b0;
+            assert (!ppu_nmi_event);
+        end else begin
+            assert (ppu_nmi_level == (status_vblank && nmi_enable));
+            if (!ppu_nmi_level)
+                nmi_event_seen_for_level <= 1'b0;
+            if (ppu_nmi_event) begin
+                assert (ppu_nmi_level);
+                assert (!nmi_event_seen_for_level)
+                    else $error("repeated NMI event while level stayed active");
+                nmi_event_seen_for_level <= 1'b1;
+            end
+            if (ppu_nmi_suppressed)
+                assert (!ppu_nmi_event);
+        end
+    end
+`endif
 endmodule
