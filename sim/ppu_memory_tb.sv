@@ -11,6 +11,8 @@ module ppu_memory_tb;
     logic [7:0] access_read_data;
     logic [13:0] buffer_read_address = 14'h2000;
     logic [7:0] buffer_read_data;
+    logic [13:0] pixel_palette_address = 14'h3f00;
+    logic [7:0] pixel_palette_read_data;
     logic [12:0] chr_addr;
     logic chr_read;
     logic chr_write;
@@ -104,6 +106,7 @@ module ppu_memory_tb;
         int destination_count;
         begin
             assert (!$isunknown({access_read_data, buffer_read_data,
+                                 pixel_palette_read_data,
                                  chr_addr, chr_read, chr_write,
                                  chr_write_data, access_region,
                                  normalized_nametable_address,
@@ -128,6 +131,7 @@ module ppu_memory_tb;
             assert (int'(chr_write_data) == values[20]);
             assert (int'(ciram_write_enable) == values[21]);
             assert (int'(palette_write_enable) == values[22]);
+            assert (pixel_palette_read_data == dut.palette_ram[0]);
 
             assert (int'(palette_index) < 32);
             assert (int'(physical_ciram_page) < 2);

@@ -1,0 +1,5 @@
+# Reuse the complete current integrated PPU pin/source set and place Phase 3H
+# in its own output directory. ppu_phase3g.qsf carries compatibility settings
+# for the evolving ppu_sprite_core top, including the Phase 3H dependencies.
+source ppu_phase3g.qsf
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_ppu_phase3h/output_files

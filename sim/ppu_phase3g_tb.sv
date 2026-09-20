@@ -10,7 +10,6 @@ module ppu_phase3g_tb;
     logic [15:0] cpu_address;
     logic [7:0] cpu_write_data;
     logic [7:0] cpu_read_data;
-    logic sprite_zero_hit_set = 1'b0;
     logic [1:0] mirroring_mode = 2'b00;
     logic [12:0] chr_addr;
     logic chr_read;
@@ -85,7 +84,6 @@ module ppu_phase3g_tb;
         .cpu_address                       (cpu_address),
         .cpu_write_data                    (cpu_write_data),
         .cpu_read_data                     (cpu_read_data),
-        .sprite_zero_hit_set               (sprite_zero_hit_set),
         .mirroring_mode                    (mirroring_mode),
         .chr_addr                          (chr_addr),
         .chr_read                          (chr_read),

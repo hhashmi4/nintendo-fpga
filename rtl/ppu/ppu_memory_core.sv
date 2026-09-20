@@ -98,6 +98,9 @@ module ppu_memory_core (
     logic [7:0] memory_read_data;
     logic [7:0] memory_buffer_read_data;
     logic memory_access_valid;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [7:0] pixel_palette_read_data_unused;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     assign memory_access_valid = ppu_memory_read_request ||
                                  ppu_memory_write_request;
@@ -190,6 +193,8 @@ module ppu_memory_core (
         .access_read_data             (memory_read_data),
         .buffer_read_address          (ppu_memory_buffer_address),
         .buffer_read_data             (memory_buffer_read_data),
+        .pixel_palette_address        (14'h3f00),
+        .pixel_palette_read_data      (pixel_palette_read_data_unused),
         .chr_addr                     (chr_addr),
         .chr_read                     (chr_read),
         .chr_write                    (chr_write),

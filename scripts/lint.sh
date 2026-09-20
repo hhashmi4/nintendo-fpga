@@ -71,6 +71,10 @@ verilator --lint-only --Wall \
     rtl/ppu/ppu_sprite_renderer.sv
 
 verilator --lint-only --Wall \
+    --top-module ppu_pixel_mixer \
+    rtl/ppu/ppu_pixel_mixer.sv
+
+verilator --lint-only --Wall \
     --top-module ppu_sprite_core \
     rtl/ppu/ppu_timing.sv \
     rtl/ppu/ppu_scroll.sv \
@@ -83,6 +87,7 @@ verilator --lint-only --Wall \
     rtl/ppu/ppu_oam.sv \
     rtl/ppu/ppu_sprite_address.sv \
     rtl/ppu/ppu_sprite_renderer.sv \
+    rtl/ppu/ppu_pixel_mixer.sv \
     rtl/ppu/ppu_sprite_core.sv
 
 CPU_RTL_FILES=(
