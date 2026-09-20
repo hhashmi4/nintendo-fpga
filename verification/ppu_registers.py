@@ -83,6 +83,10 @@ class PpuRegisterModel:
         self.w = False
         self.read_buffer = 0
         self.io_latch = 0
+        self.suppress_next_vblank = False
+        self.nmi_activation_pending = False
+        self.ppu_nmi_event = False
+        self.ppu_nmi_suppressed = False
 
     @staticmethod
     def decode(address: int) -> tuple[bool, int]:
@@ -96,6 +100,14 @@ class PpuRegisterModel:
     @property
     def vram_increment(self) -> int:
         return 32 if self.ppuctrl & 0x04 else 1
+
+    @property
+    def nmi_enable(self) -> bool:
+        return bool(self.ppuctrl & 0x80)
+
+    @property
+    def ppu_nmi_level(self) -> bool:
+        return self.status_vblank and self.nmi_enable
 
     @property
     def status(self) -> int:
@@ -163,15 +175,89 @@ class PpuRegisterModel:
             dot=inputs.dot,
         )
 
-        # The pre-render clear owns all status flags on its event edge.  This
-        # deterministic ordering intentionally does not claim later NMI-race
-        # compatibility.
+        accepted_status_read = (
+            observation.accepted
+            and not inputs.cpu_bus_write
+            and observation.register_index == PPUSTATUS
+        )
+        accepted_control_write = (
+            observation.accepted
+            and inputs.cpu_bus_write
+            and observation.register_index == PPUCTRL
+        )
+        old_nmi_level = self.ppu_nmi_level
+        vblank_set_allowed = (
+            inputs.vblank_start_event
+            and not accepted_status_read
+            and not self.suppress_next_vblank
+        )
+        next_status_vblank = self.status_vblank
+        if inputs.status_clear_event:
+            next_status_vblank = False
+        elif vblank_set_allowed:
+            next_status_vblank = True
+        if accepted_status_read:
+            next_status_vblank = False
+        next_nmi_enable = (
+            bool(inputs.cpu_write_data & 0x80)
+            if accepted_control_write
+            else self.nmi_enable
+        )
+        next_nmi_condition = next_status_vblank and next_nmi_enable
+        ordinary_activation = (
+            vblank_set_allowed and not old_nmi_level and next_nmi_condition
+        )
+        immediate_activation = (
+            not inputs.vblank_start_event
+            and accepted_control_write
+            and not old_nmi_level
+            and next_nmi_condition
+        )
+
+        self.ppu_nmi_event = False
+        self.ppu_nmi_suppressed = False
+        if inputs.vblank_start_event:
+            self.suppress_next_vblank = False
+        elif (
+            accepted_status_read
+            and inputs.scanline == 241
+            and inputs.dot == 0
+        ):
+            self.suppress_next_vblank = True
+
+        if (
+            inputs.vblank_start_event
+            and not vblank_set_allowed
+            and next_nmi_enable
+        ):
+            self.ppu_nmi_suppressed = True
+
+        if (
+            inputs.status_clear_event
+            or accepted_status_read
+            or not next_nmi_condition
+        ):
+            if self.nmi_activation_pending and accepted_status_read:
+                self.ppu_nmi_suppressed = True
+            self.nmi_activation_pending = False
+        elif ordinary_activation:
+            self.nmi_activation_pending = True
+        elif immediate_activation:
+            self.nmi_activation_pending = False
+            self.ppu_nmi_event = True
+        elif self.nmi_activation_pending and inputs.ppu_enable:
+            self.nmi_activation_pending = False
+            self.ppu_nmi_event = True
+
+        # The pre-render clear owns all status flags on its event edge. The
+        # independently modeled NMI controller above explicitly qualifies the
+        # VBlank set against accepted boundary reads.
         if inputs.status_clear_event:
             self.status_vblank = False
             self.status_sprite_zero_hit = False
             self.status_sprite_overflow = False
         else:
-            self.status_vblank |= inputs.vblank_start_event
+            self.status_vblank |= vblank_set_allowed
             self.status_sprite_zero_hit |= inputs.sprite_zero_hit_set
             self.status_sprite_overflow |= inputs.sprite_overflow_set
 

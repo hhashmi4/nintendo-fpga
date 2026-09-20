@@ -51,6 +51,11 @@ module ppu_phase3b_tb;
     logic [7:0] ppu_data_read_buffer;
     logic [7:0] ppu_io_latch;
     logic nmi_enable;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic ppu_nmi_level;
+    logic ppu_nmi_event;
+    logic ppu_nmi_suppressed;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic ppu_master_slave;
     logic sprite_size_16;
     logic background_pattern_table;

@@ -79,6 +79,9 @@ set_instance_assignment -name VIRTUAL_PIN ON -to write_toggle
 set_instance_assignment -name VIRTUAL_PIN ON -to ppu_data_read_buffer[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to ppu_io_latch[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to nmi_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_nmi_level
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_nmi_event
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_nmi_suppressed
 set_instance_assignment -name VIRTUAL_PIN ON -to ppu_master_slave
 set_instance_assignment -name VIRTUAL_PIN ON -to sprite_size_16
 set_instance_assignment -name VIRTUAL_PIN ON -to background_pattern_table

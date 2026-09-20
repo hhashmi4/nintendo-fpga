@@ -293,6 +293,21 @@ The mixer rules, palette lookup, status behavior, video boundary, verification,
 synthesis results, and deferred RGB/video work are documented in
 [`docs/ppu-phase3h-pixel-mixer.md`](docs/ppu-phase3h-pixel-mixer.md).
 
+## Phase 3I PPU VBlank and NMI
+
+- Single-owner PPUSTATUS VBlank set at 241:1 and pre-render clear at 261:1
+- Active-high NMI condition from `status_vblank && PPUCTRL[7]`
+- One-pulse activation events without retriggering a continuously active level
+- Immediate events when NMI is enabled during an uncleared VBlank
+- Repeated events after deliberate disable/re-enable condition transitions
+- Explicit 241:0 through 241:2 PPUSTATUS boundary-suppression model
+- Stall-safe ten-frame randomized Python/RTL comparison and Phase 3J interface
+
+The status ownership, NMI equation, accepted-access race convention, CPU-side
+interface boundary, verification evidence, synthesis results, and deferred
+sampling alignment are documented in
+[`docs/ppu-phase3i-nmi-vblank.md`](docs/ppu-phase3i-nmi-vblank.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)

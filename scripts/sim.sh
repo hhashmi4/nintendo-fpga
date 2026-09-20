@@ -23,6 +23,7 @@ mkdir -p \
     build/verilator/ppu_phase3g \
     build/verilator/ppu_pixel_mixer \
     build/verilator/ppu_phase3h \
+    build/verilator/ppu_phase3i \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -79,6 +80,9 @@ PPU_PHASE3H_OAM="build/sim/ppu_phase3h_oam.hex"
 PPU_PHASE3H_PALETTE="build/sim/ppu_phase3h_palette.hex"
 PPU_PHASE3H_PIXELS="build/sim/ppu_phase3h_pixels_reference.txt"
 PPU_PHASE3H_STATS="build/sim/ppu_phase3h_frame_stats.txt"
+PPU_PHASE3I_WAVEFORM="build/sim/ppu_phase3i.fst"
+PPU_PHASE3I_REFERENCE="build/sim/ppu_phase3i_reference.txt"
+PPU_PHASE3I_STATS="build/sim/ppu_phase3i_stats.txt"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -135,6 +139,9 @@ rm -f \
     "$PPU_PHASE3H_PALETTE" \
     "$PPU_PHASE3H_PIXELS" \
     "$PPU_PHASE3H_STATS" \
+    "$PPU_PHASE3I_WAVEFORM" \
+    "$PPU_PHASE3I_REFERENCE" \
+    "$PPU_PHASE3I_STATS" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -506,6 +513,28 @@ if [[ ! -s "$PPU_PHASE3H_WAVEFORM" ]]; then
     exit 1
 fi
 
+python3 scripts/generate_ppu_phase3i_vectors.py \
+    "$PPU_PHASE3I_REFERENCE" \
+    "$PPU_PHASE3I_STATS"
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/ppu_phase3i \
+    --top-module ppu_phase3i_tb \
+    -o ppu_phase3i_tb \
+    rtl/ppu/ppu_timing.sv \
+    rtl/ppu/ppu_scroll.sv \
+    rtl/ppu/ppu_registers.sv \
+    rtl/ppu/ppu_core.sv \
+    sim/ppu_phase3i_tb.sv
+
+build/verilator/ppu_phase3i/ppu_phase3i_tb
+
+if [[ ! -s "$PPU_PHASE3I_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $PPU_PHASE3I_WAVEFORM" >&2
+    exit 1
+fi
+
 CPU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
     rtl/cpu/cpu_alu.sv
@@ -780,6 +809,7 @@ echo "PPU Phase 3F waveform: $ROOT_DIR/$PPU_PHASE3F_WAVEFORM"
 echo "PPU sprite renderer waveform: $ROOT_DIR/$PPU_SPRITE_RENDERER_WAVEFORM"
 echo "PPU Phase 3G waveform: $ROOT_DIR/$PPU_PHASE3G_WAVEFORM"
 echo "PPU Phase 3H waveform: $ROOT_DIR/$PPU_PHASE3H_WAVEFORM"
+echo "PPU Phase 3I waveform: $ROOT_DIR/$PPU_PHASE3I_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

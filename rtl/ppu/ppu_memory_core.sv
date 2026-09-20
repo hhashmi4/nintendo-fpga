@@ -100,6 +100,9 @@ module ppu_memory_core (
     logic memory_access_valid;
     /* verilator lint_off UNUSEDSIGNAL */
     logic [7:0] pixel_palette_read_data_unused;
+    logic ppu_nmi_level_unused;
+    logic ppu_nmi_event_unused;
+    logic ppu_nmi_suppressed_unused;
     /* verilator lint_on UNUSEDSIGNAL */
 
     assign memory_access_valid = ppu_memory_read_request ||
@@ -156,6 +159,9 @@ module ppu_memory_core (
         .ppu_data_read_buffer        (ppu_data_read_buffer),
         .ppu_io_latch                (ppu_io_latch),
         .nmi_enable                  (nmi_enable),
+        .ppu_nmi_level               (ppu_nmi_level_unused),
+        .ppu_nmi_event               (ppu_nmi_event_unused),
+        .ppu_nmi_suppressed          (ppu_nmi_suppressed_unused),
         .ppu_master_slave            (ppu_master_slave),
         .sprite_size_16              (sprite_size_16),
         .background_pattern_table    (background_pattern_table),

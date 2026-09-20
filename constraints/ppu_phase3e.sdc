@@ -23,6 +23,7 @@ set_false_path -to [get_ports {
     post_render ppuctrl[*] ppumask[*] status_vblank status_sprite_zero_hit
     status_sprite_overflow vram_address[*] temp_vram_address[*] fine_x[*]
     write_toggle ppu_data_read_buffer[*] ppu_io_latch[*] nmi_enable
+    ppu_nmi_level ppu_nmi_event ppu_nmi_suppressed
     ppu_master_slave sprite_size_16 background_pattern_table
     sprite_pattern_table vram_increment[*] base_nametable[*] mask_grayscale
     rendering_enabled mask_show_background mask_show_background_left
