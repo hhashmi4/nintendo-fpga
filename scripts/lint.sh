@@ -102,6 +102,28 @@ verilator --lint-only --Wall -Wno-fatal \
     --top-module cpu_core \
     "${CPU_RTL_FILES[@]}"
 
+NES_RTL_FILES=(
+    "${CPU_RTL_FILES[@]}"
+    rtl/ppu/ppu_timing.sv
+    rtl/ppu/ppu_scroll.sv
+    rtl/ppu/ppu_registers.sv
+    rtl/ppu/ppu_core.sv
+    rtl/ppu/ppu_memory.sv
+    rtl/ppu/ppu_background.sv
+    rtl/ppu/ppu_background_core.sv
+    rtl/ppu/ppu_sprite_range.sv
+    rtl/ppu/ppu_oam.sv
+    rtl/ppu/ppu_sprite_address.sv
+    rtl/ppu/ppu_sprite_renderer.sv
+    rtl/ppu/ppu_pixel_mixer.sv
+    rtl/ppu/ppu_sprite_core.sv
+    rtl/nes_core.sv
+)
+
+verilator --lint-only --Wall \
+    --top-module nes_core \
+    "${NES_RTL_FILES[@]}"
+
 ALU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
     rtl/cpu/cpu_alu.sv
