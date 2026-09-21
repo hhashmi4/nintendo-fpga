@@ -10,6 +10,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot_p
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/debug_font_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_renderer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_panel_renderer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_alu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_decoder.sv
@@ -45,6 +46,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/vga_nes_scaler.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_palette_rgb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_framebuffer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_vga_video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_developer_compositor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_pll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/de1_soc_nes_vga_top.sv
 set_global_assignment -name SDC_FILE ../constraints/de1_soc_nes_vga.sdc

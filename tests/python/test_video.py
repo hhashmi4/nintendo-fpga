@@ -80,6 +80,23 @@ def test_scaler_exact_horizontal_boundaries() -> None:
     assert not scaled_coordinate(576, 479)[0]
 
 
+def test_developer_scaler_is_exactly_two_by_and_left_aligned() -> None:
+    address_counts: Counter[int] = Counter()
+    for y in range(V_ACTIVE):
+        for x in range(512):
+            region, nes_x, nes_y, address = scaled_coordinate(
+                x, y, left_aligned=True
+            )
+            assert region
+            assert nes_x == x >> 1
+            assert nes_y == y >> 1
+            address_counts[address] += 1
+        assert not scaled_coordinate(512, y, left_aligned=True)[0]
+        assert not scaled_coordinate(639, y, left_aligned=True)[0]
+    assert len(address_counts) == NES_WIDTH * NES_HEIGHT
+    assert set(address_counts.values()) == {4}
+
+
 def test_palette_has_all_64_entries_and_known_anchors() -> None:
     assert len(BASE_PALETTE) == 64
     assert palette_rgb(0x00) == (0x62, 0x62, 0x62)
