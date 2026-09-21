@@ -42,8 +42,11 @@ NROM-128 image, reproducible cartridge import, controller/NMI/DMA/frame
 milestones, a 300-frame sustained regression, and playable-ROM-to-VGA
 verification. Phase 4E-A adds an observation-only, once-per-NES-frame debug
 snapshot, a coherent toggle/acknowledge transfer into the VGA clock domain,
-and a frame-stable destination bank for the future Developer Mode renderer.
-No panel or overlay is rendered in Phase 4E-A.
+and a frame-stable destination bank. Phase 4E-B adds an independent direct-
+pixel Developer Mode page, compact deterministic font, reusable hexadecimal
+formatting, stale/invalid status, and a hard normal-video bypass. The board
+image keeps Developer Mode hard-disabled because every slide switch is already
+assigned; no physical control mapping changed.
 
 ## Phase 1 foundation
 
@@ -456,6 +459,23 @@ The field layout, CDC contract, verification, build comparison, and exact
 Phase 4E-B renderer recommendation are documented in
 [`docs/phase4e-a-devmode-snapshot.md`](docs/phase4e-a-devmode-snapshot.md).
 
+## Phase 4E-B graphical Developer Mode renderer
+
+- Full-screen 640x480 diagnostic page generated directly from coordinates
+- 6x8 ROM-style uppercase font in 8x16 text cells, with no debug framebuffer
+- CPU, PPU, cartridge, controllers, DMA, snapshot health, and system counters
+- Deterministic 8-, 16-, and 32-bit uppercase hexadecimal formatting
+- Four-frame stale threshold plus explicit `VALID`, `INVALID`, and `STALE`
+- Renderer consumes only the Phase 4E-A stable video-domain snapshot
+- Explicit RGB mux preserves normal pixels; HSYNC, VSYNC, and blanking bypass it
+- Exhaustive 352-row glyph comparison and all 307,200 active pixels matched
+  independently modeled Python output
+- Board parameter defaults Developer Mode off; SW0-SW9 and KEY0 are unchanged
+
+Architecture, layout, verification, resources, timing, and the Phase 4E-C
+side-panel recommendation are documented in
+[`docs/phase4e-b-devmode-renderer.md`](docs/phase4e-b-devmode-renderer.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -493,7 +513,8 @@ This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
 4D-A standalone/arbiter/integrated DMA and NMI tests, Phase 4D-B playable-ROM
 boot/controller/frame/VGA and 300-frame sustained tests, the Phase 4E-A
-snapshot/CDC/reset test and playable integration checks, PPU
+snapshot/CDC/reset test, the Phase 4E-B glyph/renderer/compositor/full-frame
+comparison, and playable integration checks, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -597,7 +618,7 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4E-A snapshot-enabled playable-ROM DE1-SoC NES/VGA
+Build the current Phase 4E-B renderer-enabled playable-ROM DE1-SoC NES/VGA
 image and run its strict ROM regeneration/import, fitter, assembler, timing,
 and RBF generation checks:
 
@@ -640,7 +661,7 @@ before use.
 - `rtl/cartridge` — generic cartridge shell and Mapper 0/NROM storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — standalone OAM DMA bus master
-- `rtl/debug` — grouped observation-only Developer Mode snapshot and CDC
+- `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
 - `rtl/apu`, `rtl/memory` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches

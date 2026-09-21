@@ -3,7 +3,9 @@
 // Phase 4D-B physical top. The NES stays in the 50 MHz fabric domain and is
 // advanced by an NTSC-rate clock enable; the VGA reader uses a PLL-derived
 // 25.2 MHz clock and crosses only through nes_framebuffer's handoff protocol.
-module de1_soc_nes_vga_top (
+module de1_soc_nes_vga_top #(
+    parameter logic DEVELOPER_MODE_DEFAULT = 1'b0
+) (
     input  logic       CLOCK_50,
     input  logic       KEY0,
     input  logic       SW0,
@@ -165,15 +167,23 @@ module de1_soc_nes_vga_top (
     logic active_video;
     logic vga_frame_start;
     logic vga_line_start;
+    logic [7:0] normal_vga_red;
+    logic [7:0] normal_vga_green;
+    logic [7:0] normal_vga_blue;
+    logic [7:0] developer_vga_red;
+    logic [7:0] developer_vga_green;
+    logic [7:0] developer_vga_blue;
+    logic debug_snapshot_stale;
+    (* preserve, noprune *) logic [23:0] debug_renderer_retention;
 
     logic capture_heartbeat;
     logic vga_heartbeat;
     logic dma_heartbeat;
     logic nmi_heartbeat;
 
-    // All ten slide switches already have Phase 4D-B functions. Reserve the
-    // future renderer mode internally and leave it disabled until Phase 4E-B
-    // assigns a non-conflicting physical control or alternate input device.
+    // All ten slide switches already have Phase 4D-B functions. The parameter
+    // gives simulation a clean renderer control while the board image keeps
+    // Developer Mode hard-disabled until a non-conflicting control exists.
     logic developer_mode_enable;
     nes_debug_snapshot_pkg::nes_debug_snapshot_t debug_observations;
     nes_debug_snapshot_pkg::nes_debug_snapshot_t debug_destination_snapshot;
@@ -182,7 +192,7 @@ module de1_soc_nes_vga_top (
     logic debug_destination_update;
     logic debug_destination_valid;
 
-    assign developer_mode_enable = 1'b0;
+    assign developer_mode_enable = DEVELOPER_MODE_DEFAULT;
 
     video_pll pixel_clock_source (
         .ref_clk(CLOCK_50),
@@ -455,9 +465,9 @@ module de1_soc_nes_vga_top (
         .hsync_n(VGA_HS),
         .vsync_n(VGA_VS),
         .blank_n(VGA_BLANK_N),
-        .red(VGA_R),
-        .green(VGA_G),
-        .blue(VGA_B)
+        .red(normal_vga_red),
+        .green(normal_vga_green),
+        .blue(normal_vga_blue)
     );
 
     always_comb begin
@@ -581,6 +591,53 @@ module de1_soc_nes_vga_top (
         .destination_snapshot(debug_destination_snapshot)
     );
 
+    // The renderer observes only the Phase 4E-A video-domain stable bank. It
+    // has no path back into NES execution or framebuffer capture. Passing a
+    // constant one here requests its raw page; the explicit mux below is the
+    // sole mode compositor and therefore the normal path is a hard bypass.
+    nes_debug_renderer debug_renderer (
+        .pixel_clk(pixel_clk),
+        .reset(video_reset),
+        .developer_mode_enable(1'b1),
+        .snapshot_valid(debug_destination_valid),
+        .snapshot_update(debug_destination_update),
+        .snapshot(debug_destination_snapshot),
+        .frame_start(vga_frame_start),
+        .scan_x(scan_x),
+        .scan_y(scan_y),
+        .active_video(active_video),
+        .normal_red(8'h00),
+        .normal_green(8'h00),
+        .normal_blue(8'h00),
+        .snapshot_stale(debug_snapshot_stale),
+        .red(developer_vga_red),
+        .green(developer_vga_green),
+        .blue(developer_vga_blue)
+    );
+
+    always_comb begin
+        if (developer_mode_enable) begin
+            VGA_R = developer_vga_red;
+            VGA_G = developer_vga_green;
+            VGA_B = developer_vga_blue;
+        end else begin
+            VGA_R = normal_vga_red;
+            VGA_G = normal_vga_green;
+            VGA_B = normal_vga_blue;
+        end
+    end
+
+    // Retain the future-selectable renderer in the hard-disabled board image
+    // so Phase 4E-B synthesis measures the real logic and timing cost.
+    always_ff @(posedge pixel_clk) begin
+        if (video_reset)
+            debug_renderer_retention <= '0;
+        else
+            debug_renderer_retention <= {
+                developer_vga_red, developer_vga_green, developer_vga_blue
+            };
+    end
+
     always_ff @(posedge CLOCK_50) begin
         if (system_reset) begin
             capture_heartbeat <= 1'b0;
@@ -673,6 +730,7 @@ module de1_soc_nes_vga_top (
                            ^dma_debug_source_address ||
                            ^dma_debug_source_data || ^dma_debug_bus_owner ||
                            developer_mode_enable ||
+                           debug_snapshot_stale || ^debug_renderer_retention ||
                            debug_source_capture_accepted || debug_source_busy ||
                            debug_destination_update || debug_destination_valid ||
                            ^debug_destination_snapshot;
