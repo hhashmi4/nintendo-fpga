@@ -15,7 +15,7 @@ module ppu_phase3h_tb;
     logic chr_read;
     logic chr_write;
     logic [7:0] chr_write_data;
-    logic [7:0] chr_read_data;
+    logic [7:0] chr_read_data = 8'h00;
     logic [8:0] dot;
     logic [8:0] scanline;
     logic visible_pixel;
@@ -114,13 +114,14 @@ module ppu_phase3h_tb;
     );
     /* verilator lint_on PINMISSING */
 
-    assign chr_read_data = chr_memory[chr_addr];
     assign observation_parity = ^{
         chr_read, pixel_x, pixel_y, final_winning_sprite_slot,
         final_winning_sprite_zero, sprite_overflow_set
     };
     always #5 clk <= !clk;
     always_ff @(posedge clk) begin
+        // Match the cartridge's inferred synchronous M10K CHR-ROM port.
+        chr_read_data <= chr_memory[chr_addr];
         if (chr_write) chr_memory[chr_addr] <= chr_write_data;
     end
 

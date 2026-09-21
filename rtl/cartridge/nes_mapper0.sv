@@ -63,7 +63,7 @@ module nes_mapper0 #(
         // Quartus 23.1 accepts only literal readmemh paths, while Verilator
         // accepts the reusable filename parameters used by the test suite.
         // The board build regenerates these project-owned artifacts first.
-        $readmemh("../build/cartridge/phase4c_controller_display_nrom128.prg.hex",
+        $readmemh("../build/cartridge/phase4db_playable_nrom128.prg.hex",
                   prg_rom);
 `else
         $readmemh(PRG_INIT_FILE, prg_rom);
@@ -76,7 +76,7 @@ module nes_mapper0 #(
 `endif
         if (!CHR_IS_RAM) begin
 `ifdef ALTERA_SYNTHESIS
-            $readmemh("../build/cartridge/phase4c_controller_display_nrom128.chr.hex",
+            $readmemh("../build/cartridge/phase4db_playable_nrom128.chr.hex",
                       chr_memory);
 `else
             $readmemh(CHR_INIT_FILE, chr_memory);

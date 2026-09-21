@@ -33,11 +33,13 @@ mkdir -p \
     build/verilator/nes_internal_bus_arbiter_phase4d \
     build/verilator/nes_phase4d_dma_integration \
     build/verilator/nes_phase4d_dma_nmi \
+    build/verilator/nes_phase4db_playable \
     build/verilator/nes_phase3j \
     build/verilator/nes_phase3j_nmi \
     build/verilator/vga_timing_phase3k \
     build/verilator/vga_phase3k \
     build/verilator/nes_vga_phase3k \
+    build/verilator/nes_vga_phase4db \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -107,10 +109,13 @@ NES_OAM_DMA_PHASE4D_WAVEFORM="build/sim/nes_oam_dma_phase4d.fst"
 NES_INTERNAL_BUS_ARBITER_PHASE4D_WAVEFORM="build/sim/nes_internal_bus_arbiter_phase4d.fst"
 NES_PHASE4D_DMA_INTEGRATION_WAVEFORM="build/sim/nes_phase4d_dma_integration.fst"
 NES_PHASE4D_DMA_NMI_WAVEFORM="build/sim/nes_phase4d_dma_nmi.fst"
+NES_PHASE4DB_WAVEFORM="build/sim/nes_phase4db_playable.fst"
+NES_PHASE4DB_BOOT_TRACE="build/sim/phase4db_boot_trace.txt"
 NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
 VGA_PHASE3K_WAVEFORM="build/sim/vga_phase3k.fst"
 VGA_PHASE3K_TRACE="build/sim/vga_phase3k_pixels.txt"
 NES_VGA_PHASE3K_TRACE="build/sim/nes_vga_phase3k_pixels.txt"
+NES_VGA_PHASE4DB_TRACE="build/sim/phase4db_vga_pixels.txt"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -180,10 +185,13 @@ rm -f \
     "$NES_INTERNAL_BUS_ARBITER_PHASE4D_WAVEFORM" \
     "$NES_PHASE4D_DMA_INTEGRATION_WAVEFORM" \
     "$NES_PHASE4D_DMA_NMI_WAVEFORM" \
+    "$NES_PHASE4DB_WAVEFORM" \
+    "$NES_PHASE4DB_BOOT_TRACE" \
     "$NES_PHASE3J_WAVEFORM" \
     "$VGA_PHASE3K_WAVEFORM" \
     "$VGA_PHASE3K_TRACE" \
     "$NES_VGA_PHASE3K_TRACE" \
+    "$NES_VGA_PHASE4DB_TRACE" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -241,6 +249,16 @@ if [[ ! -s "$NES_PHASE4A_BUS_WAVEFORM" ]]; then
 fi
 
 python3 scripts/generate_phase4b_fixtures.py build/cartridge
+python3 scripts/generate_phase4db_playable_rom.py \
+    build/cartridge/phase4db_regenerated.nes
+if ! cmp -s roms/phase4db_playable_nrom128.nes \
+             build/cartridge/phase4db_regenerated.nes; then
+    echo "ERROR: committed playable ROM differs from its project-owned source" >&2
+    exit 1
+fi
+python3 scripts/prepare_phase4db_cartridge.py \
+    roms/phase4db_playable_nrom128.nes \
+    build/cartridge/phase4db_playable_nrom128
 
 verilator --binary --timing --trace-fst --Wall \
     --assert \
@@ -768,6 +786,27 @@ fi
 
 verilator --binary --timing --trace-fst --Wall \
     --assert \
+    --Mdir build/verilator/nes_phase4db_playable \
+    --top-module nes_phase4db_playable_tb \
+    -o nes_phase4db_playable_tb \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/controller/controller_input_sync.sv \
+    rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0.sv \
+    rtl/cartridge/nes_cartridge.sv \
+    sim/nes_phase4db_playable_tb.sv
+
+build/verilator/nes_phase4db_playable/nes_phase4db_playable_tb
+
+if [[ ! -s "$NES_PHASE4DB_WAVEFORM" ||
+      ! -s "$NES_PHASE4DB_BOOT_TRACE" ]]; then
+    echo "ERROR: Phase 4D-B playable simulation artifacts are missing" >&2
+    exit 1
+fi
+python3 scripts/verify_phase4db_frames.py build/sim
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
     --Mdir build/verilator/nes_phase3j \
     --top-module nes_phase3j_tb \
     -o nes_phase3j_tb \
@@ -1104,6 +1143,30 @@ if [[ ! -s "$NES_VGA_PHASE3K_TRACE" ]]; then
 fi
 python3 scripts/verify_nes_vga_trace.py "$NES_VGA_PHASE3K_TRACE"
 
+verilator --binary --timing --Wall -Wno-fatal \
+    -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
+    --assert \
+    --Mdir build/verilator/nes_vga_phase4db \
+    --top-module nes_vga_phase4db_tb \
+    -o nes_vga_phase4db_tb \
+    rtl/platform/platform_config_pkg.sv \
+    rtl/platform/nes_timing_gen.sv \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/controller/controller_input_sync.sv \
+    rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0.sv \
+    rtl/cartridge/nes_cartridge.sv \
+    "${VIDEO_PHASE3K_RTL_FILES[@]}" \
+    sim/nes_vga_phase4db_tb.sv
+
+build/verilator/nes_vga_phase4db/nes_vga_phase4db_tb
+
+if [[ ! -s "$NES_VGA_PHASE4DB_TRACE" ]]; then
+    echo "ERROR: Phase 4D-B playable NES/VGA trace is missing" >&2
+    exit 1
+fi
+python3 scripts/verify_nes_vga_trace.py "$NES_VGA_PHASE4DB_TRACE"
+
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
 echo "PPU timing waveform: $ROOT_DIR/$PPU_WAVEFORM"
 echo "PPU Phase 3B waveform: $ROOT_DIR/$PPU_PHASE3B_WAVEFORM"
@@ -1128,10 +1191,13 @@ echo "NES standalone OAM DMA Phase 4D-A waveform: $ROOT_DIR/$NES_OAM_DMA_PHASE4D
 echo "NES internal bus arbiter Phase 4D-A waveform: $ROOT_DIR/$NES_INTERNAL_BUS_ARBITER_PHASE4D_WAVEFORM"
 echo "NES integrated DMA Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_INTEGRATION_WAVEFORM"
 echo "NES DMA/NMI Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_NMI_WAVEFORM"
+echo "NES playable Phase 4D-B waveform: $ROOT_DIR/$NES_PHASE4DB_WAVEFORM"
+echo "NES playable Phase 4D-B boot trace: $ROOT_DIR/$NES_PHASE4DB_BOOT_TRACE"
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"
 echo "NES/VGA Phase 3K trace: $ROOT_DIR/$NES_VGA_PHASE3K_TRACE"
+echo "NES/VGA playable Phase 4D-B trace: $ROOT_DIR/$NES_VGA_PHASE4DB_TRACE"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

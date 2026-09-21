@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-// Phase 3K physical top. The NES stays in the 50 MHz fabric domain and is
+// Phase 4D-B physical top. The NES stays in the 50 MHz fabric domain and is
 // advanced by an NTSC-rate clock enable; the VGA reader uses a PLL-derived
 // 25.2 MHz clock and crosses only through nes_framebuffer's handoff protocol.
 module de1_soc_nes_vga_top (
@@ -78,7 +78,35 @@ module de1_soc_nes_vga_top (
     logic ppu_frame_start;
     logic dma_complete_event;
     logic ppu_nmi_event;
+    logic [7:0] cpu_debug_a;
+    logic [7:0] cpu_debug_x;
+    logic [7:0] cpu_debug_y;
+    logic [7:0] cpu_debug_sp;
     logic [15:0] cpu_debug_pc;
+    logic [7:0] cpu_debug_status;
+    logic [15:0] cpu_debug_bus_address;
+    logic [7:0] cpu_debug_bus_write_data;
+    logic [7:0] cpu_debug_bus_read_data;
+    logic cpu_debug_bus_write;
+    logic cpu_debug_bus_read;
+    logic cpu_debug_bus_valid;
+    logic [8:0] ppu_debug_dot;
+    logic [8:0] ppu_debug_scanline;
+    logic ppu_debug_frame_odd;
+    logic ppu_debug_vblank;
+    logic ppu_debug_sprite_zero_hit;
+    logic ppu_debug_sprite_overflow;
+    logic [7:0] ppu_debug_ctrl;
+    logic [7:0] ppu_debug_mask;
+    logic ppu_debug_nmi_level;
+    logic [7:0] dma_debug_page;
+    logic [7:0] dma_debug_index;
+    logic [9:0] dma_debug_elapsed_cycles;
+    logic [7:0] dma_debug_source_data;
+    logic [15:0] dma_debug_source_address;
+    logic dma_debug_active;
+    nes_system_pkg::nes_bus_master_t dma_debug_bus_owner;
+    logic [1:0] ppu_debug_pixel_source;
 
     logic [7:0] controller1_async_buttons;
     logic [7:0] controller1_buttons;
@@ -222,18 +250,18 @@ module de1_soc_nes_vga_top (
         .cpu_cycle_slot(),
         .cpu_enable(),
         .scheduler_phase(),
-        .cpu_address(),
-        .cpu_write_data(),
-        .cpu_read_data(),
-        .cpu_write_enable(),
-        .cpu_read_enable(),
-        .cpu_bus_valid(),
-        .cpu_debug_a(),
-        .cpu_debug_x(),
-        .cpu_debug_y(),
-        .cpu_debug_sp(),
+        .cpu_address(cpu_debug_bus_address),
+        .cpu_write_data(cpu_debug_bus_write_data),
+        .cpu_read_data(cpu_debug_bus_read_data),
+        .cpu_write_enable(cpu_debug_bus_write),
+        .cpu_read_enable(cpu_debug_bus_read),
+        .cpu_bus_valid(cpu_debug_bus_valid),
+        .cpu_debug_a(cpu_debug_a),
+        .cpu_debug_x(cpu_debug_x),
+        .cpu_debug_y(cpu_debug_y),
+        .cpu_debug_sp(cpu_debug_sp),
         .cpu_debug_pc(cpu_debug_pc),
-        .cpu_debug_status(),
+        .cpu_debug_status(cpu_debug_status),
         .cpu_bus_target(),
         .cpu_ram_address(),
         .cpu_ppu_register(),
@@ -243,28 +271,31 @@ module de1_soc_nes_vga_top (
         .cpu_dma_access(),
         .cpu_controller_access(),
         .cpu_cartridge_access(),
-        .dma_active(),
+        .dma_active(dma_debug_active),
         .dma_phase(),
-        .dma_page(),
-        .dma_index(),
+        .dma_page(dma_debug_page),
+        .dma_index(dma_debug_index),
         .dma_data(),
-        .dma_stall_cycles(),
+        .dma_stall_cycles(dma_debug_elapsed_cycles),
         .dma_read_count(),
         .dma_write_count(),
         .dma_read_event(),
         .dma_write_event(),
         .dma_complete_event(dma_complete_event),
-        .ppu_dot(),
-        .ppu_scanline(),
-        .ppu_frame_odd(),
+        .dma_source_address(dma_debug_source_address),
+        .dma_source_data(dma_debug_source_data),
+        .internal_bus_owner(dma_debug_bus_owner),
+        .ppu_dot(ppu_debug_dot),
+        .ppu_scanline(ppu_debug_scanline),
+        .ppu_frame_odd(ppu_debug_frame_odd),
         .ppu_frame_start(ppu_frame_start),
         .ppu_frame_end(),
-        .ppu_status_vblank(),
-        .ppu_status_sprite_zero_hit(),
-        .ppu_status_sprite_overflow(),
-        .ppu_ctrl(),
-        .ppu_mask(),
-        .ppu_nmi_level(),
+        .ppu_status_vblank(ppu_debug_vblank),
+        .ppu_status_sprite_zero_hit(ppu_debug_sprite_zero_hit),
+        .ppu_status_sprite_overflow(ppu_debug_sprite_overflow),
+        .ppu_ctrl(ppu_debug_ctrl),
+        .ppu_mask(ppu_debug_mask),
+        .ppu_nmi_level(ppu_debug_nmi_level),
         .ppu_nmi_event(ppu_nmi_event),
         .ppu_nmi_suppressed(),
         .ppu_oam_addr(),
@@ -276,7 +307,7 @@ module de1_soc_nes_vga_top (
         .pixel_palette_address(),
         .pixel_nes_color(pixel_color),
         .pixel_color_emphasis(pixel_emphasis),
-        .pixel_source()
+        .pixel_source(ppu_debug_pixel_source)
     );
     /* verilator lint_on PINMISSING */
     /* verilator lint_on PINCONNECTEMPTY */
@@ -310,9 +341,9 @@ module de1_soc_nes_vga_top (
         .PRG_ROM_BYTES (16384),
         .CHR_IS_RAM    (1'b0),
         .PRG_RAM_ENABLE(1'b0),
-        .MIRRORING_MODE(2'd0),
-        .PRG_INIT_FILE ("../build/cartridge/phase4c_controller_display_nrom128.prg.hex"),
-        .CHR_INIT_FILE ("../build/cartridge/phase4c_controller_display_nrom128.chr.hex")
+        .MIRRORING_MODE(2'd1),
+        .PRG_INIT_FILE ("../build/cartridge/phase4db_playable_nrom128.prg.hex"),
+        .CHR_INIT_FILE ("../build/cartridge/phase4db_playable_nrom128.chr.hex")
     ) cartridge (
         .clk(CLOCK_50),
         .reset(system_reset),
@@ -469,5 +500,20 @@ module de1_soc_nes_vga_top (
                            controller_debug_serial2 ||
                            controller_debug_read_4016 ||
                            controller_debug_read_4017 ||
-                           controller_debug_latch;
+                           controller_debug_latch || ^cpu_debug_a ||
+                           ^cpu_debug_x || ^cpu_debug_y || ^cpu_debug_sp ||
+                           ^cpu_debug_status || ^cpu_debug_bus_address ||
+                           ^cpu_debug_bus_write_data ||
+                           ^cpu_debug_bus_read_data || cpu_debug_bus_write ||
+                           cpu_debug_bus_read || cpu_debug_bus_valid ||
+                           ^ppu_debug_dot || ^ppu_debug_scanline ||
+                           ppu_debug_frame_odd || ppu_debug_vblank ||
+                           ppu_debug_sprite_zero_hit ||
+                           ppu_debug_sprite_overflow || ^ppu_debug_ctrl ||
+                           ^ppu_debug_mask || ppu_debug_nmi_level ||
+                           ^ppu_debug_pixel_source || dma_debug_active ||
+                           ^dma_debug_page || ^dma_debug_index ||
+                           ^dma_debug_elapsed_cycles ||
+                           ^dma_debug_source_address ||
+                           ^dma_debug_source_data || ^dma_debug_bus_owner;
 endmodule

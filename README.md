@@ -37,7 +37,10 @@ controller ports, an abstract synchronized input boundary, DE1-SoC Controller
 that polls both ports into CPU RAM. Phase 4D-A extracts the verified OAM DMA
 sequencer into a standalone internal bus master with explicit CPU/DMA
 arbitration, cartridge-source reads, and expanded passive diagnostics. Native
-HDMI and physical VGA observation remain outstanding.
+HDMI remains future work. Phase 4D-B adds a project-owned MIT-licensed playable
+NROM-128 image, reproducible cartridge import, controller/NMI/DMA/frame
+milestones, a 300-frame sustained regression, and playable-ROM-to-VGA
+verification. Physical VGA observation still requires an attached DE1-SoC.
 
 ## Phase 1 foundation
 
@@ -419,6 +422,22 @@ The preserved behavior, arbitration rules, verification, and Phase 4D-B
 playable-ROM recommendation are documented in
 [`docs/phase4d-a-oam-dma-bus-master.md`](docs/phase4d-a-oam-dma-bus-master.md).
 
+## Phase 4D-B playable NROM validation
+
+- Project-owned, MIT-licensed NROM-128 game image with no commercial ROM data
+- Start-controlled gameplay, eight-button polling, bounded movement, backgrounds,
+  sprites, VBlank NMI, and one page-$02 OAM DMA per gameplay frame
+- Strict iNES metadata/vector checks and byte-identical source regeneration
+- Nine deterministic 256x240 FPGA PPU frame hashes and viewable PPM artifacts
+- 300-frame sustained CPU/controller/NMI/DMA/PPU integration regression
+- Actual cartridge-to-framebuffer-to-640x480 VGA path comparison
+- Sparse-enable synchronous-CHR compatibility fix with focused regression
+- Simulation qualification complete; physical board validation remains pending
+
+The ROM, import flow, compatibility fix, simulation evidence, Quartus results,
+programming command, and physical checklist are documented in
+[`docs/phase4d-b-playable-rom-validation.md`](docs/phase4d-b-playable-rom-validation.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -454,7 +473,8 @@ Run the normal suite from the repository root:
 This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
-4D-A standalone/arbiter/integrated DMA and NMI tests, PPU
+4D-A standalone/arbiter/integrated DMA and NMI tests, Phase 4D-B playable-ROM
+boot/controller/frame/VGA and 300-frame sustained tests, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -470,6 +490,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_phase4c_controller.fst`, `nes_oam_dma_phase4d.fst`,
 `nes_internal_bus_arbiter_phase4d.fst`,
 `nes_phase4d_dma_integration.fst`, `nes_phase4d_dma_nmi.fst`,
+`nes_phase4db_playable.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -557,7 +578,8 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4D-A DE1-SoC NES/VGA image and run its fitter/timing
+Build the current Phase 4D-B playable-ROM DE1-SoC NES/VGA image and run its
+strict ROM regeneration/import, fitter, assembler, timing, and RBF generation
 checks:
 
 ```bash
