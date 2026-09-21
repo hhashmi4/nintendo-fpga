@@ -27,9 +27,12 @@ triple M10K framebuffer, safe NES/VGA frame handoff, 2x scaling, deterministic
 NES-to-RGB conversion, and a synthesized 640x480 DE1-SoC VGA board image.
 Phase 4A separates the NES CPU bus, complete memory decode, mirrored 2 KiB RAM,
 and future APU/controller/cartridge boundaries while preserving the verified
-CPU, PPU, and DMA behavior. APU,
-mapper, cartridge loading, controllers, audio, and native HDMI do not exist
-yet; physical VGA observation remains outstanding.
+CPU, PPU, and DMA behavior. Phase 4B adds strict host-side iNES import, a
+replaceable cartridge shell, Mapper 0/NROM-128 and NROM-256 PRG mapping,
+CHR ROM/RAM, cartridge-selected nametable mirroring, and a real cartridge
+reset-vector boot path. APU, advanced mappers, physical cartridge loading,
+controllers, audio, and native HDMI do not exist yet; physical VGA observation
+remains outstanding.
 
 ## Phase 1 foundation
 
@@ -362,6 +365,22 @@ The memory map, interfaces, reset/clock contracts, verification, and future
 VGA/debug/HDMI architecture are documented in
 [`docs/phase4a-system-bus.md`](docs/phase4a-system-bus.md).
 
+## Phase 4B Mapper 0 cartridge subsystem
+
+- Strict iNES 1.0 validation and reproducible PRG/CHR/JSON conversion tooling
+- Generic CPU/PPU cartridge boundary with Mapper 0 behind the Phase 4A bus
+- NROM-128 16 KiB PRG mirroring and NROM-256 direct 32 KiB mapping
+- 8 KiB CHR ROM and writable 8 KiB CHR RAM configurations
+- Optional 8 KiB PRG RAM architecture at `$6000-$7FFF`
+- Horizontal/vertical cartridge metadata wired into the existing PPU CIRAM map
+- Project-owned boot/display/mapping fixtures generated without commercial ROMs
+- Real CPU reset-vector boot and CPU-to-PPU-to-CHR integration verification
+- M10K-inferred PRG/CHR storage in the DE1-SoC board image
+
+The format rules, mapper data flow, fixtures, reset boot proof, observability,
+synthesis results, and future-mapper boundary are documented in
+[`docs/phase4b-cartridge-nrom.md`](docs/phase4b-cartridge-nrom.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -395,7 +414,7 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
-4A exhaustive system-bus/RAM test, PPU
+4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -406,7 +425,8 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
 `ppu_oam.fst`, `ppu_phase3f.fst`,
 `ppu_sprite_renderer.fst`, `ppu_phase3g.fst`, `ppu_phase3h.fst`,
-`ppu_phase3i.fst`, `nes_phase4a_bus.fst`, `nes_phase3j.fst`, `vga_phase3k.fst`,
+`ppu_phase3i.fst`, `nes_phase4a_bus.fst`, `mapper0_phase4b.fst`,
+`nes_phase4b_boot.fst`, `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -493,7 +513,8 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the Phase 3K DE1-SoC VGA SOF/RBF and run its fitter/timing checks:
+Build the current Phase 4B DE1-SoC NES/VGA SOF/RBF and run its
+fitter/timing checks:
 
 ```bash
 ./scripts/build_de1_soc_nes_vga_quartus.sh
@@ -531,8 +552,9 @@ before use.
 - `rtl/cpu` — CPU state, ALU, addressing, decoder, and shared instruction sequencer
 - `rtl/ppu` — PPU timing, CPU registers, memory map, and integrated cores
 - `rtl/system` — NES CPU address decoder, system bus, and internal CPU RAM
-- `rtl/apu` — reserved for later phases
-- `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
+- `rtl/cartridge` — generic cartridge shell and Mapper 0/NROM storage
+- `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
+- `rtl/apu`, `rtl/memory`, `rtl/controller` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches
 - `verification` and `tests/python` — Python reference infrastructure/tests
 - `constraints` — SDC timing constraints

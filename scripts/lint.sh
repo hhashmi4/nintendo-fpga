@@ -140,6 +140,15 @@ verilator --lint-only --Wall \
     --top-module nes_core \
     "${NES_RTL_FILES[@]}"
 
+CARTRIDGE_RTL_FILES=(
+    rtl/cartridge/nes_mapper0.sv
+    rtl/cartridge/nes_cartridge.sv
+)
+
+verilator --lint-only --Wall \
+    --top-module nes_cartridge \
+    "${CARTRIDGE_RTL_FILES[@]}"
+
 ALU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
     rtl/cpu/cpu_alu.sv
@@ -194,8 +203,8 @@ PHASE3K_RTL_FILES=(
     rtl/platform/level_sync.sv
     rtl/platform/nes_timing_gen.sv
     "${NES_RTL_FILES[@]}"
+    "${CARTRIDGE_RTL_FILES[@]}"
     rtl/diagnostic/hex7seg.sv
-    rtl/diagnostic/nes_vga_diag_memory.sv
     rtl/video/vga_timing.sv
     rtl/video/vga_nes_scaler.sv
     rtl/video/nes_palette_rgb.sv
