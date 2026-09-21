@@ -49,6 +49,8 @@ image keeps Developer Mode hard-disabled because every slide switch is already
 assigned; no physical control mapping changed. Phase 4E-C adds the simultaneous
 512x480 exact-2x playable game region and 128x480 compact snapshot panel, with
 an explicit boundary compositor and the same pixel-identical normal bypass.
+Phase 4E-D adds five frame-latched panel pages that reuse the coherent snapshot,
+font, formatter, colors, compositor, and fixed 512/128 geometry.
 
 ## Phase 1 foundation
 
@@ -499,6 +501,24 @@ Architecture, compact layout, mode priority, verification, resources, timing,
 and the Phase 4E-D page recommendation are documented in
 [`docs/phase4e-c-devmode-side-panel.md`](docs/phase4e-c-devmode-side-panel.md).
 
+## Phase 4E-D multiple Developer Mode pages
+
+- Five frame-latched panel pages: Overview, CPU/Bus, PPU/Cartridge,
+  DMA/Controllers, and System/Performance
+- Page requests queue during a frame and commit atomically at VGA frame start
+- Reset selects Page 0 and page-next wraps `0 -> 1 -> 2 -> 3 -> 4 -> 0`
+- All pages reuse the same coherent 711-bit video-domain snapshot, font,
+  formatting helpers, panel colors, compositor, and 512/128 geometry
+- Common `VALID`, `INVALID`, and `STALE` status is visible on every page
+- Five complete 640x480 RTL frames are compared against the independent
+  Python reference at all 307,200 active pixels per page
+- The internal virtual controls leave SW0, SW1, SW2-SW9, and KEY0 unchanged;
+  the production board image still defaults Developer Mode off
+
+Architecture, controls, layouts, verification, resources, timing, and the
+Phase 4E-E debugger-control recommendation are documented in
+[`docs/phase4e-d-devmode-pages.md`](docs/phase4e-d-devmode-pages.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -538,7 +558,8 @@ Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
 boot/controller/frame/VGA and 300-frame sustained tests, the Phase 4E-A
 snapshot/CDC/reset test, the Phase 4E-B glyph/renderer/compositor/full-frame
 comparison, the Phase 4E-C panel/compositor full-frame and real playable-ROM
-combined-frame comparisons, and playable integration checks, PPU
+combined-frame comparisons, the Phase 4E-D page-selector and five-page
+pixel-perfect comparisons, and playable integration checks, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -556,6 +577,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_phase4d_dma_integration.fst`, `nes_phase4d_dma_nmi.fst`,
 `nes_phase4db_playable.fst`, `nes_debug_snapshot.fst`,
 `nes_debug_renderer.fst`, `nes_developer_side_panel.fst`,
+`nes_debug_pages.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -643,7 +665,7 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4E-C side-panel-enabled playable-ROM DE1-SoC NES/VGA
+Build the current Phase 4E-D page-enabled playable-ROM DE1-SoC NES/VGA
 image and run its strict ROM regeneration/import, fitter, assembler, timing,
 and RBF generation checks:
 

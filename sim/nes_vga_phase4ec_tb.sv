@@ -43,6 +43,7 @@ module nes_vga_phase4ec_tb;
     integer controller_polls = 0;
     integer snapshot_updates = 0;
     integer cpu_state_changes = 0;
+    integer page_changes = 0;
     integer combined_pixels = 0;
     logic [63:0] last_cpu_state = '0;
     logic have_cpu_state = 1'b0;
@@ -69,6 +70,31 @@ module nes_vga_phase4ec_tb;
     task automatic set_buttons(input logic [7:0] buttons);
         begin
             {sw9, sw8, sw7, sw6, sw5, sw4, sw3, sw2} = buttons;
+        end
+    endtask
+
+    task automatic request_virtual_next_page;
+        logic [2:0] previous_page;
+        logic [2:0] expected_page;
+        begin
+            previous_page = dut.developer_page_active;
+            expected_page = (previous_page == 3'd4) ?
+                            3'd0 : previous_page + 3'd1;
+            do @(negedge dut.pixel_clk);
+            while (dut.vga_frame_start);
+            force dut.developer_page_next_request = 1'b1;
+            @(posedge dut.pixel_clk);
+            #1;
+            force dut.developer_page_next_request = 1'b0;
+            assert (dut.developer_page_active == previous_page);
+            assert (dut.developer_page_request_pending);
+            while (dut.developer_page_active == previous_page)
+                @(posedge dut.pixel_clk);
+            #1;
+            assert (dut.developer_page_active == expected_page);
+            assert (!dut.developer_page_request_pending);
+            release dut.developer_page_next_request;
+            page_changes = page_changes + 1;
         end
     endtask
 
@@ -227,6 +253,7 @@ module nes_vga_phase4ec_tb;
         integer freeze_snapshot;
         integer freeze_bank;
         integer long_run_start;
+        integer page_index;
 
         bank_sprite_x[0] = -1;
         bank_sprite_x[1] = -1;
@@ -285,6 +312,14 @@ module nes_vga_phase4ec_tb;
         second_sprite_x = bank_sprite_x[dut.framebuffer_read_bank];
         assert (second_sprite_x > first_sprite_x);
 
+        // Cycle repeatedly through every page using the internal virtual
+        // control hook. Each request is deliberately made mid-frame and must
+        // remain pending until the next VGA frame start.
+        for (page_index = 0; page_index < 10; page_index = page_index + 1)
+            request_virtual_next_page();
+        assert (page_changes == 10);
+        assert (dut.developer_page_active == 3'd0);
+
         // SW1 freezes only framebuffer capture. Snapshots and panel state keep
         // advancing while the displayed game bank remains unchanged.
         sw1 = 1'b1;
@@ -323,12 +358,12 @@ module nes_vga_phase4ec_tb;
         assert (snapshot_updates >= 60);
         assert (cpu_state_changes > 0);
 
-        $display("PASS: Phase 4E-C playable ROM + coherent side panel integration");
-        $display("system=%0d ppu=%0d frames=%0d snapshots=%0d nmi=%0d dma=%0d polls=%0d cpu_state_changes=%0d pixels=%0d sprite=%0d->%0d",
+        $display("PASS: Phase 4E-C/D playable ROM + coherent multi-page side panel integration");
+        $display("system=%0d ppu=%0d frames=%0d snapshots=%0d nmi=%0d dma=%0d polls=%0d cpu_state_changes=%0d page_changes=%0d pixels=%0d sprite=%0d->%0d",
                  system_cycles, ppu_ticks,
                  dut.debug_destination_snapshot.system.source_frame_number,
                  snapshot_updates, nmi_events, dma_completions,
-                 controller_polls, cpu_state_changes, combined_pixels,
+                 controller_polls, cpu_state_changes, page_changes, combined_pixels,
                  first_sprite_x, second_sprite_x);
         $finish;
     end

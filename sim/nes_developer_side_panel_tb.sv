@@ -41,6 +41,7 @@ module nes_developer_side_panel_tb;
         .snapshot_valid(snapshot_valid),
         .snapshot_update(snapshot_update),
         .snapshot(snapshot),
+        .page_select(3'd0),
         .frame_start(frame_start),
         .scan_x(scan_x),
         .scan_y(scan_y),

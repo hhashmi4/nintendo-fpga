@@ -1,10 +1,11 @@
 `timescale 1ns/1ps
 
-// Phase 4E-C physical top. The NES stays in the 50 MHz fabric domain and is
+// Phase 4E-D physical top. The NES stays in the 50 MHz fabric domain and is
 // advanced by an NTSC-rate clock enable; the VGA reader uses a PLL-derived
 // 25.2 MHz clock and crosses only through nes_framebuffer's handoff protocol.
 module de1_soc_nes_vga_top #(
     parameter logic DEVELOPER_MODE_DEFAULT = 1'b0,
+    parameter logic [2:0] DEVELOPER_PAGE_DEFAULT = 3'd0,
     parameter string PRG_INIT_FILE =
         "../build/cartridge/phase4db_playable_nrom128.prg.hex",
     parameter string CHR_INIT_FILE =
@@ -192,6 +193,13 @@ module de1_soc_nes_vga_top #(
     // gives simulation a clean renderer control while the board image keeps
     // Developer Mode hard-disabled until a non-conflicting control exists.
     (* preserve *) logic developer_mode_enable;
+    // Virtual/testbench hooks. They intentionally have no physical board
+    // mapping because SW0..SW9 and KEY0 are all retained Phase 4D-B controls.
+    (* preserve, noprune *) logic developer_page_next_request;
+    (* preserve, noprune *) logic developer_page_select_valid;
+    (* preserve, noprune *) logic [2:0] developer_page_request;
+    (* preserve, noprune *) logic [2:0] developer_page_active;
+    (* preserve, noprune *) logic developer_page_request_pending;
     nes_debug_snapshot_pkg::nes_debug_snapshot_t debug_observations;
     nes_debug_snapshot_pkg::nes_debug_snapshot_t debug_destination_snapshot;
     logic debug_source_capture_accepted;
@@ -225,11 +233,31 @@ module de1_soc_nes_vga_top #(
     // synthesized logic while selecting the parameter default after reset.
     // The production image uses the default zero; simulation can set one.
     always_ff @(posedge pixel_clk) begin
-        if (video_reset)
+        if (video_reset) begin
             developer_mode_enable <= DEVELOPER_MODE_DEFAULT;
-        else
+            developer_page_next_request <= 1'b0;
+            developer_page_select_valid <= 1'b0;
+            developer_page_request <= DEVELOPER_PAGE_DEFAULT;
+        end else begin
             developer_mode_enable <= developer_mode_enable;
+            developer_page_next_request <= developer_page_next_request;
+            developer_page_select_valid <= developer_page_select_valid;
+            developer_page_request <= developer_page_request;
+        end
     end
+
+    nes_debug_page_select #(
+        .RESET_PAGE(DEVELOPER_PAGE_DEFAULT)
+    ) debug_page_select (
+        .pixel_clk(pixel_clk),
+        .reset(video_reset),
+        .frame_start(vga_frame_start),
+        .page_next_request(developer_page_next_request),
+        .page_select_valid(developer_page_select_valid),
+        .requested_page(developer_page_request),
+        .active_page(developer_page_active),
+        .request_pending(developer_page_request_pending)
+    );
 
     level_sync test_pattern_video_sync (
         .clk(pixel_clk),
@@ -619,6 +647,7 @@ module de1_soc_nes_vga_top #(
         .snapshot_valid(debug_destination_valid),
         .snapshot_update(debug_destination_update),
         .snapshot(debug_destination_snapshot),
+        .page_select(developer_page_active),
         .frame_start(vga_frame_start),
         .scan_x(panel_render_x),
         .scan_y(panel_render_y),
@@ -645,7 +674,7 @@ module de1_soc_nes_vga_top #(
     );
 
     // Retain the panel output explicitly in the hard-disabled production
-    // image so Phase 4E-C synthesis measures the implemented renderer.
+    // image so Phase 4E-D synthesis measures the implemented renderer.
     always_ff @(posedge pixel_clk) begin
         if (video_reset)
             debug_panel_retention <= '0;

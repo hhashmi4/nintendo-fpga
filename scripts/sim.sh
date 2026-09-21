@@ -37,6 +37,7 @@ mkdir -p \
     build/verilator/nes_debug_snapshot \
     build/verilator/nes_debug_renderer \
     build/verilator/nes_developer_side_panel \
+    build/verilator/nes_debug_pages \
     build/verilator/nes_phase3j \
     build/verilator/nes_phase3j_nmi \
     build/verilator/vga_timing_phase3k \
@@ -123,6 +124,8 @@ NES_DEBUG_RENDERER_FRAME="build/sim/phase4eb_developer_mode.ppm"
 NES_DEVELOPER_SIDE_PANEL_WAVEFORM="build/sim/nes_developer_side_panel.fst"
 NES_DEVELOPER_SIDE_PANEL_TRACE="build/sim/phase4ec_combined_pixels.txt"
 NES_DEVELOPER_SIDE_PANEL_FRAME="build/sim/phase4ec_combined.ppm"
+NES_DEBUG_PAGES_WAVEFORM="build/sim/nes_debug_pages.fst"
+NES_DEBUG_PAGES_ARTIFACT_DIR="build/sim/phase4ed_pages"
 NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
 VGA_PHASE3K_WAVEFORM="build/sim/vga_phase3k.fst"
 VGA_PHASE3K_TRACE="build/sim/vga_phase3k_pixels.txt"
@@ -210,6 +213,7 @@ rm -f \
     "$NES_DEVELOPER_SIDE_PANEL_WAVEFORM" \
     "$NES_DEVELOPER_SIDE_PANEL_TRACE" \
     "$NES_DEVELOPER_SIDE_PANEL_FRAME" \
+    "$NES_DEBUG_PAGES_WAVEFORM" \
     "$NES_PHASE3J_WAVEFORM" \
     "$VGA_PHASE3K_WAVEFORM" \
     "$VGA_PHASE3K_TRACE" \
@@ -896,6 +900,28 @@ python3 scripts/verify_phase4ec_compositor.py \
     "$NES_DEVELOPER_SIDE_PANEL_TRACE" "$NES_DEVELOPER_SIDE_PANEL_FRAME"
 
 verilator --binary --timing --trace-fst --Wall \
+    -Wno-fatal -Wno-UNUSEDPARAM -Wno-BLKSEQ \
+    --assert \
+    --Mdir build/verilator/nes_debug_pages \
+    --top-module nes_debug_pages_tb \
+    -o nes_debug_pages_tb \
+    rtl/debug/nes_debug_snapshot_pkg.sv \
+    rtl/debug/debug_font_pkg.sv \
+    rtl/debug/nes_debug_page_select.sv \
+    rtl/debug/nes_debug_panel_renderer.sv \
+    rtl/video/nes_developer_compositor.sv \
+    sim/nes_debug_pages_tb.sv
+
+build/verilator/nes_debug_pages/nes_debug_pages_tb
+
+if [[ ! -s "$NES_DEBUG_PAGES_WAVEFORM" ]]; then
+    echo "ERROR: Phase 4E-D page simulation waveform is missing" >&2
+    exit 1
+fi
+python3 scripts/verify_phase4ed_pages.py \
+    build/sim "$NES_DEBUG_PAGES_ARTIFACT_DIR"
+
+verilator --binary --timing --trace-fst --Wall \
     --assert \
     --Mdir build/verilator/nes_phase3j \
     --top-module nes_phase3j_tb \
@@ -1264,6 +1290,7 @@ PHASE4EC_TOP_RTL_FILES=(
     rtl/platform/nes_timing_gen.sv
     rtl/debug/nes_debug_snapshot_pkg.sv
     rtl/debug/nes_debug_snapshot.sv
+    rtl/debug/nes_debug_page_select.sv
     rtl/debug/debug_font_pkg.sv
     rtl/debug/nes_debug_panel_renderer.sv
     "${NES_PHASE3J_RTL_FILES[@]}"
@@ -1330,6 +1357,8 @@ echo "NES debug renderer Phase 4E-B waveform: $ROOT_DIR/$NES_DEBUG_RENDERER_WAVE
 echo "NES debug renderer Phase 4E-B frame: $ROOT_DIR/$NES_DEBUG_RENDERER_FRAME"
 echo "NES Developer side-panel Phase 4E-C waveform: $ROOT_DIR/$NES_DEVELOPER_SIDE_PANEL_WAVEFORM"
 echo "NES Developer side-panel Phase 4E-C frame: $ROOT_DIR/$NES_DEVELOPER_SIDE_PANEL_FRAME"
+echo "NES Developer pages Phase 4E-D waveform: $ROOT_DIR/$NES_DEBUG_PAGES_WAVEFORM"
+echo "NES Developer pages Phase 4E-D frames: $ROOT_DIR/$NES_DEBUG_PAGES_ARTIFACT_DIR"
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"

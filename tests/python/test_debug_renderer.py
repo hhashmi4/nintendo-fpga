@@ -60,7 +60,8 @@ def test_controller_compaction_and_full_frame_shape() -> None:
 def test_phase4ec_compact_panel_layout() -> None:
     grid, _ = build_panel_character_grid()
     rows = ["".join(row) for row in grid]
-    assert rows[0][1:9] == "DEV MODE"
+    assert rows[0][1:9] == "OVERVIEW"
+    assert rows[0][12:15] == "1/5"
     assert rows[1][1:6] == "VALID"
     assert rows[3][1:8] == "PC 80A5"
     assert rows[4][1:15] == "A 03 X 10 Y 20"
@@ -84,3 +85,37 @@ def test_phase4ec_panel_and_combined_frame_shapes() -> None:
             game[game_row:game_row + 512 * 3]
         assert combined[combined_row + 512 * 3:(y + 1) * 640 * 3] == \
             panel[panel_row:(y + 1) * 128 * 3]
+
+
+def test_phase4ed_all_page_layouts_and_health() -> None:
+    expected_titles = ("OVERVIEW", "CPU/BUS", "PPU/CART", "DMA/PAD", "SYSTEM")
+    expected_content = (
+        (3, "PC 80A5"),
+        (7, "ADDR 2002"),
+        (16, "PRG 40A5:4C"),
+        (6, "DAT 5A  OAM A5"),
+        (12, "MISS  00000000"),
+    )
+    for page, title in enumerate(expected_titles):
+        grid, _ = build_panel_character_grid(page=page)
+        rows = ["".join(row) for row in grid]
+        assert rows[0][1:1 + len(title)] == title
+        assert rows[0][12:15] == f"{page + 1}/5"
+        row, content = expected_content[page]
+        assert content in rows[row]
+        invalid, _ = build_panel_character_grid(page=page, valid=False)
+        stale, _ = build_panel_character_grid(page=page, stale=True)
+        assert "INVALID" in "".join(invalid[1])
+        assert "STALE" in "".join(stale[1])
+
+
+def test_phase4ed_page_validation_and_distinct_frames() -> None:
+    game = bytes(512 * 480 * 3)
+    frames = [render_combined_frame(game, page=page) for page in range(5)]
+    assert len(set(frames)) == 5
+    try:
+        build_panel_character_grid(page=5)
+    except ValueError as error:
+        assert "0..4" in str(error)
+    else:
+        raise AssertionError("invalid page did not raise ValueError")
