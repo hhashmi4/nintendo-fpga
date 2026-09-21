@@ -35,6 +35,7 @@ mkdir -p \
     build/verilator/nes_phase4d_dma_nmi \
     build/verilator/nes_phase4db_playable \
     build/verilator/nes_debug_snapshot \
+    build/verilator/nes_debug_renderer \
     build/verilator/nes_phase3j \
     build/verilator/nes_phase3j_nmi \
     build/verilator/vga_timing_phase3k \
@@ -113,6 +114,10 @@ NES_PHASE4D_DMA_NMI_WAVEFORM="build/sim/nes_phase4d_dma_nmi.fst"
 NES_PHASE4DB_WAVEFORM="build/sim/nes_phase4db_playable.fst"
 NES_PHASE4DB_BOOT_TRACE="build/sim/phase4db_boot_trace.txt"
 NES_DEBUG_SNAPSHOT_WAVEFORM="build/sim/nes_debug_snapshot.fst"
+NES_DEBUG_RENDERER_WAVEFORM="build/sim/nes_debug_renderer.fst"
+NES_DEBUG_RENDERER_FONT_REFERENCE="build/sim/debug_font_reference.txt"
+NES_DEBUG_RENDERER_TRACE="build/sim/phase4eb_developer_pixels.txt"
+NES_DEBUG_RENDERER_FRAME="build/sim/phase4eb_developer_mode.ppm"
 NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
 VGA_PHASE3K_WAVEFORM="build/sim/vga_phase3k.fst"
 VGA_PHASE3K_TRACE="build/sim/vga_phase3k_pixels.txt"
@@ -190,6 +195,10 @@ rm -f \
     "$NES_PHASE4DB_WAVEFORM" \
     "$NES_PHASE4DB_BOOT_TRACE" \
     "$NES_DEBUG_SNAPSHOT_WAVEFORM" \
+    "$NES_DEBUG_RENDERER_WAVEFORM" \
+    "$NES_DEBUG_RENDERER_FONT_REFERENCE" \
+    "$NES_DEBUG_RENDERER_TRACE" \
+    "$NES_DEBUG_RENDERER_FRAME" \
     "$NES_PHASE3J_WAVEFORM" \
     "$VGA_PHASE3K_WAVEFORM" \
     "$VGA_PHASE3K_TRACE" \
@@ -826,6 +835,30 @@ if [[ ! -s "$NES_DEBUG_SNAPSHOT_WAVEFORM" ]]; then
     exit 1
 fi
 
+python3 scripts/generate_debug_font_vectors.py \
+    "$NES_DEBUG_RENDERER_FONT_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall \
+    -Wno-UNUSEDPARAM -Wno-BLKSEQ \
+    --assert \
+    --Mdir build/verilator/nes_debug_renderer \
+    --top-module nes_debug_renderer_tb \
+    -o nes_debug_renderer_tb \
+    rtl/debug/nes_debug_snapshot_pkg.sv \
+    rtl/debug/debug_font_pkg.sv \
+    rtl/debug/nes_debug_renderer.sv \
+    sim/nes_debug_renderer_tb.sv
+
+build/verilator/nes_debug_renderer/nes_debug_renderer_tb
+
+if [[ ! -s "$NES_DEBUG_RENDERER_WAVEFORM" ||
+      ! -s "$NES_DEBUG_RENDERER_TRACE" ]]; then
+    echo "ERROR: Phase 4E-B renderer simulation artifacts are missing" >&2
+    exit 1
+fi
+python3 scripts/verify_phase4eb_renderer.py \
+    "$NES_DEBUG_RENDERER_TRACE" "$NES_DEBUG_RENDERER_FRAME"
+
 verilator --binary --timing --trace-fst --Wall \
     --assert \
     --Mdir build/verilator/nes_phase3j \
@@ -1215,6 +1248,8 @@ echo "NES DMA/NMI Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_NMI_WAVEFORM"
 echo "NES playable Phase 4D-B waveform: $ROOT_DIR/$NES_PHASE4DB_WAVEFORM"
 echo "NES playable Phase 4D-B boot trace: $ROOT_DIR/$NES_PHASE4DB_BOOT_TRACE"
 echo "NES debug snapshot Phase 4E-A waveform: $ROOT_DIR/$NES_DEBUG_SNAPSHOT_WAVEFORM"
+echo "NES debug renderer Phase 4E-B waveform: $ROOT_DIR/$NES_DEBUG_RENDERER_WAVEFORM"
+echo "NES debug renderer Phase 4E-B frame: $ROOT_DIR/$NES_DEBUG_RENDERER_FRAME"
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"
