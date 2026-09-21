@@ -34,6 +34,7 @@ mkdir -p \
     build/verilator/nes_phase4d_dma_integration \
     build/verilator/nes_phase4d_dma_nmi \
     build/verilator/nes_phase4db_playable \
+    build/verilator/nes_debug_snapshot \
     build/verilator/nes_phase3j \
     build/verilator/nes_phase3j_nmi \
     build/verilator/vga_timing_phase3k \
@@ -111,6 +112,7 @@ NES_PHASE4D_DMA_INTEGRATION_WAVEFORM="build/sim/nes_phase4d_dma_integration.fst"
 NES_PHASE4D_DMA_NMI_WAVEFORM="build/sim/nes_phase4d_dma_nmi.fst"
 NES_PHASE4DB_WAVEFORM="build/sim/nes_phase4db_playable.fst"
 NES_PHASE4DB_BOOT_TRACE="build/sim/phase4db_boot_trace.txt"
+NES_DEBUG_SNAPSHOT_WAVEFORM="build/sim/nes_debug_snapshot.fst"
 NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
 VGA_PHASE3K_WAVEFORM="build/sim/vga_phase3k.fst"
 VGA_PHASE3K_TRACE="build/sim/vga_phase3k_pixels.txt"
@@ -187,6 +189,7 @@ rm -f \
     "$NES_PHASE4D_DMA_NMI_WAVEFORM" \
     "$NES_PHASE4DB_WAVEFORM" \
     "$NES_PHASE4DB_BOOT_TRACE" \
+    "$NES_DEBUG_SNAPSHOT_WAVEFORM" \
     "$NES_PHASE3J_WAVEFORM" \
     "$VGA_PHASE3K_WAVEFORM" \
     "$VGA_PHASE3K_TRACE" \
@@ -790,6 +793,8 @@ verilator --binary --timing --trace-fst --Wall \
     --top-module nes_phase4db_playable_tb \
     -o nes_phase4db_playable_tb \
     "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/debug/nes_debug_snapshot_pkg.sv \
+    rtl/debug/nes_debug_snapshot.sv \
     rtl/controller/controller_input_sync.sv \
     rtl/controller/nes_controller.sv \
     rtl/cartridge/nes_mapper0.sv \
@@ -804,6 +809,22 @@ if [[ ! -s "$NES_PHASE4DB_WAVEFORM" ||
     exit 1
 fi
 python3 scripts/verify_phase4db_frames.py build/sim
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_debug_snapshot \
+    --top-module nes_debug_snapshot_tb \
+    -o nes_debug_snapshot_tb \
+    rtl/debug/nes_debug_snapshot_pkg.sv \
+    rtl/debug/nes_debug_snapshot.sv \
+    sim/nes_debug_snapshot_tb.sv
+
+build/verilator/nes_debug_snapshot/nes_debug_snapshot_tb
+
+if [[ ! -s "$NES_DEBUG_SNAPSHOT_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_DEBUG_SNAPSHOT_WAVEFORM" >&2
+    exit 1
+fi
 
 verilator --binary --timing --trace-fst --Wall \
     --assert \
@@ -1193,6 +1214,7 @@ echo "NES integrated DMA Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_INTEGRA
 echo "NES DMA/NMI Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_NMI_WAVEFORM"
 echo "NES playable Phase 4D-B waveform: $ROOT_DIR/$NES_PHASE4DB_WAVEFORM"
 echo "NES playable Phase 4D-B boot trace: $ROOT_DIR/$NES_PHASE4DB_BOOT_TRACE"
+echo "NES debug snapshot Phase 4E-A waveform: $ROOT_DIR/$NES_DEBUG_SNAPSHOT_WAVEFORM"
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"

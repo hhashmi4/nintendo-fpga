@@ -76,14 +76,21 @@ module de1_soc_nes_vga_top (
     logic [5:0] pixel_color;
     logic [2:0] pixel_emphasis;
     logic ppu_frame_start;
+    logic nes_core_ppu_enable;
+    logic nes_core_cpu_cycle_slot;
     logic dma_complete_event;
+    logic dma_start_event;
+    logic dma_read_event;
+    logic dma_write_event;
     logic ppu_nmi_event;
+    logic ppu_nmi_suppressed;
     logic [7:0] cpu_debug_a;
     logic [7:0] cpu_debug_x;
     logic [7:0] cpu_debug_y;
     logic [7:0] cpu_debug_sp;
     logic [15:0] cpu_debug_pc;
     logic [7:0] cpu_debug_status;
+    logic [7:0] cpu_debug_instruction;
     logic [15:0] cpu_debug_bus_address;
     logic [7:0] cpu_debug_bus_write_data;
     logic [7:0] cpu_debug_bus_read_data;
@@ -99,12 +106,21 @@ module de1_soc_nes_vga_top (
     logic [7:0] ppu_debug_ctrl;
     logic [7:0] ppu_debug_mask;
     logic ppu_debug_nmi_level;
+    logic [13:0] ppu_debug_palette_address;
     logic [7:0] dma_debug_page;
     logic [7:0] dma_debug_index;
+    logic [7:0] dma_debug_data;
+    logic [2:0] dma_debug_phase;
     logic [9:0] dma_debug_elapsed_cycles;
+    logic [8:0] dma_debug_read_count;
+    logic [8:0] dma_debug_write_count;
     logic [7:0] dma_debug_source_data;
     logic [15:0] dma_debug_source_address;
     logic dma_debug_active;
+    logic dma_debug_cpu_stall;
+    logic dma_debug_started_odd;
+    logic dma_debug_dummy_cycle;
+    logic dma_debug_alignment_cycle;
     nes_system_pkg::nes_bus_master_t dma_debug_bus_owner;
     logic [1:0] ppu_debug_pixel_source;
 
@@ -154,6 +170,19 @@ module de1_soc_nes_vga_top (
     logic vga_heartbeat;
     logic dma_heartbeat;
     logic nmi_heartbeat;
+
+    // All ten slide switches already have Phase 4D-B functions. Reserve the
+    // future renderer mode internally and leave it disabled until Phase 4E-B
+    // assigns a non-conflicting physical control or alternate input device.
+    logic developer_mode_enable;
+    nes_debug_snapshot_pkg::nes_debug_snapshot_t debug_observations;
+    nes_debug_snapshot_pkg::nes_debug_snapshot_t debug_destination_snapshot;
+    logic debug_source_capture_accepted;
+    logic debug_source_busy;
+    logic debug_destination_update;
+    logic debug_destination_valid;
+
+    assign developer_mode_enable = 1'b0;
 
     video_pll pixel_clock_source (
         .ref_clk(CLOCK_50),
@@ -246,8 +275,8 @@ module de1_soc_nes_vga_top (
         .chr_write(chr_write),
         .chr_write_data(chr_write_data),
         .chr_read_data(chr_read_data),
-        .ppu_enable(),
-        .cpu_cycle_slot(),
+        .ppu_enable(nes_core_ppu_enable),
+        .cpu_cycle_slot(nes_core_cpu_cycle_slot),
         .cpu_enable(),
         .scheduler_phase(),
         .cpu_address(cpu_debug_bus_address),
@@ -262,6 +291,7 @@ module de1_soc_nes_vga_top (
         .cpu_debug_sp(cpu_debug_sp),
         .cpu_debug_pc(cpu_debug_pc),
         .cpu_debug_status(cpu_debug_status),
+        .cpu_debug_instruction(cpu_debug_instruction),
         .cpu_bus_target(),
         .cpu_ram_address(),
         .cpu_ppu_register(),
@@ -272,18 +302,23 @@ module de1_soc_nes_vga_top (
         .cpu_controller_access(),
         .cpu_cartridge_access(),
         .dma_active(dma_debug_active),
-        .dma_phase(),
+        .dma_phase(dma_debug_phase),
         .dma_page(dma_debug_page),
         .dma_index(dma_debug_index),
-        .dma_data(),
+        .dma_data(dma_debug_data),
         .dma_stall_cycles(dma_debug_elapsed_cycles),
-        .dma_read_count(),
-        .dma_write_count(),
-        .dma_read_event(),
-        .dma_write_event(),
+        .dma_read_count(dma_debug_read_count),
+        .dma_write_count(dma_debug_write_count),
+        .dma_read_event(dma_read_event),
+        .dma_write_event(dma_write_event),
         .dma_complete_event(dma_complete_event),
+        .dma_start_event(dma_start_event),
+        .dma_cpu_stall(dma_debug_cpu_stall),
         .dma_source_address(dma_debug_source_address),
         .dma_source_data(dma_debug_source_data),
+        .dma_started_odd(dma_debug_started_odd),
+        .dma_dummy_cycle(dma_debug_dummy_cycle),
+        .dma_alignment_cycle(dma_debug_alignment_cycle),
         .internal_bus_owner(dma_debug_bus_owner),
         .ppu_dot(ppu_debug_dot),
         .ppu_scanline(ppu_debug_scanline),
@@ -297,14 +332,14 @@ module de1_soc_nes_vga_top (
         .ppu_mask(ppu_debug_mask),
         .ppu_nmi_level(ppu_debug_nmi_level),
         .ppu_nmi_event(ppu_nmi_event),
-        .ppu_nmi_suppressed(),
+        .ppu_nmi_suppressed(ppu_nmi_suppressed),
         .ppu_oam_addr(),
         .ppu_oam_write_commit(),
         .ppu_oam_collision(),
         .pixel_valid(pixel_valid),
         .pixel_x(pixel_x),
         .pixel_y(pixel_y),
-        .pixel_palette_address(),
+        .pixel_palette_address(ppu_debug_palette_address),
         .pixel_nes_color(pixel_color),
         .pixel_color_emphasis(pixel_emphasis),
         .pixel_source(ppu_debug_pixel_source)
@@ -425,6 +460,127 @@ module de1_soc_nes_vga_top (
         .blue(VGA_B)
     );
 
+    always_comb begin
+        debug_observations = '0;
+
+        debug_observations.cpu.pc = cpu_debug_pc;
+        debug_observations.cpu.a = cpu_debug_a;
+        debug_observations.cpu.x = cpu_debug_x;
+        debug_observations.cpu.y = cpu_debug_y;
+        debug_observations.cpu.sp = cpu_debug_sp;
+        debug_observations.cpu.status = cpu_debug_status;
+        debug_observations.cpu.opcode = cpu_debug_instruction;
+        debug_observations.cpu.address = cpu_debug_bus_address;
+        debug_observations.cpu.read_data = cpu_debug_bus_read_data;
+        debug_observations.cpu.write_data = cpu_debug_bus_write_data;
+        debug_observations.cpu.read = cpu_debug_bus_read;
+        debug_observations.cpu.write = cpu_debug_bus_write;
+        debug_observations.cpu.bus_valid = cpu_debug_bus_valid;
+        debug_observations.cpu.stalled = dma_debug_cpu_stall;
+        debug_observations.cpu.bus_owner = dma_debug_bus_owner;
+
+        debug_observations.ppu.scanline = ppu_debug_scanline;
+        debug_observations.ppu.dot = ppu_debug_dot;
+        debug_observations.ppu.frame_odd = ppu_debug_frame_odd;
+        debug_observations.ppu.ctrl = ppu_debug_ctrl;
+        debug_observations.ppu.mask = ppu_debug_mask;
+        debug_observations.ppu.status = {
+            ppu_debug_vblank,
+            ppu_debug_sprite_zero_hit,
+            ppu_debug_sprite_overflow,
+            5'b00000
+        };
+        debug_observations.ppu.pixel_x = pixel_x;
+        debug_observations.ppu.pixel_y = pixel_y;
+        debug_observations.ppu.palette_address =
+            ppu_debug_palette_address;
+        debug_observations.ppu.pixel_color = pixel_color;
+        debug_observations.ppu.pixel_emphasis = pixel_emphasis;
+        debug_observations.ppu.pixel_source = ppu_debug_pixel_source;
+        debug_observations.ppu.pixel_valid = pixel_valid;
+        debug_observations.ppu.nmi_enabled = ppu_debug_ctrl[7];
+        debug_observations.ppu.nmi_level = ppu_debug_nmi_level;
+        debug_observations.ppu.vblank = ppu_debug_vblank;
+        debug_observations.ppu.sprite_zero_hit =
+            ppu_debug_sprite_zero_hit;
+        debug_observations.ppu.sprite_overflow =
+            ppu_debug_sprite_overflow;
+
+        debug_observations.cartridge.present = cartridge_present;
+        debug_observations.cartridge.mapper_number =
+            cartridge_mapper_number;
+        debug_observations.cartridge.nrom_256 = cartridge_nrom_256;
+        debug_observations.cartridge.prg_address =
+            cartridge_debug_prg_address;
+        debug_observations.cartridge.prg_data = cartridge_debug_prg_data;
+        debug_observations.cartridge.prg_read = cartridge_debug_prg_read;
+        debug_observations.cartridge.prg_write = cartridge_debug_prg_write;
+        debug_observations.cartridge.chr_address =
+            cartridge_debug_chr_address;
+        debug_observations.cartridge.chr_data = cartridge_debug_chr_data;
+        debug_observations.cartridge.chr_read = cartridge_debug_chr_read;
+        debug_observations.cartridge.chr_write = cartridge_debug_chr_write;
+        debug_observations.cartridge.chr_is_ram = cartridge_chr_is_ram;
+        debug_observations.cartridge.mirroring =
+            cartridge_mirroring_mode;
+
+        debug_observations.controller.live1 = controller_debug_live1;
+        debug_observations.controller.live2 = controller_debug_live2;
+        debug_observations.controller.shift1 = controller_debug_shift1;
+        debug_observations.controller.shift2 = controller_debug_shift2;
+        debug_observations.controller.index1 = controller_debug_index1;
+        debug_observations.controller.index2 = controller_debug_index2;
+        debug_observations.controller.strobe = controller_debug_strobe;
+        debug_observations.controller.serial1 = controller_debug_serial1;
+        debug_observations.controller.serial2 = controller_debug_serial2;
+
+        debug_observations.dma.active = dma_debug_active;
+        debug_observations.dma.source_page = dma_debug_page;
+        debug_observations.dma.source_address = dma_debug_source_address;
+        debug_observations.dma.source_data = dma_debug_source_data;
+        debug_observations.dma.byte_index = dma_debug_index;
+        debug_observations.dma.oam_data = dma_debug_data;
+        debug_observations.dma.phase = dma_debug_phase;
+        debug_observations.dma.started_odd = dma_debug_started_odd;
+        debug_observations.dma.elapsed_slots = dma_debug_elapsed_cycles;
+        debug_observations.dma.read_count = dma_debug_read_count;
+        debug_observations.dma.write_count = dma_debug_write_count;
+        debug_observations.dma.cpu_stall = dma_debug_cpu_stall;
+        debug_observations.dma.bus_owner = dma_debug_bus_owner;
+        debug_observations.dma.start_event = dma_start_event;
+        debug_observations.dma.read_event = dma_read_event;
+        debug_observations.dma.write_event = dma_write_event;
+        debug_observations.dma.dummy_cycle = dma_debug_dummy_cycle;
+        debug_observations.dma.alignment_cycle =
+            dma_debug_alignment_cycle;
+    end
+
+    nes_debug_snapshot debug_snapshot (
+        .source_clk(CLOCK_50),
+        .source_reset(system_reset),
+        .source_frame_capture(ppu_frame_start),
+        .manual_capture(1'b0),
+        .observations(debug_observations),
+        .nmi_event(ppu_nmi_event),
+        .nmi_suppressed_event(ppu_nmi_suppressed),
+        .dma_complete_event(dma_complete_event),
+        .controller_poll_event(controller_debug_latch),
+        .controller_read_4016_event(controller_debug_read_4016),
+        .controller_read_4017_event(controller_debug_read_4017),
+        .cpu_slot_event(nes_core_cpu_cycle_slot),
+        .ppu_cycle_event(nes_core_ppu_enable),
+        .prg_read_event(cartridge_debug_prg_read),
+        .chr_read_event(cartridge_debug_chr_read),
+        .source_capture_accepted(debug_source_capture_accepted),
+        .source_busy(debug_source_busy),
+        .destination_clk(pixel_clk),
+        .destination_reset(video_reset),
+        .destination_frame_start(vga_frame_start),
+        .destination_update(debug_destination_update),
+        .destination_valid(debug_destination_valid),
+        .destination_snapshot(debug_destination_snapshot)
+    );
+
     always_ff @(posedge CLOCK_50) begin
         if (system_reset) begin
             capture_heartbeat <= 1'b0;
@@ -515,5 +671,9 @@ module de1_soc_nes_vga_top (
                            ^dma_debug_page || ^dma_debug_index ||
                            ^dma_debug_elapsed_cycles ||
                            ^dma_debug_source_address ||
-                           ^dma_debug_source_data || ^dma_debug_bus_owner;
+                           ^dma_debug_source_data || ^dma_debug_bus_owner ||
+                           developer_mode_enable ||
+                           debug_source_capture_accepted || debug_source_busy ||
+                           debug_destination_update || debug_destination_valid ||
+                           ^debug_destination_snapshot;
 endmodule

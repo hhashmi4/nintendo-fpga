@@ -2,12 +2,26 @@
 
 module nes_phase4db_playable_tb;
     import nes_system_pkg::*;
+    import nes_debug_snapshot_pkg::*;
 
     logic clk = 1'b0;
+    logic debug_clk = 1'b0;
     logic reset = 1'b1;
     logic [7:0] async_buttons = 8'h00;
     logic [7:0] synced_buttons;
     logic [1:0] cartridge_mirroring;
+    logic cartridge_present;
+    logic [7:0] cartridge_mapper_number;
+    logic cartridge_nrom_256;
+    logic cartridge_chr_is_ram;
+    logic [14:0] cartridge_debug_prg_address;
+    logic [7:0] cartridge_debug_prg_data;
+    logic [12:0] cartridge_debug_chr_address;
+    logic [7:0] cartridge_debug_chr_data;
+    logic cartridge_debug_prg_read;
+    logic cartridge_debug_prg_write;
+    logic cartridge_debug_chr_read;
+    logic cartridge_debug_chr_write;
 
     logic [15:0] cart_cpu_address;
     logic cart_cpu_read;
@@ -30,7 +44,9 @@ module nes_phase4db_playable_tb;
     logic cpu_enable;
     logic [15:0] cpu_address;
     logic [7:0] cpu_write_data;
+    logic [7:0] cpu_read_data;
     logic cpu_write_enable;
+    logic cpu_read_enable;
     logic cpu_bus_valid;
     logic [7:0] cpu_debug_a;
     logic [7:0] cpu_debug_x;
@@ -38,13 +54,16 @@ module nes_phase4db_playable_tb;
     logic [7:0] cpu_debug_sp;
     logic [15:0] cpu_debug_pc;
     logic [7:0] cpu_debug_status;
+    logic [7:0] cpu_debug_instruction;
 
     logic dma_active;
+    logic [2:0] dma_phase;
     logic [7:0] dma_page;
     logic [7:0] dma_index;
     logic [9:0] dma_stall_cycles;
     logic [8:0] dma_read_count;
     logic [8:0] dma_write_count;
+    logic [7:0] dma_data;
     logic dma_read_event;
     logic dma_write_event;
     logic dma_complete_event;
@@ -52,28 +71,60 @@ module nes_phase4db_playable_tb;
     logic dma_cpu_stall;
     logic [15:0] dma_source_address;
     logic [7:0] dma_source_data;
+    logic dma_started_odd;
+    logic dma_dummy_cycle;
+    logic dma_alignment_cycle;
     nes_cpu_target_t dma_source_target;
     nes_bus_master_t internal_bus_owner;
 
     logic [8:0] ppu_dot;
     logic [8:0] ppu_scanline;
+    logic ppu_frame_odd;
     logic ppu_frame_start;
     logic ppu_status_vblank;
+    logic ppu_status_sprite_zero_hit;
+    logic ppu_status_sprite_overflow;
     logic [7:0] ppu_ctrl;
     logic [7:0] ppu_mask;
     logic ppu_nmi_event;
+    logic ppu_nmi_level;
+    logic ppu_nmi_suppressed;
     logic pixel_valid;
     logic [7:0] pixel_x;
     logic [7:0] pixel_y;
     logic [5:0] pixel_color;
     logic [2:0] pixel_emphasis;
+    logic [13:0] pixel_palette_address;
     logic [1:0] pixel_source;
 
     logic controller_strobe;
+    logic [7:0] controller_live1;
+    logic [7:0] controller_live2;
     logic [7:0] controller_latched;
+    logic [7:0] controller_latched2;
     logic [3:0] controller_index;
+    logic [3:0] controller_index2;
+    logic controller_serial1;
+    logic controller_serial2;
     logic controller_read_4016;
+    logic controller_read_4017;
     logic controller_latch_event;
+
+    nes_debug_snapshot_t debug_observations;
+    nes_debug_snapshot_t debug_destination_snapshot;
+    logic debug_frame_start = 1'b0;
+    logic debug_capture_accepted;
+    logic debug_source_busy;
+    logic debug_destination_update;
+    logic debug_destination_valid;
+    integer debug_capture_count = 0;
+    integer debug_update_count = 0;
+    logic [15:0] previous_snapshot_pc = 16'h0000;
+    logic [7:0] previous_snapshot_a = 8'h00;
+    logic saw_snapshot_cpu_change = 1'b0;
+    logic saw_snapshot_controller_input = 1'b0;
+    logic saw_snapshot_cartridge_read = 1'b0;
+    logic saw_snapshot_dma_completion = 1'b0;
 
     integer fabric_cycles = 0;
     integer ppu_cycles = 0;
@@ -109,6 +160,7 @@ module nes_phase4db_playable_tb;
     logic logged_palette_write = 1'b0;
 
     always #5 clk <= !clk;
+    always #7 debug_clk <= !debug_clk;
 
     controller_input_sync #(.WIDTH(8)) input_synchronizer (
         .clk(clk),
@@ -129,16 +181,16 @@ module nes_phase4db_playable_tb;
         .cpu_write_data(controller_cpu_write_data),
         .cpu_read_data(controller_cpu_read_data),
         .debug_strobe(controller_strobe),
-        .debug_live_controller1(),
-        .debug_live_controller2(),
+        .debug_live_controller1(controller_live1),
+        .debug_live_controller2(controller_live2),
         .debug_shift_controller1(controller_latched),
-        .debug_shift_controller2(),
+        .debug_shift_controller2(controller_latched2),
         .debug_index_controller1(controller_index),
-        .debug_index_controller2(),
-        .debug_serial_controller1(),
-        .debug_serial_controller2(),
+        .debug_index_controller2(controller_index2),
+        .debug_serial_controller1(controller_serial1),
+        .debug_serial_controller2(controller_serial2),
         .debug_read_4016(controller_read_4016),
-        .debug_read_4017(),
+        .debug_read_4017(controller_read_4017),
         .debug_latch_event(controller_latch_event)
     );
 
@@ -158,13 +210,20 @@ module nes_phase4db_playable_tb;
         .chr_address(chr_address), .chr_read(chr_read),
         .chr_write(chr_write), .chr_write_data(chr_write_data),
         .chr_read_data(chr_read_data),
-        .cartridge_present(), .mapper_number(), .nrom_256(),
-        .chr_is_ram(), .mirroring_mode(cartridge_mirroring),
-        .debug_prg_address(), .debug_prg_data(),
-        .debug_chr_address(), .debug_chr_data(),
-        .debug_prg_read(), .debug_prg_write(),
+        .cartridge_present(cartridge_present),
+        .mapper_number(cartridge_mapper_number),
+        .nrom_256(cartridge_nrom_256),
+        .chr_is_ram(cartridge_chr_is_ram),
+        .mirroring_mode(cartridge_mirroring),
+        .debug_prg_address(cartridge_debug_prg_address),
+        .debug_prg_data(cartridge_debug_prg_data),
+        .debug_chr_address(cartridge_debug_chr_address),
+        .debug_chr_data(cartridge_debug_chr_data),
+        .debug_prg_read(cartridge_debug_prg_read),
+        .debug_prg_write(cartridge_debug_prg_write),
         .debug_prg_ram_read(), .debug_prg_ram_write(),
-        .debug_chr_read(), .debug_chr_write()
+        .debug_chr_read(cartridge_debug_chr_read),
+        .debug_chr_write(cartridge_debug_chr_write)
     );
 
     nes_core nes (
@@ -193,9 +252,9 @@ module nes_phase4db_playable_tb;
         .scheduler_phase(),
         .cpu_address(cpu_address),
         .cpu_write_data(cpu_write_data),
-        .cpu_read_data(),
+        .cpu_read_data(cpu_read_data),
         .cpu_write_enable(cpu_write_enable),
-        .cpu_read_enable(),
+        .cpu_read_enable(cpu_read_enable),
         .cpu_bus_valid(cpu_bus_valid),
         .cpu_debug_a(cpu_debug_a),
         .cpu_debug_x(cpu_debug_x),
@@ -203,12 +262,13 @@ module nes_phase4db_playable_tb;
         .cpu_debug_sp(cpu_debug_sp),
         .cpu_debug_pc(cpu_debug_pc),
         .cpu_debug_status(cpu_debug_status),
+        .cpu_debug_instruction(cpu_debug_instruction),
         .cpu_bus_target(), .cpu_ram_address(), .cpu_ppu_register(),
         .cpu_ram_access(), .cpu_ppu_access(), .cpu_apu_access(),
         .cpu_dma_access(), .cpu_controller_access(),
         .cpu_cartridge_access(),
-        .dma_active(dma_active), .dma_phase(), .dma_page(dma_page),
-        .dma_index(dma_index), .dma_data(),
+        .dma_active(dma_active), .dma_phase(dma_phase), .dma_page(dma_page),
+        .dma_index(dma_index), .dma_data(dma_data),
         .dma_stall_cycles(dma_stall_cycles),
         .dma_read_count(dma_read_count),
         .dma_write_count(dma_write_count),
@@ -219,22 +279,206 @@ module nes_phase4db_playable_tb;
         .dma_cpu_stall(dma_cpu_stall),
         .dma_source_address(dma_source_address),
         .dma_source_data(dma_source_data),
-        .dma_started_odd(), .dma_dummy_cycle(), .dma_alignment_cycle(),
+        .dma_started_odd(dma_started_odd),
+        .dma_dummy_cycle(dma_dummy_cycle),
+        .dma_alignment_cycle(dma_alignment_cycle),
         .dma_source_target(dma_source_target),
         .internal_bus_owner(internal_bus_owner),
-        .ppu_dot(ppu_dot), .ppu_scanline(ppu_scanline), .ppu_frame_odd(),
+        .ppu_dot(ppu_dot), .ppu_scanline(ppu_scanline),
+        .ppu_frame_odd(ppu_frame_odd),
         .ppu_frame_start(ppu_frame_start), .ppu_frame_end(),
         .ppu_status_vblank(ppu_status_vblank),
-        .ppu_status_sprite_zero_hit(), .ppu_status_sprite_overflow(),
-        .ppu_ctrl(ppu_ctrl), .ppu_mask(ppu_mask), .ppu_nmi_level(),
-        .ppu_nmi_event(ppu_nmi_event), .ppu_nmi_suppressed(),
+        .ppu_status_sprite_zero_hit(ppu_status_sprite_zero_hit),
+        .ppu_status_sprite_overflow(ppu_status_sprite_overflow),
+        .ppu_ctrl(ppu_ctrl), .ppu_mask(ppu_mask),
+        .ppu_nmi_level(ppu_nmi_level),
+        .ppu_nmi_event(ppu_nmi_event),
+        .ppu_nmi_suppressed(ppu_nmi_suppressed),
         .ppu_oam_addr(), .ppu_oam_write_commit(), .ppu_oam_collision(),
         .pixel_valid(pixel_valid), .pixel_x(pixel_x), .pixel_y(pixel_y),
-        .pixel_palette_address(), .pixel_nes_color(pixel_color),
+        .pixel_palette_address(pixel_palette_address),
+        .pixel_nes_color(pixel_color),
         .pixel_color_emphasis(pixel_emphasis),
         .pixel_source(pixel_source)
     );
     /* verilator lint_on PINCONNECTEMPTY */
+
+    always_comb begin
+        debug_observations = '0;
+        debug_observations.cpu.pc = cpu_debug_pc;
+        debug_observations.cpu.a = cpu_debug_a;
+        debug_observations.cpu.x = cpu_debug_x;
+        debug_observations.cpu.y = cpu_debug_y;
+        debug_observations.cpu.sp = cpu_debug_sp;
+        debug_observations.cpu.status = cpu_debug_status;
+        debug_observations.cpu.opcode = cpu_debug_instruction;
+        debug_observations.cpu.address = cpu_address;
+        debug_observations.cpu.read_data = cpu_read_data;
+        debug_observations.cpu.write_data = cpu_write_data;
+        debug_observations.cpu.read = cpu_read_enable;
+        debug_observations.cpu.write = cpu_write_enable;
+        debug_observations.cpu.bus_valid = cpu_bus_valid;
+        debug_observations.cpu.stalled = dma_cpu_stall;
+        debug_observations.cpu.bus_owner = internal_bus_owner;
+
+        debug_observations.ppu.scanline = ppu_scanline;
+        debug_observations.ppu.dot = ppu_dot;
+        debug_observations.ppu.frame_odd = ppu_frame_odd;
+        debug_observations.ppu.ctrl = ppu_ctrl;
+        debug_observations.ppu.mask = ppu_mask;
+        debug_observations.ppu.status = {
+            ppu_status_vblank,
+            ppu_status_sprite_zero_hit,
+            ppu_status_sprite_overflow,
+            5'b00000
+        };
+        debug_observations.ppu.pixel_x = pixel_x;
+        debug_observations.ppu.pixel_y = pixel_y;
+        debug_observations.ppu.palette_address = pixel_palette_address;
+        debug_observations.ppu.pixel_color = pixel_color;
+        debug_observations.ppu.pixel_emphasis = pixel_emphasis;
+        debug_observations.ppu.pixel_source = pixel_source;
+        debug_observations.ppu.pixel_valid = pixel_valid;
+        debug_observations.ppu.nmi_enabled = ppu_ctrl[7];
+        debug_observations.ppu.nmi_level = ppu_nmi_level;
+        debug_observations.ppu.vblank = ppu_status_vblank;
+        debug_observations.ppu.sprite_zero_hit =
+            ppu_status_sprite_zero_hit;
+        debug_observations.ppu.sprite_overflow =
+            ppu_status_sprite_overflow;
+
+        debug_observations.cartridge.present = cartridge_present;
+        debug_observations.cartridge.mapper_number =
+            cartridge_mapper_number;
+        debug_observations.cartridge.nrom_256 = cartridge_nrom_256;
+        debug_observations.cartridge.prg_address =
+            cartridge_debug_prg_address;
+        debug_observations.cartridge.prg_data = cartridge_debug_prg_data;
+        debug_observations.cartridge.prg_read = cartridge_debug_prg_read;
+        debug_observations.cartridge.prg_write = cartridge_debug_prg_write;
+        debug_observations.cartridge.chr_address =
+            cartridge_debug_chr_address;
+        debug_observations.cartridge.chr_data = cartridge_debug_chr_data;
+        debug_observations.cartridge.chr_read = cartridge_debug_chr_read;
+        debug_observations.cartridge.chr_write = cartridge_debug_chr_write;
+        debug_observations.cartridge.chr_is_ram = cartridge_chr_is_ram;
+        debug_observations.cartridge.mirroring = cartridge_mirroring;
+
+        debug_observations.controller.live1 = controller_live1;
+        debug_observations.controller.live2 = controller_live2;
+        debug_observations.controller.shift1 = controller_latched;
+        debug_observations.controller.shift2 = controller_latched2;
+        debug_observations.controller.index1 = controller_index;
+        debug_observations.controller.index2 = controller_index2;
+        debug_observations.controller.strobe = controller_strobe;
+        debug_observations.controller.serial1 = controller_serial1;
+        debug_observations.controller.serial2 = controller_serial2;
+
+        debug_observations.dma.active = dma_active;
+        debug_observations.dma.source_page = dma_page;
+        debug_observations.dma.source_address = dma_source_address;
+        debug_observations.dma.source_data = dma_source_data;
+        debug_observations.dma.byte_index = dma_index;
+        debug_observations.dma.oam_data = dma_data;
+        debug_observations.dma.phase = dma_phase;
+        debug_observations.dma.started_odd = dma_started_odd;
+        debug_observations.dma.elapsed_slots = dma_stall_cycles;
+        debug_observations.dma.read_count = dma_read_count;
+        debug_observations.dma.write_count = dma_write_count;
+        debug_observations.dma.cpu_stall = dma_cpu_stall;
+        debug_observations.dma.bus_owner = internal_bus_owner;
+        debug_observations.dma.start_event = dma_start_event;
+        debug_observations.dma.read_event = dma_read_event;
+        debug_observations.dma.write_event = dma_write_event;
+        debug_observations.dma.dummy_cycle = dma_dummy_cycle;
+        debug_observations.dma.alignment_cycle = dma_alignment_cycle;
+    end
+
+    nes_debug_snapshot debug_snapshot (
+        .source_clk(clk),
+        .source_reset(reset),
+        .source_frame_capture(ppu_frame_start),
+        .manual_capture(1'b0),
+        .observations(debug_observations),
+        .nmi_event(ppu_nmi_event),
+        .nmi_suppressed_event(ppu_nmi_suppressed),
+        .dma_complete_event(dma_complete_event),
+        .controller_poll_event(controller_latch_event),
+        .controller_read_4016_event(controller_read_4016),
+        .controller_read_4017_event(controller_read_4017),
+        .cpu_slot_event(cpu_cycle_slot),
+        .ppu_cycle_event(ppu_enable),
+        .prg_read_event(cartridge_debug_prg_read),
+        .chr_read_event(cartridge_debug_chr_read),
+        .source_capture_accepted(debug_capture_accepted),
+        .source_busy(debug_source_busy),
+        .destination_clk(debug_clk),
+        .destination_reset(reset),
+        .destination_frame_start(debug_frame_start),
+        .destination_update(debug_destination_update),
+        .destination_valid(debug_destination_valid),
+        .destination_snapshot(debug_destination_snapshot)
+    );
+
+    // Model a future video frame boundary after each asynchronous bundled-data
+    // transfer has had ample time to settle and acknowledge.
+    initial begin
+        forever begin
+            @(posedge ppu_frame_start);
+            repeat (12) @(posedge debug_clk);
+            debug_frame_start = 1'b1;
+            @(posedge debug_clk);
+            debug_frame_start = 1'b0;
+        end
+    end
+
+    always @(negedge clk) begin
+        if (!reset && debug_capture_accepted)
+            debug_capture_count <= debug_capture_count + 1;
+    end
+
+    always @(negedge debug_clk) begin
+        if (!reset && debug_destination_update) begin
+            debug_update_count <= debug_update_count + 1;
+            assert (debug_destination_valid);
+            assert (debug_destination_snapshot.system.snapshot_id ==
+                    32'(debug_update_count + 1));
+            assert (debug_destination_snapshot.system.source_frame_number ==
+                    debug_destination_snapshot.system.snapshot_id);
+            assert (debug_destination_snapshot.system.missed_capture_count ==
+                    32'd0);
+            assert (debug_destination_snapshot.ppu.scanline == 9'd0 &&
+                    debug_destination_snapshot.ppu.dot == 9'd0);
+            assert (debug_destination_snapshot.ppu.status[7] ==
+                    debug_destination_snapshot.ppu.vblank);
+            assert (debug_destination_snapshot.ppu.status[6] ==
+                    debug_destination_snapshot.ppu.sprite_zero_hit);
+            assert (debug_destination_snapshot.ppu.status[5] ==
+                    debug_destination_snapshot.ppu.sprite_overflow);
+            assert (debug_destination_snapshot.cartridge.present &&
+                    debug_destination_snapshot.cartridge.mapper_number == 8'd0 &&
+                    !debug_destination_snapshot.cartridge.nrom_256 &&
+                    !debug_destination_snapshot.cartridge.chr_is_ram &&
+                    debug_destination_snapshot.cartridge.mirroring == 2'd1);
+            assert (debug_destination_snapshot.cpu.stalled ==
+                    debug_destination_snapshot.dma.cpu_stall);
+            assert (debug_destination_snapshot.cpu.bus_owner ==
+                    debug_destination_snapshot.dma.bus_owner);
+
+            if (debug_update_count != 0 &&
+                (debug_destination_snapshot.cpu.pc != previous_snapshot_pc ||
+                 debug_destination_snapshot.cpu.a != previous_snapshot_a))
+                saw_snapshot_cpu_change <= 1'b1;
+            if (debug_destination_snapshot.controller.live1 == 8'h50)
+                saw_snapshot_controller_input <= 1'b1;
+            if (debug_destination_snapshot.cartridge.prg_read)
+                saw_snapshot_cartridge_read <= 1'b1;
+            if (debug_destination_snapshot.dma.complete_event)
+                saw_snapshot_dma_completion <= 1'b1;
+            previous_snapshot_pc <= debug_destination_snapshot.cpu.pc;
+            previous_snapshot_a <= debug_destination_snapshot.cpu.a;
+        end
+    end
 
     always @(posedge clk) begin
         logic in_nmi;
@@ -567,6 +811,11 @@ module nes_phase4db_playable_tb;
             @(posedge clk);
         while (dma_active || await_dma_resume)
             @(posedge clk);
+        while (!debug_destination_valid ||
+               debug_destination_snapshot.system.source_frame_number <
+               32'(frame_count))
+            @(posedge debug_clk);
+        @(negedge debug_clk);
 
         assert (reset_vector_low_reads >= 1 && reset_vector_high_reads >= 1);
         assert (prg_reads > 100_000);
@@ -586,6 +835,36 @@ module nes_phase4db_playable_tb;
         assert (!controller_strobe && controller_index == 4'd8 &&
                 controller_latched == 8'hff);
         assert (saw_first_dma_byte && saw_last_dma_byte);
+        assert (debug_capture_count == frame_count);
+        assert (debug_update_count == frame_count);
+        assert (!debug_source_busy);
+        assert (debug_destination_snapshot.system.snapshot_id ==
+                32'(frame_count));
+        assert (debug_destination_snapshot.system.source_frame_number ==
+                32'(frame_count));
+        assert (debug_destination_snapshot.system.nmi_count <=
+                32'(nmi_events) &&
+                32'(nmi_events) -
+                debug_destination_snapshot.system.nmi_count <= 32'd1);
+        assert (debug_destination_snapshot.system.dma_count <=
+                32'(dma_completions) &&
+                32'(dma_completions) -
+                debug_destination_snapshot.system.dma_count <= 32'd1);
+        assert (debug_destination_snapshot.system.controller_poll_count <=
+                32'(controller_polls) &&
+                32'(controller_polls) -
+                debug_destination_snapshot.system.controller_poll_count <=
+                32'd1);
+        assert (debug_destination_snapshot.system.cpu_slot_count <=
+                32'(cpu_slots));
+        assert (debug_destination_snapshot.system.ppu_cycle_count <=
+                32'(ppu_cycles));
+        assert (debug_destination_snapshot.system.prg_read_count > 32'd100_000);
+        assert (debug_destination_snapshot.system.chr_read_count > 32'd100_000);
+        assert (saw_snapshot_cpu_change);
+        assert (saw_snapshot_controller_input);
+        assert (saw_snapshot_cartridge_read);
+        assert (saw_snapshot_dma_completion);
         assert (nes.internal_cpu_ram.memory[11'h00e] == 8'h00);
         assert (cpu_debug_pc >= 16'h8000 && cpu_debug_pc < 16'h9200);
         $fwrite(trace_file,
@@ -608,6 +887,13 @@ module nes_phase4db_playable_tb;
         $display("controller_polls=%0d reads4016=%0d prg_reads=%0d ppu_writes=%0d pc=%04x sp=%02x",
                  controller_polls, controller_reads, prg_reads,
                  ppu_register_writes, cpu_debug_pc, cpu_debug_sp);
+        $display("Phase 4E-A snapshots=%0d updates=%0d nmi=%0d dma=%0d polls=%0d prg=%0d chr=%0d",
+                 debug_capture_count, debug_update_count,
+                 debug_destination_snapshot.system.nmi_count,
+                 debug_destination_snapshot.system.dma_count,
+                 debug_destination_snapshot.system.controller_poll_count,
+                 debug_destination_snapshot.system.prg_read_count,
+                 debug_destination_snapshot.system.chr_read_count);
         $finish;
     end
 
