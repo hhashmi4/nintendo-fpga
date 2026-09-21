@@ -40,7 +40,10 @@ arbitration, cartridge-source reads, and expanded passive diagnostics. Native
 HDMI remains future work. Phase 4D-B adds a project-owned MIT-licensed playable
 NROM-128 image, reproducible cartridge import, controller/NMI/DMA/frame
 milestones, a 300-frame sustained regression, and playable-ROM-to-VGA
-verification. Physical VGA observation still requires an attached DE1-SoC.
+verification. Phase 4E-A adds an observation-only, once-per-NES-frame debug
+snapshot, a coherent toggle/acknowledge transfer into the VGA clock domain,
+and a frame-stable destination bank for the future Developer Mode renderer.
+No panel or overlay is rendered in Phase 4E-A.
 
 ## Phase 1 foundation
 
@@ -432,11 +435,26 @@ playable-ROM recommendation are documented in
 - 300-frame sustained CPU/controller/NMI/DMA/PPU integration regression
 - Actual cartridge-to-framebuffer-to-640x480 VGA path comparison
 - Sparse-enable synchronous-CHR compatibility fix with focused regression
-- Simulation qualification complete; physical board validation remains pending
+- The Phase 4D-B playable image was subsequently validated on physical hardware
 
 The ROM, import flow, compatibility fix, simulation evidence, Quartus results,
 programming command, and physical checklist are documented in
 [`docs/phase4d-b-playable-rom-validation.md`](docs/phase4d-b-playable-rom-validation.md).
+
+## Phase 4E-A Developer Mode snapshot foundation
+
+- Grouped 711-bit CPU, PPU, cartridge, controller, DMA, and system snapshot
+- Deterministic capture at PPU frame start, plus a reserved manual trigger
+- Stable source bank and bundled-data toggle/acknowledge CDC into `pixel_clk`
+- Renderer-facing bank changes only at a VGA frame boundary
+- Monotonic snapshot/frame IDs, sticky interval events, and lightweight counters
+- Internal Developer Mode enable reserved and tied off because SW0-SW9 are occupied
+- Focused asynchronous-clock/reset/FST test and playable 300-frame integration
+- Normal output remains pixel-identical to all nine Phase 4D-B frame hashes
+
+The field layout, CDC contract, verification, build comparison, and exact
+Phase 4E-B renderer recommendation are documented in
+[`docs/phase4e-a-devmode-snapshot.md`](docs/phase4e-a-devmode-snapshot.md).
 
 ## Development environment
 
@@ -474,7 +492,8 @@ This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
 4D-A standalone/arbiter/integrated DMA and NMI tests, Phase 4D-B playable-ROM
-boot/controller/frame/VGA and 300-frame sustained tests, PPU
+boot/controller/frame/VGA and 300-frame sustained tests, the Phase 4E-A
+snapshot/CDC/reset test and playable integration checks, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -490,7 +509,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_phase4c_controller.fst`, `nes_oam_dma_phase4d.fst`,
 `nes_internal_bus_arbiter_phase4d.fst`,
 `nes_phase4d_dma_integration.fst`, `nes_phase4d_dma_nmi.fst`,
-`nes_phase4db_playable.fst`,
+`nes_phase4db_playable.fst`, `nes_debug_snapshot.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -578,9 +597,9 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4D-B playable-ROM DE1-SoC NES/VGA image and run its
-strict ROM regeneration/import, fitter, assembler, timing, and RBF generation
-checks:
+Build the current Phase 4E-A snapshot-enabled playable-ROM DE1-SoC NES/VGA
+image and run its strict ROM regeneration/import, fitter, assembler, timing,
+and RBF generation checks:
 
 ```bash
 ./scripts/build_de1_soc_nes_vga_quartus.sh
@@ -621,6 +640,7 @@ before use.
 - `rtl/cartridge` — generic cartridge shell and Mapper 0/NROM storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — standalone OAM DMA bus master
+- `rtl/debug` — grouped observation-only Developer Mode snapshot and CDC
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
 - `rtl/apu`, `rtl/memory` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches

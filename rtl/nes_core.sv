@@ -51,6 +51,7 @@ module nes_core (
     output logic [7:0]  cpu_debug_sp,
     output logic [15:0] cpu_debug_pc,
     output logic [7:0]  cpu_debug_status,
+    output logic [7:0]  cpu_debug_instruction,
 
     output nes_system_pkg::nes_cpu_target_t cpu_bus_target,
     output logic [10:0] cpu_ram_address,
@@ -135,7 +136,6 @@ module nes_core (
     logic [7:0] bus_cart_write_data;
     logic dma_trigger;
 
-    logic [7:0] unused_cpu_instruction;
     logic [5:0] unused_cpu_execution_state;
     logic [5:0] unused_cpu_decoded_instruction;
     logic [3:0] unused_cpu_addressing_mode;
@@ -298,7 +298,7 @@ module nes_core (
         .debug_sp               (cpu_debug_sp),
         .debug_pc               (cpu_debug_pc),
         .debug_status           (cpu_debug_status),
-        .debug_instruction      (unused_cpu_instruction),
+        .debug_instruction      (cpu_debug_instruction),
         .debug_execution_state  (unused_cpu_execution_state),
         .debug_decoded_instruction(unused_cpu_decoded_instruction),
         .debug_addressing_mode  (unused_cpu_addressing_mode),
