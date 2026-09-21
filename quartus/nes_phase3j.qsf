@@ -1,0 +1,91 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY nes_core
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_alu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_decoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_address_gen.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_timing.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_scroll.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_registers.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_memory.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_background.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_background_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_range.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_oam.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_address.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_renderer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_pixel_mixer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/nes_core.sv
+set_global_assignment -name SDC_FILE ../constraints/nes_phase3j.sdc
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_nes_phase3j/output_files
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
+
+set_location_assignment PIN_AF14 -to clk
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk
+set_instance_assignment -name VIRTUAL_PIN ON -to reset
+set_instance_assignment -name VIRTUAL_PIN ON -to irq
+set_instance_assignment -name VIRTUAL_PIN ON -to mirroring_mode[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_read
+set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_write
+set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_addr[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_read
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_write
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_cycle_slot
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to scheduler_phase[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_write_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_bus_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_a[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_y[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_sp[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_pc[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_active
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_phase[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_page[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_index[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_stall_cycles[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_read_count[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_write_count[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_read_event
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_write_event
+set_instance_assignment -name VIRTUAL_PIN ON -to dma_complete_event
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_dot[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_scanline[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_frame_odd
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_frame_start
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_frame_end
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_status_vblank
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_status_sprite_zero_hit
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_status_sprite_overflow
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_ctrl[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_mask[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_nmi_level
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_nmi_event
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_nmi_suppressed
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_oam_addr[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_oam_write_commit
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_oam_collision
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_x[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_y[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_palette_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_nes_color[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_color_emphasis[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to pixel_source[*]

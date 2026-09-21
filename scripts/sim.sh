@@ -24,6 +24,8 @@ mkdir -p \
     build/verilator/ppu_pixel_mixer \
     build/verilator/ppu_phase3h \
     build/verilator/ppu_phase3i \
+    build/verilator/nes_phase3j \
+    build/verilator/nes_phase3j_nmi \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -83,6 +85,7 @@ PPU_PHASE3H_STATS="build/sim/ppu_phase3h_frame_stats.txt"
 PPU_PHASE3I_WAVEFORM="build/sim/ppu_phase3i.fst"
 PPU_PHASE3I_REFERENCE="build/sim/ppu_phase3i_reference.txt"
 PPU_PHASE3I_STATS="build/sim/ppu_phase3i_stats.txt"
+NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -142,6 +145,7 @@ rm -f \
     "$PPU_PHASE3I_WAVEFORM" \
     "$PPU_PHASE3I_REFERENCE" \
     "$PPU_PHASE3I_STATS" \
+    "$NES_PHASE3J_WAVEFORM" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -535,6 +539,53 @@ if [[ ! -s "$PPU_PHASE3I_WAVEFORM" ]]; then
     exit 1
 fi
 
+NES_PHASE3J_RTL_FILES=(
+    rtl/cpu/cpu_pkg.sv
+    rtl/cpu/cpu_alu.sv
+    rtl/cpu/cpu_decoder.sv
+    rtl/cpu/cpu_address_gen.sv
+    rtl/cpu/cpu_core.sv
+    rtl/ppu/ppu_timing.sv
+    rtl/ppu/ppu_scroll.sv
+    rtl/ppu/ppu_registers.sv
+    rtl/ppu/ppu_core.sv
+    rtl/ppu/ppu_memory.sv
+    rtl/ppu/ppu_background.sv
+    rtl/ppu/ppu_background_core.sv
+    rtl/ppu/ppu_sprite_range.sv
+    rtl/ppu/ppu_oam.sv
+    rtl/ppu/ppu_sprite_address.sv
+    rtl/ppu/ppu_sprite_renderer.sv
+    rtl/ppu/ppu_pixel_mixer.sv
+    rtl/ppu/ppu_sprite_core.sv
+    rtl/nes_core.sv
+)
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_phase3j \
+    --top-module nes_phase3j_tb \
+    -o nes_phase3j_tb \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    sim/nes_phase3j_tb.sv
+
+build/verilator/nes_phase3j/nes_phase3j_tb
+
+if [[ ! -s "$NES_PHASE3J_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_PHASE3J_WAVEFORM" >&2
+    exit 1
+fi
+
+verilator --binary --timing --Wall \
+    --assert \
+    --Mdir build/verilator/nes_phase3j_nmi \
+    --top-module nes_phase3j_nmi_tb \
+    -o nes_phase3j_nmi_tb \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    sim/nes_phase3j_nmi_tb.sv
+
+build/verilator/nes_phase3j_nmi/nes_phase3j_nmi_tb
+
 CPU_RTL_FILES=(
     rtl/cpu/cpu_pkg.sv
     rtl/cpu/cpu_alu.sv
@@ -810,6 +861,7 @@ echo "PPU sprite renderer waveform: $ROOT_DIR/$PPU_SPRITE_RENDERER_WAVEFORM"
 echo "PPU Phase 3G waveform: $ROOT_DIR/$PPU_PHASE3G_WAVEFORM"
 echo "PPU Phase 3H waveform: $ROOT_DIR/$PPU_PHASE3H_WAVEFORM"
 echo "PPU Phase 3I waveform: $ROOT_DIR/$PPU_PHASE3I_WAVEFORM"
+echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

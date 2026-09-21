@@ -19,9 +19,11 @@ pixels. Phase 3F adds real primary/secondary OAM and cycle-scheduled sprite
 evaluation. Phase 3G adds cartridge-facing sprite pattern fetches, flip logic,
 X counters, shifters, and logical sprite candidates. Phase 3H mixes background
 and sprite candidates, reads palette RAM, emits final six-bit NES colors plus
-emphasis metadata, and implements sprite-zero hit. RGB conversion, APU, DMA,
-mapper, video output, controller, and a complete game-execution system do not
-exist yet.
+emphasis metadata, and implements sprite-zero hit. Phase 3I adds VBlank/NMI
+condition timing and boundary suppression. Phase 3J integrates the CPU, PPU,
+2 KiB CPU RAM, NES bus decode, 3:1 scheduler, cartridge boundaries, NMI, and
+513/514-cycle OAM DMA as one NES core. RGB conversion, APU, mapper, video
+output, and controllers do not exist yet.
 
 ## Phase 1 foundation
 
@@ -308,6 +310,22 @@ interface boundary, verification evidence, synthesis results, and deferred
 sampling alignment are documented in
 [`docs/ppu-phase3i-nmi-vblank.md`](docs/ppu-phase3i-nmi-vblank.md).
 
+## Phase 3J CPU/PPU integration
+
+- One-clock `PPU, PPU, PPU+CPU-slot` scheduler with an exact logical 3:1 ratio
+- Synthesizable 2 KiB CPU RAM mirrored through `$1FFF`
+- PPU-register routing across `$2000-$3FFF` and deterministic open I/O space
+- Separate cartridge-facing PRG and existing cartridge-facing CHR interfaces
+- Active-high PPU NMI level connected to the CPU's verified edge synchronizer
+- `$4014` OAM DMA with CPU stall, uninterrupted PPU operation, and 513/514 slots
+- CPU programs that configure the PPU, execute NMI handlers, DMA OAM, and move
+  a sprite in the final pixel stream
+
+The scheduler phase, memory map, DMA state machine, NMI sampling result,
+verification evidence, synthesis results, and deferred video/controller work
+are documented in
+[`docs/phase3j-cpu-ppu-integration.md`](docs/phase3j-cpu-ppu-integration.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -343,12 +361,14 @@ Run the normal suite from the repository root:
 This runs pytest, synthesizable RTL lint, and the self-checking platform, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
-Phase 2K board-program simulation.
+Phase 2K board-program simulation, plus the Phase 3J integrated system and NMI
+sampling programs.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
 `ppu_oam.fst`, `ppu_phase3f.fst`,
 `ppu_sprite_renderer.fst`, `ppu_phase3g.fst`, `ppu_phase3h.fst`,
+`ppu_phase3i.fst`, `nes_phase3j.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -420,6 +440,19 @@ proof:
 
 ```bash
 ./scripts/build_ppu_phase3h_quartus.sh
+```
+
+Run the standalone integrated Phase 3I PPU NMI/VBlank synthesis and timing
+proof:
+
+```bash
+./scripts/build_ppu_phase3i_quartus.sh
+```
+
+Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
+
+```bash
+./scripts/build_nes_phase3j_quartus.sh
 ```
 
 Build the SOF and RBF locally:
