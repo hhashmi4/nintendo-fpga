@@ -5,6 +5,7 @@
 module nes_core (
     input  logic        clk,
     input  logic        reset,
+    input  logic        nes_enable,
     input  logic        irq,
 
     input  logic [1:0]  mirroring_mode,
@@ -115,8 +116,8 @@ module nes_core (
     logic unused_cpu_page_cross;
     logic unused_cpu_page_cross_valid;
 
-    assign ppu_enable = !reset;
-    assign cpu_cycle_slot = !reset && scheduler_phase == 2'd2;
+    assign ppu_enable = !reset && nes_enable;
+    assign cpu_cycle_slot = ppu_enable && scheduler_phase == 2'd2;
     assign cpu_enable = cpu_cycle_slot && !dma_active;
 
     assign cpu_select_ram = cpu_address <= 16'h1fff;
@@ -222,9 +223,11 @@ module nes_core (
             dma_write_count   <= 9'd0;
             dma_complete_event <= 1'b0;
         end else begin
-            scheduler_phase <= scheduler_phase == 2'd2 ? 2'd0 :
-                               scheduler_phase + 2'd1;
             dma_complete_event <= 1'b0;
+
+            if (nes_enable)
+                scheduler_phase <= scheduler_phase == 2'd2 ? 2'd0 :
+                                   scheduler_phase + 2'd1;
 
             if (cpu_cycle_slot)
                 cpu_cycle_parity <= !cpu_cycle_parity;
@@ -346,16 +349,20 @@ module nes_core (
 `ifndef SYNTHESIS
     logic [1:0] previous_scheduler_phase;
     logic previous_dma_active;
+    logic previous_nes_enable;
 
     always_ff @(posedge clk) begin
         if (reset) begin
             previous_scheduler_phase <= 2'd2;
             previous_dma_active <= 1'b0;
+            previous_nes_enable <= 1'b1;
         end else begin
             assert (scheduler_phase <= 2'd2);
-            assert (scheduler_phase == (previous_scheduler_phase == 2'd2 ?
-                                        2'd0 :
-                                        previous_scheduler_phase + 2'd1));
+            assert (scheduler_phase ==
+                    (previous_nes_enable ?
+                     (previous_scheduler_phase == 2'd2 ? 2'd0 :
+                      previous_scheduler_phase + 2'd1) :
+                     previous_scheduler_phase));
             assert (!(cpu_enable && dma_active));
             assert (!(cart_cpu_read && cart_cpu_write));
             assert (!(dma_read_event && dma_write_event));
@@ -373,6 +380,7 @@ module nes_core (
                 assert (!cpu_enable);
             previous_scheduler_phase <= scheduler_phase;
             previous_dma_active <= dma_active;
+            previous_nes_enable <= nes_enable;
         end
     end
 `endif

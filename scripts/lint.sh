@@ -171,3 +171,27 @@ verilator --lint-only --Wall -Wno-fatal \
     -Irtl/diagnostic \
     --top-module cpu_board_diag_top \
     "${CPU_BOARD_DIAG_RTL_FILES[@]}"
+
+PHASE3K_RTL_FILES=(
+    rtl/platform/platform_config_pkg.sv
+    rtl/platform/reset_sync.sv
+    rtl/platform/level_sync.sv
+    rtl/platform/nes_timing_gen.sv
+    "${NES_RTL_FILES[@]}"
+    rtl/diagnostic/hex7seg.sv
+    rtl/diagnostic/nes_vga_diag_memory.sv
+    rtl/video/vga_timing.sv
+    rtl/video/vga_nes_scaler.sv
+    rtl/video/nes_palette_rgb.sv
+    rtl/video/nes_framebuffer.sv
+    rtl/video/nes_vga_video.sv
+    rtl/video/video_pll.sv
+    rtl/de1_soc_nes_vga_top.sv
+)
+
+# The board top deliberately exposes only physical status, leaving the rich
+# NES debug interface internal. The PLL uses a behavioral model in Verilator.
+verilator --lint-only --Wall -Wno-fatal \
+    -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
+    --top-module de1_soc_nes_vga_top \
+    "${PHASE3K_RTL_FILES[@]}"

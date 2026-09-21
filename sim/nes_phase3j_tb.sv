@@ -69,6 +69,7 @@ module nes_phase3j_tb;
     nes_core dut (
         .clk                    (clk),
         .reset                  (reset),
+        .nes_enable             (1'b1),
         .irq                    (irq),
         .mirroring_mode         (mirroring_mode),
         .cart_cpu_address       (cart_cpu_address),

@@ -26,6 +26,9 @@ mkdir -p \
     build/verilator/ppu_phase3i \
     build/verilator/nes_phase3j \
     build/verilator/nes_phase3j_nmi \
+    build/verilator/vga_timing_phase3k \
+    build/verilator/vga_phase3k \
+    build/verilator/nes_vga_phase3k \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -86,6 +89,9 @@ PPU_PHASE3I_WAVEFORM="build/sim/ppu_phase3i.fst"
 PPU_PHASE3I_REFERENCE="build/sim/ppu_phase3i_reference.txt"
 PPU_PHASE3I_STATS="build/sim/ppu_phase3i_stats.txt"
 NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
+VGA_PHASE3K_WAVEFORM="build/sim/vga_phase3k.fst"
+VGA_PHASE3K_TRACE="build/sim/vga_phase3k_pixels.txt"
+NES_VGA_PHASE3K_TRACE="build/sim/nes_vga_phase3k_pixels.txt"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -146,6 +152,9 @@ rm -f \
     "$PPU_PHASE3I_REFERENCE" \
     "$PPU_PHASE3I_STATS" \
     "$NES_PHASE3J_WAVEFORM" \
+    "$VGA_PHASE3K_WAVEFORM" \
+    "$VGA_PHASE3K_TRACE" \
+    "$NES_VGA_PHASE3K_TRACE" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -846,6 +855,59 @@ if [[ ! -s "$CPU_BOARD_DIAG_WAVEFORM" ]]; then
     exit 1
 fi
 
+VIDEO_PHASE3K_RTL_FILES=(
+    rtl/video/vga_timing.sv
+    rtl/video/vga_nes_scaler.sv
+    rtl/video/nes_palette_rgb.sv
+    rtl/video/nes_framebuffer.sv
+    rtl/video/nes_vga_video.sv
+)
+
+verilator --binary --timing --Wall --assert \
+    --Mdir build/verilator/vga_timing_phase3k \
+    --top-module vga_timing_phase3k_tb \
+    -o vga_timing_phase3k_tb \
+    rtl/video/vga_timing.sv \
+    sim/vga_timing_phase3k_tb.sv
+
+build/verilator/vga_timing_phase3k/vga_timing_phase3k_tb
+
+verilator --binary --timing --trace-fst --Wall --assert \
+    --Mdir build/verilator/vga_phase3k \
+    --top-module vga_phase3k_tb \
+    -o vga_phase3k_tb \
+    "${VIDEO_PHASE3K_RTL_FILES[@]}" \
+    sim/vga_phase3k_tb.sv
+
+build/verilator/vga_phase3k/vga_phase3k_tb
+
+if [[ ! -s "$VGA_PHASE3K_WAVEFORM" || ! -s "$VGA_PHASE3K_TRACE" ]]; then
+    echo "ERROR: Phase 3K static VGA simulation artifacts are missing" >&2
+    exit 1
+fi
+python3 scripts/verify_vga_trace.py "$VGA_PHASE3K_TRACE"
+
+verilator --binary --timing --Wall -Wno-fatal \
+    -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
+    --assert \
+    --Mdir build/verilator/nes_vga_phase3k \
+    --top-module nes_vga_phase3k_tb \
+    -o nes_vga_phase3k_tb \
+    rtl/platform/platform_config_pkg.sv \
+    rtl/platform/nes_timing_gen.sv \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/diagnostic/nes_vga_diag_memory.sv \
+    "${VIDEO_PHASE3K_RTL_FILES[@]}" \
+    sim/nes_vga_phase3k_tb.sv
+
+build/verilator/nes_vga_phase3k/nes_vga_phase3k_tb
+
+if [[ ! -s "$NES_VGA_PHASE3K_TRACE" ]]; then
+    echo "ERROR: Phase 3K integrated NES/VGA trace is missing" >&2
+    exit 1
+fi
+python3 scripts/verify_nes_vga_trace.py "$NES_VGA_PHASE3K_TRACE"
+
 echo "Platform waveform: $ROOT_DIR/$PLATFORM_WAVEFORM"
 echo "PPU timing waveform: $ROOT_DIR/$PPU_WAVEFORM"
 echo "PPU Phase 3B waveform: $ROOT_DIR/$PPU_PHASE3B_WAVEFORM"
@@ -862,6 +924,9 @@ echo "PPU Phase 3G waveform: $ROOT_DIR/$PPU_PHASE3G_WAVEFORM"
 echo "PPU Phase 3H waveform: $ROOT_DIR/$PPU_PHASE3H_WAVEFORM"
 echo "PPU Phase 3I waveform: $ROOT_DIR/$PPU_PHASE3I_WAVEFORM"
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
+echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
+echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"
+echo "NES/VGA Phase 3K trace: $ROOT_DIR/$NES_VGA_PHASE3K_TRACE"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"
