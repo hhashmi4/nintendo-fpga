@@ -4,28 +4,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Callable
 
-
-class CpuTarget(IntEnum):
-    RAM = 0
-    PPU = 1
-    DMA = 2
-    OPEN = 3
-    CARTRIDGE = 4
-
-
-def decode_cpu_address(address: int) -> tuple[CpuTarget, int]:
-    """Decode a 16-bit CPU address and return its physical sub-address."""
-
-    address &= 0xFFFF
-    if address <= 0x1FFF:
-        return CpuTarget.RAM, address & 0x07FF
-    if address <= 0x3FFF:
-        return CpuTarget.PPU, address & 0x0007
-    if address == 0x4014:
-        return CpuTarget.DMA, 0
-    if address >= 0x4020:
-        return CpuTarget.CARTRIDGE, address
-    return CpuTarget.OPEN, 0
+from verification.nes_bus import CpuTarget, decode_cpu_address
 
 
 class Scheduler:

@@ -11,6 +11,10 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_alu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_decoder.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_address_gen.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_system_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_address_decoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_ram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_timing.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_scroll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_registers.sv
@@ -25,8 +29,9 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_renderer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_pixel_mixer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_core.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/nes_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_mapper0.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_cartridge.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/diagnostic/hex7seg.sv
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/diagnostic/nes_vga_diag_memory.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/vga_timing.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/vga_nes_scaler.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_palette_rgb.sv

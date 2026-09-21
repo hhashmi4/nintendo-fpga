@@ -36,6 +36,8 @@ module nes_phase3j_nmi_tb;
         .mirroring_mode       (2'b00),
         .cart_cpu_address     (cart_cpu_address),
         .cart_cpu_read_data   (cart_cpu_read_data),
+        .apu_cpu_read_data    (8'h00),
+        .controller_cpu_read_data(8'h00),
         .chr_read_data        (chr_read_data),
         .cpu_enable           (cpu_enable),
         .cpu_address          (cpu_address),
@@ -124,9 +126,9 @@ module nes_phase3j_nmi_tb;
             @(posedge clk);
         repeat (200) @(posedge clk);
 
-        assert ({24'd0, dut.cpu_ram[11'h010]} == nmi_events)
+        assert ({24'd0, dut.internal_cpu_ram.memory[11'h010]} == nmi_events)
             else $fatal(1, "CPU saw %0d NMIs but PPU generated %0d",
-                        dut.cpu_ram[11'h010], nmi_events);
+                        dut.internal_cpu_ram.memory[11'h010], nmi_events);
         assert (control_writes_in_vblank == 2)
             else $fatal(1, "enable-during-VBlank sequence missing");
         assert (nmi_events >= 4)
@@ -141,7 +143,8 @@ module nes_phase3j_nmi_tb;
 
         $display("Phase 3J scheduled NMI sampling passed");
         $display("frames=%0d events=%0d cpu_recognitions=%0d suppressions=%0d",
-                 frame_count, nmi_events, dut.cpu_ram[11'h010],
+                 frame_count, nmi_events,
+                 dut.internal_cpu_ram.memory[11'h010],
                  suppressed_events);
         $display("status_reads=%0d boundary_dot0=%0d boundary_after=%0d vblank_control_writes=%0d",
                  status_reads, boundary_read_dot0, boundary_read_after,

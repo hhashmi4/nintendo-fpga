@@ -47,6 +47,21 @@ module de1_soc_nes_vga_top (
     logic chr_write;
     logic [7:0] chr_write_data;
     logic [7:0] chr_read_data;
+    logic cartridge_present;
+    logic [7:0] cartridge_mapper_number;
+    logic cartridge_nrom_256;
+    logic cartridge_chr_is_ram;
+    logic [1:0] cartridge_mirroring_mode;
+    logic [14:0] cartridge_debug_prg_address;
+    logic [7:0] cartridge_debug_prg_data;
+    logic [12:0] cartridge_debug_chr_address;
+    logic [7:0] cartridge_debug_chr_data;
+    logic cartridge_debug_prg_read;
+    logic cartridge_debug_prg_write;
+    logic cartridge_debug_prg_ram_read;
+    logic cartridge_debug_prg_ram_write;
+    logic cartridge_debug_chr_read;
+    logic cartridge_debug_chr_write;
     logic pixel_valid;
     logic [7:0] pixel_x;
     logic [7:0] pixel_y;
@@ -136,17 +151,28 @@ module de1_soc_nes_vga_top (
     );
 
     /* verilator lint_off PINCONNECTEMPTY */
+    /* verilator lint_off PINMISSING */
     nes_core nes (
         .clk(CLOCK_50),
         .reset(system_reset),
         .nes_enable(nes_ppu_ce),
         .irq(1'b0),
-        .mirroring_mode(2'b00),
+        .mirroring_mode(cartridge_mirroring_mode),
         .cart_cpu_address(cart_cpu_address),
         .cart_cpu_read(cart_cpu_read),
         .cart_cpu_write(cart_cpu_write),
         .cart_cpu_write_data(cart_cpu_write_data),
         .cart_cpu_read_data(cart_cpu_read_data),
+        .apu_cpu_address(),
+        .apu_cpu_read(),
+        .apu_cpu_write(),
+        .apu_cpu_write_data(),
+        .apu_cpu_read_data(8'h00),
+        .controller_port(),
+        .controller_cpu_read(),
+        .controller_cpu_write(),
+        .controller_cpu_write_data(),
+        .controller_cpu_read_data(8'h00),
         .chr_addr(chr_address),
         .chr_read(chr_read),
         .chr_write(chr_write),
@@ -160,12 +186,23 @@ module de1_soc_nes_vga_top (
         .cpu_write_data(),
         .cpu_read_data(),
         .cpu_write_enable(),
+        .cpu_read_enable(),
         .cpu_bus_valid(),
         .cpu_debug_a(),
         .cpu_debug_x(),
         .cpu_debug_y(),
         .cpu_debug_sp(),
         .cpu_debug_pc(cpu_debug_pc),
+        .cpu_debug_status(),
+        .cpu_bus_target(),
+        .cpu_ram_address(),
+        .cpu_ppu_register(),
+        .cpu_ram_access(),
+        .cpu_ppu_access(),
+        .cpu_apu_access(),
+        .cpu_dma_access(),
+        .cpu_controller_access(),
+        .cpu_cartridge_access(),
         .dma_active(),
         .dma_phase(),
         .dma_page(),
@@ -201,9 +238,20 @@ module de1_soc_nes_vga_top (
         .pixel_color_emphasis(pixel_emphasis),
         .pixel_source()
     );
+    /* verilator lint_on PINMISSING */
     /* verilator lint_on PINCONNECTEMPTY */
 
-    nes_vga_diag_memory diagnostic_cartridge (
+    nes_cartridge #(
+        .MAPPER_NUMBER (0),
+        .PRG_ROM_BYTES (16384),
+        .CHR_IS_RAM    (1'b0),
+        .PRG_RAM_ENABLE(1'b0),
+        .MIRRORING_MODE(2'd0),
+        .PRG_INIT_FILE ("../build/cartridge/phase4b_display_nrom128.prg.hex"),
+        .CHR_INIT_FILE ("../build/cartridge/phase4b_display_nrom128.chr.hex")
+    ) cartridge (
+        .clk(CLOCK_50),
+        .reset(system_reset),
         .cpu_address(cart_cpu_address),
         .cpu_read(cart_cpu_read),
         .cpu_write(cart_cpu_write),
@@ -213,7 +261,22 @@ module de1_soc_nes_vga_top (
         .chr_read(chr_read),
         .chr_write(chr_write),
         .chr_write_data(chr_write_data),
-        .chr_read_data(chr_read_data)
+        .chr_read_data(chr_read_data),
+        .cartridge_present(cartridge_present),
+        .mapper_number(cartridge_mapper_number),
+        .nrom_256(cartridge_nrom_256),
+        .chr_is_ram(cartridge_chr_is_ram),
+        .mirroring_mode(cartridge_mirroring_mode),
+        .debug_prg_address(cartridge_debug_prg_address),
+        .debug_prg_data(cartridge_debug_prg_data),
+        .debug_chr_address(cartridge_debug_chr_address),
+        .debug_chr_data(cartridge_debug_chr_data),
+        .debug_prg_read(cartridge_debug_prg_read),
+        .debug_prg_write(cartridge_debug_prg_write),
+        .debug_prg_ram_read(cartridge_debug_prg_ram_read),
+        .debug_prg_ram_write(cartridge_debug_prg_ram_write),
+        .debug_chr_read(cartridge_debug_chr_read),
+        .debug_chr_write(cartridge_debug_chr_write)
     );
 
     nes_framebuffer framebuffer (
@@ -317,5 +380,18 @@ module de1_soc_nes_vga_top (
                            (|capture_write_bank) || framebuffer_swap ||
                            (|framebuffer_read_bank) || ^displayed_frames ||
                            ^scan_x || ^scan_y || ^source_nes_x ||
-                           ^source_nes_y || active_video || vga_line_start;
+                           ^source_nes_y || active_video || vga_line_start ||
+                           cartridge_present || ^cartridge_mapper_number ||
+                           cartridge_nrom_256 || cartridge_chr_is_ram ||
+                           ^cartridge_mirroring_mode ||
+                           ^cartridge_debug_prg_address ||
+                           ^cartridge_debug_prg_data ||
+                           ^cartridge_debug_chr_address ||
+                           ^cartridge_debug_chr_data ||
+                           cartridge_debug_prg_read ||
+                           cartridge_debug_prg_write ||
+                           cartridge_debug_prg_ram_read ||
+                           cartridge_debug_prg_ram_write ||
+                           cartridge_debug_chr_read ||
+                           cartridge_debug_chr_write;
 endmodule

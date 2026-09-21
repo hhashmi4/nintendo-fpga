@@ -80,6 +80,7 @@ module nes_vga_phase3k_tb;
     );
 
     /* verilator lint_off PINCONNECTEMPTY */
+    /* verilator lint_off PINMISSING */
     nes_core nes (
         .clk(system_clk),
         .reset(reset),
@@ -91,6 +92,8 @@ module nes_vga_phase3k_tb;
         .cart_cpu_write(cart_cpu_write),
         .cart_cpu_write_data(cart_cpu_write_data),
         .cart_cpu_read_data(cart_cpu_read_data),
+        .apu_cpu_read_data(8'h00),
+        .controller_cpu_read_data(8'h00),
         .chr_addr(chr_address),
         .chr_read(chr_read),
         .chr_write(chr_write),
@@ -145,6 +148,7 @@ module nes_vga_phase3k_tb;
         .pixel_color_emphasis(pixel_emphasis),
         .pixel_source(pixel_source)
     );
+    /* verilator lint_on PINMISSING */
     /* verilator lint_on PINCONNECTEMPTY */
 
     nes_vga_diag_memory cartridge (

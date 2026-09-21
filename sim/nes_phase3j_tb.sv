@@ -75,6 +75,8 @@ module nes_phase3j_tb;
         .cart_cpu_address       (cart_cpu_address),
         .cart_cpu_read          (cart_cpu_read),
         .cart_cpu_read_data     (cart_cpu_read_data),
+        .apu_cpu_read_data      (8'h00),
+        .controller_cpu_read_data(8'h00),
         .chr_addr               (chr_addr),
         .chr_read_data          (chr_read_data),
         .ppu_enable             (ppu_enable),
@@ -240,16 +242,16 @@ module nes_phase3j_tb;
         repeat (6) @(posedge clk);
         reset = 1'b0;
 
-        while ((dut.cpu_ram[11'h004] < 8'd3 || dma_active ||
+        while ((dut.internal_cpu_ram.memory[11'h004] < 8'd3 || dma_active ||
                 frame_number < 4) && fabric_cycles < 500000)
             @(posedge clk);
         repeat (1000) @(posedge clk);
 
         assert (fabric_cycles < 500000)
             else $fatal(1, "integrated program timeout PC=%04x", cpu_debug_pc);
-        assert (dut.cpu_ram[11'h003] == 8'ha5)
+        assert (dut.internal_cpu_ram.memory[11'h003] == 8'ha5)
             else $fatal(1, "RAM mirror failed");
-        assert (dut.cpu_ram[11'h005] == 8'h5a)
+        assert (dut.internal_cpu_ram.memory[11'h005] == 8'h5a)
             else $fatal(1, "CPU did not finish initialization");
         assert (ppu_ctrl == 8'h80 && ppu_mask == 8'h14)
             else $fatal(1, "mirrored PPU writes failed %02x %02x",
@@ -264,7 +266,7 @@ module nes_phase3j_tb;
         assert (dma_reads == dma_completions * 256);
         assert (dma_writes == dma_completions * 256);
         assert (nmi_events >= 3);
-        assert (dut.cpu_ram[11'h004] >= 8'd3);
+        assert (dut.internal_cpu_ram.memory[11'h004] >= 8'd3);
         assert (sprite_pixels > 0)
             else $fatal(1, "integrated sprite path produced no sprite pixels");
 
@@ -289,7 +291,7 @@ module nes_phase3j_tb;
                  dma_completions, dma_reads, dma_writes,
                  first_dma_stall, second_dma_stall);
         $display("nmi_events=%0d nmi_handlers=%0d cartridge_reads=%0d ppu_accesses=%0d",
-                 nmi_events, dut.cpu_ram[11'h004], cartridge_reads,
+                 nmi_events, dut.internal_cpu_ram.memory[11'h004], cartridge_reads,
                  ppu_cpu_accesses);
         $display("frames=%0d sprite_pixels=%0d dynamic_pairs=%0d",
                  frame_number + 1, sprite_pixels, dynamic_pairs);

@@ -3,16 +3,25 @@
 create_clock -name clk -period 20.000 [get_ports {clk}]
 
 set_false_path -from [get_ports {
-    reset nes_enable irq mirroring_mode[*] cart_cpu_read_data[*] chr_read_data[*]
+    reset nes_enable irq mirroring_mode[*] cart_cpu_read_data[*]
+    apu_cpu_read_data[*] controller_cpu_read_data[*] chr_read_data[*]
 }]
 
 set_false_path -to [get_ports {
     cart_cpu_address[*] cart_cpu_read cart_cpu_write cart_cpu_write_data[*]
+    apu_cpu_address[*] apu_cpu_read apu_cpu_write apu_cpu_write_data[*]
+    controller_port controller_cpu_read controller_cpu_write
+    controller_cpu_write_data[*]
     chr_addr[*] chr_read chr_write chr_write_data[*]
     ppu_enable cpu_cycle_slot cpu_enable scheduler_phase[*]
     cpu_address[*] cpu_write_data[*] cpu_read_data[*] cpu_write_enable
+    cpu_read_enable
     cpu_bus_valid cpu_debug_a[*] cpu_debug_x[*] cpu_debug_y[*]
-    cpu_debug_sp[*] cpu_debug_pc[*] dma_active dma_phase[*] dma_page[*]
+    cpu_debug_sp[*] cpu_debug_pc[*] cpu_debug_status[*]
+    cpu_bus_target[*] cpu_ram_address[*] cpu_ppu_register[*]
+    cpu_ram_access cpu_ppu_access cpu_apu_access cpu_dma_access
+    cpu_controller_access cpu_cartridge_access
+    dma_active dma_phase[*] dma_page[*]
     dma_index[*] dma_data[*] dma_stall_cycles[*] dma_read_count[*]
     dma_write_count[*] dma_read_event dma_write_event dma_complete_event
     ppu_dot[*] ppu_scanline[*] ppu_frame_odd ppu_frame_start ppu_frame_end
