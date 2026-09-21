@@ -8,6 +8,14 @@ module de1_soc_nes_vga_top (
     input  logic       KEY0,
     input  logic       SW0,
     input  logic       SW1,
+    input  logic       SW2,
+    input  logic       SW3,
+    input  logic       SW4,
+    input  logic       SW5,
+    input  logic       SW6,
+    input  logic       SW7,
+    input  logic       SW8,
+    input  logic       SW9,
     output logic [9:0] LEDR,
     output logic [6:0] HEX0,
     output logic [6:0] HEX1,
@@ -71,6 +79,26 @@ module de1_soc_nes_vga_top (
     logic dma_complete_event;
     logic ppu_nmi_event;
     logic [15:0] cpu_debug_pc;
+
+    logic [7:0] controller1_async_buttons;
+    logic [7:0] controller1_buttons;
+    logic controller_port;
+    logic controller_cpu_read;
+    logic controller_cpu_write;
+    logic [7:0] controller_cpu_write_data;
+    logic [7:0] controller_cpu_read_data;
+    logic controller_debug_strobe;
+    logic [7:0] controller_debug_live1;
+    logic [7:0] controller_debug_live2;
+    logic [7:0] controller_debug_shift1;
+    logic [7:0] controller_debug_shift2;
+    logic [3:0] controller_debug_index1;
+    logic [3:0] controller_debug_index2;
+    logic controller_debug_serial1;
+    logic controller_debug_serial2;
+    logic controller_debug_read_4016;
+    logic controller_debug_read_4017;
+    logic controller_debug_latch;
 
     logic capture_active;
     logic capture_complete;
@@ -141,6 +169,18 @@ module de1_soc_nes_vga_top (
         .synced_level(freeze_capture)
     );
 
+    // Temporary development mapping. The abstract button vector remains
+    // independent of board wiring: bit 0=A through bit 7=Right.
+    assign controller1_async_buttons =
+        {SW9, SW8, SW7, SW6, SW5, SW4, SW3, SW2};
+
+    controller_input_sync #(.WIDTH(8)) controller1_input_synchronizer (
+        .clk(CLOCK_50),
+        .reset(system_reset),
+        .async_buttons(controller1_async_buttons),
+        .synced_buttons(controller1_buttons)
+    );
+
     nes_timing_gen nes_rate_generator (
         .clk(CLOCK_50),
         .reset(system_reset),
@@ -168,11 +208,11 @@ module de1_soc_nes_vga_top (
         .apu_cpu_write(),
         .apu_cpu_write_data(),
         .apu_cpu_read_data(8'h00),
-        .controller_port(),
-        .controller_cpu_read(),
-        .controller_cpu_write(),
-        .controller_cpu_write_data(),
-        .controller_cpu_read_data(8'h00),
+        .controller_port(controller_port),
+        .controller_cpu_read(controller_cpu_read),
+        .controller_cpu_write(controller_cpu_write),
+        .controller_cpu_write_data(controller_cpu_write_data),
+        .controller_cpu_read_data(controller_cpu_read_data),
         .chr_addr(chr_address),
         .chr_read(chr_read),
         .chr_write(chr_write),
@@ -241,14 +281,38 @@ module de1_soc_nes_vga_top (
     /* verilator lint_on PINMISSING */
     /* verilator lint_on PINCONNECTEMPTY */
 
+    nes_controller controllers (
+        .clk(CLOCK_50),
+        .reset(system_reset),
+        .controller1_buttons(controller1_buttons),
+        .controller2_buttons(8'h00),
+        .cpu_port(controller_port),
+        .cpu_read(controller_cpu_read),
+        .cpu_write(controller_cpu_write),
+        .cpu_write_data(controller_cpu_write_data),
+        .cpu_read_data(controller_cpu_read_data),
+        .debug_strobe(controller_debug_strobe),
+        .debug_live_controller1(controller_debug_live1),
+        .debug_live_controller2(controller_debug_live2),
+        .debug_shift_controller1(controller_debug_shift1),
+        .debug_shift_controller2(controller_debug_shift2),
+        .debug_index_controller1(controller_debug_index1),
+        .debug_index_controller2(controller_debug_index2),
+        .debug_serial_controller1(controller_debug_serial1),
+        .debug_serial_controller2(controller_debug_serial2),
+        .debug_read_4016(controller_debug_read_4016),
+        .debug_read_4017(controller_debug_read_4017),
+        .debug_latch_event(controller_debug_latch)
+    );
+
     nes_cartridge #(
         .MAPPER_NUMBER (0),
         .PRG_ROM_BYTES (16384),
         .CHR_IS_RAM    (1'b0),
         .PRG_RAM_ENABLE(1'b0),
         .MIRRORING_MODE(2'd0),
-        .PRG_INIT_FILE ("../build/cartridge/phase4b_display_nrom128.prg.hex"),
-        .CHR_INIT_FILE ("../build/cartridge/phase4b_display_nrom128.chr.hex")
+        .PRG_INIT_FILE ("../build/cartridge/phase4c_controller_display_nrom128.prg.hex"),
+        .CHR_INIT_FILE ("../build/cartridge/phase4c_controller_display_nrom128.chr.hex")
     ) cartridge (
         .clk(CLOCK_50),
         .reset(system_reset),
@@ -352,8 +416,9 @@ module de1_soc_nes_vga_top (
             vga_heartbeat <= !vga_heartbeat;
     end
 
-    hex7seg hex0_driver (.value(captured_frames[3:0]), .segments_n(HEX0));
-    hex7seg hex1_driver (.value(captured_frames[7:4]), .segments_n(HEX1));
+    // HEX1:HEX0 shows the synchronized Controller 1 state for board bring-up.
+    hex7seg hex0_driver (.value(controller_debug_live1[3:0]), .segments_n(HEX0));
+    hex7seg hex1_driver (.value(controller_debug_live1[7:4]), .segments_n(HEX1));
     hex7seg hex2_driver (.value(cpu_debug_pc[3:0]), .segments_n(HEX2));
     hex7seg hex3_driver (.value(cpu_debug_pc[7:4]), .segments_n(HEX3));
     hex7seg hex4_driver (.value(cpu_debug_pc[11:8]), .segments_n(HEX4));
@@ -393,5 +458,16 @@ module de1_soc_nes_vga_top (
                            cartridge_debug_prg_ram_read ||
                            cartridge_debug_prg_ram_write ||
                            cartridge_debug_chr_read ||
-                           cartridge_debug_chr_write;
+                           cartridge_debug_chr_write ||
+                           ^captured_frames || controller_debug_strobe ||
+                           ^controller_debug_live2 ||
+                           ^controller_debug_shift1 ||
+                           ^controller_debug_shift2 ||
+                           ^controller_debug_index1 ||
+                           ^controller_debug_index2 ||
+                           controller_debug_serial1 ||
+                           controller_debug_serial2 ||
+                           controller_debug_read_4016 ||
+                           controller_debug_read_4017 ||
+                           controller_debug_latch;
 endmodule

@@ -14,8 +14,9 @@ set_clock_groups -asynchronous \
     -group [get_clocks {CLOCK_50}] \
     -group $vga_domain_clocks
 
-# KEY0 asserts reset asynchronously; SW0/SW1 enter two-flop synchronizers.
-set_false_path -from [get_ports {KEY0 SW0 SW1}]
+# KEY0 asserts reset asynchronously; every slide switch enters a two-flop
+# synchronizer before its value is used in the corresponding clock domain.
+set_false_path -from [get_ports {KEY0 SW0 SW1 SW2 SW3 SW4 SW5 SW6 SW7 SW8 SW9}]
 
 # Give the external ADV7123 RGB/sync inputs a conservative eight-nanosecond
 # setup budget. VGA_CLK is the inverted pixel clock, providing a half-cycle of

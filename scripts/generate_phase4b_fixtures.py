@@ -146,6 +146,92 @@ def display_prg() -> bytes:
     return bytes(prg)
 
 
+def emit_controller_poll(program: Program) -> None:
+    """Poll both ports into $10/$11 in NES A-to-Right bit order."""
+
+    program.emit(0xA9, 0x01, 0x8D, 0x16, 0x40)  # LDA #1; STA $4016
+    program.emit(0xA9, 0x00, 0x8D, 0x16, 0x40)  # LDA #0; STA $4016
+
+    program.emit(0xA2, 0x08, 0xA9, 0x00, 0x85, 0x10)  # X=8; result1=0
+    program.label("controller1_poll")
+    program.emit(0xAD, 0x16, 0x40)  # LDA $4016
+    program.emit(0x4A, 0x66, 0x10, 0xCA)  # LSR A; ROR $10; DEX
+    program.branch(0xD0, "controller1_poll")
+
+    program.emit(0xA2, 0x08, 0xA9, 0x00, 0x85, 0x11)  # X=8; result2=0
+    program.label("controller2_poll")
+    program.emit(0xAD, 0x17, 0x40)  # LDA $4017
+    program.emit(0x4A, 0x66, 0x11, 0xCA)  # LSR A; ROR $11; DEX
+    program.branch(0xD0, "controller2_poll")
+
+
+def controller_poll_prg() -> bytes:
+    """Owned test program proving controller input -> bus -> CPU RAM."""
+
+    prg = bytearray([0xEA] * PRG_BANK_SIZE)
+    program = Program(0x8000)
+    program.emit(0x78, 0xD8)  # SEI; CLD
+    program.emit(0xA2, 0xFF, 0x9A)  # LDX #$ff; TXS
+    program.label("poll_loop")
+    emit_controller_poll(program)
+    program.emit(0xE6, 0x12)  # INC $12 poll counter
+    program.absolute(0x4C, "poll_loop")
+    put(prg, 0x8000, program.resolve())
+    set_vectors(prg, nmi=0x8000, reset=0x8000, irq=0x8000)
+    return bytes(prg)
+
+
+def controller_display_prg() -> bytes:
+    """Board image: display pattern and color it from Controller 1 polls."""
+
+    prg = bytearray([0xEA] * PRG_BANK_SIZE)
+    program = Program(0x8000)
+    program.emit(0x78, 0xD8)  # SEI; CLD
+    program.emit(0xA9, 0x00, 0x8D, 0x00, 0x20)  # disable NMI
+    program.emit(0x8D, 0x01, 0x20)  # disable rendering
+    program.emit(0xA9, 0x3F, 0x8D, 0x06, 0x20)
+    program.emit(0xA9, 0x00, 0x8D, 0x06, 0x20)
+    program.emit(0xA2, 0x00)
+    program.label("palette")
+    program.emit(0xBD, 0x00, 0x81)  # LDA $8100,X
+    program.emit(0x8D, 0x07, 0x20, 0xE8, 0xE0, 0x20)
+    program.branch(0xD0, "palette")
+    program.emit(0xA9, 0x20, 0x8D, 0x06, 0x20)
+    program.emit(0xA9, 0x00, 0x8D, 0x06, 0x20)
+    program.emit(0xA0, 0x04, 0xA2, 0x00, 0xA9, 0x01)
+    program.label("nametable")
+    program.emit(0x8D, 0x07, 0x20, 0xE8)
+    program.branch(0xD0, "nametable")
+    program.emit(0x88)
+    program.branch(0xD0, "nametable")
+    program.emit(0xA9, 0x00, 0x8D, 0x05, 0x20, 0x8D, 0x05, 0x20)
+    program.emit(0x8D, 0x00, 0x20)
+    program.emit(0xA9, 0x0A, 0x8D, 0x01, 0x20)
+
+    program.label("poll_loop")
+    emit_controller_poll(program)
+    program.emit(0xE6, 0x12)  # INC $12 poll counter
+    program.emit(0xA9, 0x3F, 0x8D, 0x06, 0x20)
+    program.emit(0xA9, 0x01, 0x8D, 0x06, 0x20)  # PPU address $3f01
+    program.emit(0xA5, 0x10)  # LDA Controller 1 result
+    program.branch(0xF0, "no_buttons")  # BEQ
+    program.emit(0xA9, 0x21)  # visible blue when any button is pressed
+    program.branch(0xD0, "color_ready")  # unconditional because A != 0
+    program.label("no_buttons")
+    program.emit(0xA9, 0x0F)  # black when no buttons are pressed
+    program.label("color_ready")
+    program.emit(0x8D, 0x07, 0x20)  # STA PPUDATA
+    program.absolute(0x4C, "poll_loop")
+
+    put(prg, 0x8000, program.resolve())
+    palette = bytes(
+        (0x0F, 0x01, 0x21, 0x31) * 4 + (0x0F, 0x06, 0x16, 0x26) * 4
+    )
+    put(prg, 0x8100, palette)
+    set_vectors(prg, nmi=0x8000, reset=0x8000, irq=0x8000)
+    return bytes(prg)
+
+
 def mapping_prg(size: int) -> bytes:
     data = bytearray(
         ((index * 37) ^ (index >> 8) ^ 0xA5) & 0xFF
@@ -217,6 +303,20 @@ def main() -> None:
         boot_prg(),
         b"",
         vertical=False,
+    )
+    write_fixture(
+        output_dir,
+        "phase4c_controller_nrom128",
+        controller_poll_prg(),
+        chr_data,
+        vertical=False,
+    )
+    write_fixture(
+        output_dir,
+        "phase4c_controller_display_nrom128",
+        controller_display_prg(),
+        chr_data,
+        vertical=True,
     )
 
 
