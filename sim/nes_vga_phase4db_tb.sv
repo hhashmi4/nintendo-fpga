@@ -200,11 +200,13 @@ module nes_vga_phase4db_tb;
 
     nes_vga_video video (
         .pixel_clk(pixel_clk), .reset(reset), .test_pattern(1'b0),
+        .developer_layout(1'b0),
         .framebuffer_valid(display_valid),
         .framebuffer_pixel(framebuffer_pixel),
         .framebuffer_address(framebuffer_address), .frame_start(),
         .frame_end(vga_frame_end), .line_start(), .scan_x(scan_x),
-        .scan_y(scan_y), .source_nes_x(), .source_nes_y(),
+        .scan_y(scan_y), .render_x(), .render_y(), .render_active(),
+        .source_nes_x(), .source_nes_y(),
         .active_video(active_video), .hsync_n(), .vsync_n(), .blank_n(),
         .red(red), .green(green), .blue(blue)
     );

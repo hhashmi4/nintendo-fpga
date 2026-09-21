@@ -81,14 +81,17 @@ def vga_frame() -> Iterator[VgaSample]:
             )
 
 
-def scaled_coordinate(x: int, y: int) -> tuple[bool, int, int, int]:
+def scaled_coordinate(
+    x: int, y: int, *, left_aligned: bool = False,
+) -> tuple[bool, int, int, int]:
     """Return region flag, NES x/y, and framebuffer address."""
 
     if not (0 <= x < H_ACTIVE and 0 <= y < V_ACTIVE):
         return False, 0, 0, 0
-    if not LEFT_BORDER <= x < LEFT_BORDER + SCALED_WIDTH:
+    left_edge = 0 if left_aligned else LEFT_BORDER
+    if not left_edge <= x < left_edge + SCALED_WIDTH:
         return False, 0, 0, 0
-    nes_x = (x - LEFT_BORDER) >> 1
+    nes_x = (x - left_edge) >> 1
     nes_y = y >> 1
     return True, nes_x, nes_y, nes_y * NES_WIDTH + nes_x
 

@@ -2,9 +2,12 @@ from verification.debug_renderer import (
     FONT_5X8,
     SUPPORTED_CHARACTERS,
     build_character_grid,
+    build_panel_character_grid,
     hex_value,
     pad_text,
+    render_combined_frame,
     render_frame,
+    render_panel,
 )
 
 
@@ -52,3 +55,32 @@ def test_controller_compaction_and_full_frame_shape() -> None:
     pixels = render_frame()
     assert len(pixels) == 640 * 480 * 3
     assert pixels[:3] == bytes((0x10, 0x28, 0x44))
+
+
+def test_phase4ec_compact_panel_layout() -> None:
+    grid, _ = build_panel_character_grid()
+    rows = ["".join(row) for row in grid]
+    assert rows[0][1:9] == "DEV MODE"
+    assert rows[1][1:6] == "VALID"
+    assert rows[3][1:8] == "PC 80A5"
+    assert rows[4][1:15] == "A 03 X 10 Y 20"
+    assert rows[9][1:12] == "SL08E DT0DD"
+    assert rows[16][1:13] == "CHR12F0 MIRH"
+    assert rows[19][1:9] == "A--TU--R"
+    assert rows[27][1:11] == "ID0000012C"
+
+
+def test_phase4ec_panel_and_combined_frame_shapes() -> None:
+    panel = render_panel()
+    assert len(panel) == 128 * 480 * 3
+    game = bytes((index & 0xFF for index in range(512 * 480 * 3)))
+    combined = render_combined_frame(game)
+    assert len(combined) == 640 * 480 * 3
+    for y in (0, 239, 479):
+        combined_row = y * 640 * 3
+        game_row = y * 512 * 3
+        panel_row = y * 128 * 3
+        assert combined[combined_row:combined_row + 512 * 3] == \
+            game[game_row:game_row + 512 * 3]
+        assert combined[combined_row + 512 * 3:(y + 1) * 640 * 3] == \
+            panel[panel_row:(y + 1) * 128 * 3]

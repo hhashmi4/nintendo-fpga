@@ -248,3 +248,142 @@ def render_frame(
                         color = colors.get((row, column), TEXT)
             pixels.extend(color)
     return bytes(pixels)
+
+
+PANEL_WIDTH = 128
+GAME_WIDTH = 512
+PANEL_SEPARATOR_Y = frozenset((32, 120, 200, 280, 328, 392, 479))
+
+
+def build_panel_character_grid(
+    snapshot: DemoSnapshot = DemoSnapshot(), *, valid: bool = True,
+    stale: bool = False,
+) -> tuple[list[list[str]], dict[tuple[int, int], tuple[int, int, int]]]:
+    """Build the compact 16-column by 30-row Phase 4E-C text page."""
+
+    grid = [[" " for _ in range(16)] for _ in range(30)]
+    colors: dict[tuple[int, int], tuple[int, int, int]] = {}
+
+    def put(row: int, column: int, text: str, color=TEXT) -> None:
+        for offset, character in enumerate(text):
+            if 0 <= row < 30 and 0 <= column + offset < 16:
+                grid[row][column + offset] = character
+                colors[row, column + offset] = color
+
+    put(0, 1, "DEV MODE", HEADING)
+    put(1, 1, "INVALID" if not valid else "STALE" if stale else "VALID",
+        BAD if (not valid or stale) else GOOD)
+
+    put(2, 1, "CPU", SECTION)
+    put(3, 1, "PC")
+    put(3, 4, hex_value(snapshot.pc, 4))
+    put(4, 1, "A")
+    put(4, 3, hex_value(snapshot.a, 2))
+    put(4, 6, "X")
+    put(4, 8, hex_value(snapshot.x, 2))
+    put(4, 11, "Y")
+    put(4, 13, hex_value(snapshot.y, 2))
+    put(5, 1, "SP")
+    put(5, 3, hex_value(snapshot.sp, 2))
+    put(5, 6, "P")
+    put(5, 7, hex_value(snapshot.status, 2))
+    put(5, 10, "OP")
+    put(5, 12, hex_value(snapshot.opcode, 2))
+    put(6, 1, "STALL" if snapshot.stalled else "RUN",
+        BAD if snapshot.stalled else GOOD)
+    put(6, 7, owner_text(snapshot.bus_owner))
+
+    put(8, 1, "PPU", SECTION)
+    put(9, 1, "SL")
+    put(9, 3, hex_value(snapshot.scanline, 3))
+    put(9, 7, "DT")
+    put(9, 9, hex_value(snapshot.dot, 3))
+    put(10, 1, "C")
+    put(10, 2, hex_value(snapshot.ctrl, 2))
+    put(10, 5, "M")
+    put(10, 6, hex_value(snapshot.mask, 2))
+    put(10, 9, "S")
+    put(10, 10, hex_value(snapshot.ppu_status, 2))
+    put(11, 1, f"N{int(snapshot.nmi_level)}")
+    put(11, 4, f"V{int(snapshot.vblank)}")
+    put(11, 7, f"Z{int(snapshot.sprite_zero_hit)}")
+
+    put(13, 1, "CART", SECTION)
+    put(14, 1, "MAP")
+    put(14, 4, hex_value(snapshot.mapper, 2))
+    put(14, 7, f"N{'256' if snapshot.nrom_256 else '128'}")
+    put(15, 1, "PRG")
+    put(15, 4, hex_value(snapshot.prg_address, 4))
+    put(16, 1, "CHR")
+    put(16, 4, hex_value(snapshot.chr_address, 4))
+    put(16, 9, "MIR")
+    put(16, 12, "H" if snapshot.mirroring == 1 else "V")
+
+    put(18, 1, "PAD1", SECTION)
+    put(19, 1, pad_text(snapshot.pad1))
+
+    put(21, 1, "DMA", SECTION)
+    put(21, 5, "ACTIVE" if snapshot.dma_active else "IDLE",
+        BAD if snapshot.dma_active else GOOD)
+    put(22, 1, "PG")
+    put(22, 3, hex_value(snapshot.dma_page, 2))
+    put(22, 6, "IX")
+    put(22, 8, hex_value(snapshot.dma_index, 2))
+    put(23, 1, "CT")
+    put(23, 3, hex_value(snapshot.dma_count, 8))
+
+    put(25, 1, "SYSTEM", SECTION)
+    put(26, 1, "FR")
+    put(26, 3, hex_value(snapshot.source_frame, 8))
+    put(27, 1, "ID")
+    put(27, 3, hex_value(snapshot.snapshot_id, 8))
+    put(28, 1, "NMI")
+    put(28, 4, hex_value(snapshot.nmi_count, 8))
+    put(29, 1, "DMA")
+    put(29, 4, hex_value(snapshot.dma_count, 8))
+    return grid, colors
+
+
+def render_panel(
+    snapshot: DemoSnapshot = DemoSnapshot(), *, valid: bool = True,
+    stale: bool = False,
+) -> bytes:
+    """Render the 128x480 side panel using the shared deterministic font."""
+
+    grid, colors = build_panel_character_grid(snapshot, valid=valid, stale=stale)
+    pixels = bytearray()
+    for y in range(480):
+        for x in range(PANEL_WIDTH):
+            color = HEADER_BACKGROUND if y < 32 else BACKGROUND
+            if x in (0, PANEL_WIDTH - 1) or y in PANEL_SEPARATOR_Y:
+                color = BORDER
+            column = x >> 3
+            row = y >> 4
+            glyph_column = x & 7
+            glyph_row = (y & 15) >> 1
+            character = grid[row][column]
+            if glyph_column < 6:
+                row_bits = FONT_5X8.get(character, FONT_5X8[" "])[glyph_row] + "0"
+                if row_bits[glyph_column] == "1":
+                    color = colors.get((row, column), TEXT)
+            pixels.extend(color)
+    return bytes(pixels)
+
+
+def render_combined_frame(
+    game_pixels: bytes,
+    snapshot: DemoSnapshot = DemoSnapshot(), *, valid: bool = True,
+    stale: bool = False,
+) -> bytes:
+    """Compose 512x480 game RGB bytes with the 128x480 debug panel."""
+
+    if len(game_pixels) != GAME_WIDTH * 480 * 3:
+        raise ValueError("game_pixels must contain exactly 512x480 RGB pixels")
+    panel = render_panel(snapshot, valid=valid, stale=stale)
+    combined = bytearray()
+    game_stride = GAME_WIDTH * 3
+    panel_stride = PANEL_WIDTH * 3
+    for y in range(480):
+        combined.extend(game_pixels[y * game_stride:(y + 1) * game_stride])
+        combined.extend(panel[y * panel_stride:(y + 1) * panel_stride])
+    return bytes(combined)

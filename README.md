@@ -46,7 +46,9 @@ and a frame-stable destination bank. Phase 4E-B adds an independent direct-
 pixel Developer Mode page, compact deterministic font, reusable hexadecimal
 formatting, stale/invalid status, and a hard normal-video bypass. The board
 image keeps Developer Mode hard-disabled because every slide switch is already
-assigned; no physical control mapping changed.
+assigned; no physical control mapping changed. Phase 4E-C adds the simultaneous
+512x480 exact-2x playable game region and 128x480 compact snapshot panel, with
+an explicit boundary compositor and the same pixel-identical normal bypass.
 
 ## Phase 1 foundation
 
@@ -476,6 +478,27 @@ Architecture, layout, verification, resources, timing, and the Phase 4E-C
 side-panel recommendation are documented in
 [`docs/phase4e-b-devmode-renderer.md`](docs/phase4e-b-devmode-renderer.md).
 
+## Phase 4E-C game and Developer side panel
+
+- Developer Mode maps the 256x240 NES framebuffer at exact 2x scale to
+  `x=0..511`, `y=0..479`
+- A compact 16-column by 30-row snapshot panel occupies only `x=512..639`
+- The Phase 4E-B 6x8 font, hexadecimal helpers, colors, and stale logic are
+  reused without a debug framebuffer
+- CPU, PPU, cartridge, Controller 1, DMA, source-frame, snapshot, NMI, and DMA
+  state remain continuously visible
+- One final compositor proves the hard `x=511` game / `x=512` panel boundary
+- SW0 test bars and SW1 framebuffer freeze retain their established semantics;
+  the panel continues to receive snapshots while the game capture is frozen
+- Focused and real playable-ROM combined frames are independently compared at
+  all 307,200 active pixels
+- Normal Mode remains the literal existing NES RGB path and retains all nine
+  Phase 4D-B hashes; board Developer Mode still defaults off
+
+Architecture, compact layout, mode priority, verification, resources, timing,
+and the Phase 4E-D page recommendation are documented in
+[`docs/phase4e-c-devmode-side-panel.md`](docs/phase4e-c-devmode-side-panel.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -514,7 +537,8 @@ Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
 4D-A standalone/arbiter/integrated DMA and NMI tests, Phase 4D-B playable-ROM
 boot/controller/frame/VGA and 300-frame sustained tests, the Phase 4E-A
 snapshot/CDC/reset test, the Phase 4E-B glyph/renderer/compositor/full-frame
-comparison, and playable integration checks, PPU
+comparison, the Phase 4E-C panel/compositor full-frame and real playable-ROM
+combined-frame comparisons, and playable integration checks, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -531,6 +555,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_internal_bus_arbiter_phase4d.fst`,
 `nes_phase4d_dma_integration.fst`, `nes_phase4d_dma_nmi.fst`,
 `nes_phase4db_playable.fst`, `nes_debug_snapshot.fst`,
+`nes_debug_renderer.fst`, `nes_developer_side_panel.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -618,7 +643,7 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4E-B renderer-enabled playable-ROM DE1-SoC NES/VGA
+Build the current Phase 4E-C side-panel-enabled playable-ROM DE1-SoC NES/VGA
 image and run its strict ROM regeneration/import, fitter, assembler, timing,
 and RBF generation checks:
 
