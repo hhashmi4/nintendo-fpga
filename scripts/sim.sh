@@ -27,6 +27,8 @@ mkdir -p \
     build/verilator/nes_phase4a_bus \
     build/verilator/mapper0_phase4b \
     build/verilator/nes_phase4b_boot \
+    build/verilator/nes_controller_phase4c \
+    build/verilator/nes_phase4c_controller \
     build/verilator/nes_phase3j \
     build/verilator/nes_phase3j_nmi \
     build/verilator/vga_timing_phase3k \
@@ -95,6 +97,8 @@ NES_PHASE4A_BUS_WAVEFORM="build/sim/nes_phase4a_bus.fst"
 NES_PHASE4A_BUS_REFERENCE="build/sim/nes_phase4a_bus_reference.txt"
 MAPPER0_PHASE4B_WAVEFORM="build/sim/mapper0_phase4b.fst"
 NES_PHASE4B_BOOT_WAVEFORM="build/sim/nes_phase4b_boot.fst"
+NES_CONTROLLER_PHASE4C_WAVEFORM="build/sim/nes_controller_phase4c.fst"
+NES_PHASE4C_CONTROLLER_WAVEFORM="build/sim/nes_phase4c_controller.fst"
 NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
 VGA_PHASE3K_WAVEFORM="build/sim/vga_phase3k.fst"
 VGA_PHASE3K_TRACE="build/sim/vga_phase3k_pixels.txt"
@@ -162,6 +166,8 @@ rm -f \
     "$NES_PHASE4A_BUS_REFERENCE" \
     "$MAPPER0_PHASE4B_WAVEFORM" \
     "$NES_PHASE4B_BOOT_WAVEFORM" \
+    "$NES_CONTROLLER_PHASE4C_WAVEFORM" \
+    "$NES_PHASE4C_CONTROLLER_WAVEFORM" \
     "$NES_PHASE3J_WAVEFORM" \
     "$VGA_PHASE3K_WAVEFORM" \
     "$VGA_PHASE3K_TRACE" \
@@ -237,6 +243,22 @@ build/verilator/mapper0_phase4b/mapper0_phase4b_tb
 
 if [[ ! -s "$MAPPER0_PHASE4B_WAVEFORM" ]]; then
     echo "ERROR: simulation did not generate a non-empty $MAPPER0_PHASE4B_WAVEFORM" >&2
+    exit 1
+fi
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_controller_phase4c \
+    --top-module nes_controller_phase4c_tb \
+    -o nes_controller_phase4c_tb \
+    rtl/controller/controller_input_sync.sv \
+    rtl/controller/nes_controller.sv \
+    sim/nes_controller_phase4c_tb.sv
+
+build/verilator/nes_controller_phase4c/nes_controller_phase4c_tb
+
+if [[ ! -s "$NES_CONTROLLER_PHASE4C_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_CONTROLLER_PHASE4C_WAVEFORM" >&2
     exit 1
 fi
 
@@ -642,6 +664,24 @@ fi
 
 verilator --binary --timing --trace-fst --Wall \
     --assert \
+    --Mdir build/verilator/nes_phase4c_controller \
+    --top-module nes_phase4c_controller_tb \
+    -o nes_phase4c_controller_tb \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0.sv \
+    rtl/cartridge/nes_cartridge.sv \
+    sim/nes_phase4c_controller_tb.sv
+
+build/verilator/nes_phase4c_controller/nes_phase4c_controller_tb
+
+if [[ ! -s "$NES_PHASE4C_CONTROLLER_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_PHASE4C_CONTROLLER_WAVEFORM" >&2
+    exit 1
+fi
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
     --Mdir build/verilator/nes_phase3j \
     --top-module nes_phase3j_tb \
     -o nes_phase3j_tb \
@@ -996,6 +1036,8 @@ echo "PPU Phase 3I waveform: $ROOT_DIR/$PPU_PHASE3I_WAVEFORM"
 echo "NES Phase 4A bus waveform: $ROOT_DIR/$NES_PHASE4A_BUS_WAVEFORM"
 echo "Mapper 0 Phase 4B waveform: $ROOT_DIR/$MAPPER0_PHASE4B_WAVEFORM"
 echo "NES Phase 4B boot waveform: $ROOT_DIR/$NES_PHASE4B_BOOT_WAVEFORM"
+echo "NES controller Phase 4C waveform: $ROOT_DIR/$NES_CONTROLLER_PHASE4C_WAVEFORM"
+echo "NES Phase 4C integrated controller waveform: $ROOT_DIR/$NES_PHASE4C_CONTROLLER_WAVEFORM"
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"

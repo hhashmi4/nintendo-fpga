@@ -112,6 +112,19 @@ verilator --lint-only --Wall \
     --top-module nes_cpu_ram \
     rtl/system/nes_cpu_ram.sv
 
+CONTROLLER_RTL_FILES=(
+    rtl/controller/controller_input_sync.sv
+    rtl/controller/nes_controller.sv
+)
+
+verilator --lint-only --Wall \
+    --top-module nes_controller \
+    rtl/controller/nes_controller.sv
+
+verilator --lint-only --Wall \
+    --top-module controller_input_sync \
+    rtl/controller/controller_input_sync.sv
+
 verilator --lint-only --Wall -Wno-fatal \
     --top-module cpu_core \
     "${CPU_RTL_FILES[@]}"
@@ -204,6 +217,7 @@ PHASE3K_RTL_FILES=(
     rtl/platform/nes_timing_gen.sv
     "${NES_RTL_FILES[@]}"
     "${CARTRIDGE_RTL_FILES[@]}"
+    "${CONTROLLER_RTL_FILES[@]}"
     rtl/diagnostic/hex7seg.sv
     rtl/video/vga_timing.sv
     rtl/video/vga_nes_scaler.sv

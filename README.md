@@ -31,8 +31,11 @@ CPU, PPU, and DMA behavior. Phase 4B adds strict host-side iNES import, a
 replaceable cartridge shell, Mapper 0/NROM-128 and NROM-256 PRG mapping,
 CHR ROM/RAM, cartridge-selected nametable mirroring, and a real cartridge
 reset-vector boot path. APU, advanced mappers, physical cartridge loading,
-controllers, audio, and native HDMI do not exist yet; physical VGA observation
-remains outstanding.
+and audio remain future work. Phase 4C adds two authentic NES serial
+controller ports, an abstract synchronized input boundary, DE1-SoC Controller
+1 switch mapping, exhaustive protocol verification, and a cartridge program
+that polls both ports into CPU RAM. Native HDMI and physical VGA observation
+remain outstanding.
 
 ## Phase 1 foundation
 
@@ -381,6 +384,23 @@ The format rules, mapper data flow, fixtures, reset boot proof, observability,
 synthesis results, and future-mapper boundary are documented in
 [`docs/phase4b-cartridge-nrom.md`](docs/phase4b-cartridge-nrom.md).
 
+## Phase 4C controller subsystem
+
+- Shared `$4016` strobe with simultaneous falling-edge latch of both ports
+- Independent A/B/Select/Start/Up/Down/Left/Right shift registers
+- `$4016` Controller 1 reads and `$4017` Controller 2 reads on deterministic D0
+- NES-compatible logical ones after each eight-button sequence
+- Preserved `$4017` write path for the future APU frame counter
+- Abstract two-controller state vectors outside `nes_core`
+- Two-flop DE1-SoC input synchronization and SW2-SW9 Controller 1 mapping
+- Exhaustive 256-state-per-port Python and RTL protocol checking
+- Real cartridge-driven CPU polling into RAM `$0010/$0011`
+- Passive live, latched, index, serial, strobe, and access diagnostics
+
+The protocol, board mapping, synchronization/debounce decision, end-to-end
+data flow, verification, physical procedure, and Phase 4D boundary are in
+[`docs/phase4c-controllers.md`](docs/phase4c-controllers.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -414,7 +434,8 @@ Run the normal suite from the repository root:
 ```
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
-4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests, PPU
+4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
+Phase 4C exhaustive controller and integrated cartridge-poll tests, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -426,7 +447,8 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_oam.fst`, `ppu_phase3f.fst`,
 `ppu_sprite_renderer.fst`, `ppu_phase3g.fst`, `ppu_phase3h.fst`,
 `ppu_phase3i.fst`, `nes_phase4a_bus.fst`, `mapper0_phase4b.fst`,
-`nes_phase4b_boot.fst`, `nes_phase3j.fst`, `vga_phase3k.fst`,
+`nes_phase4b_boot.fst`, `nes_controller_phase4c.fst`,
+`nes_phase4c_controller.fst`, `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -513,7 +535,7 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4B DE1-SoC NES/VGA SOF/RBF and run its
+Build the current Phase 4C DE1-SoC NES/VGA/controller SOF/RBF and run its
 fitter/timing checks:
 
 ```bash
@@ -553,8 +575,9 @@ before use.
 - `rtl/ppu` — PPU timing, CPU registers, memory map, and integrated cores
 - `rtl/system` — NES CPU address decoder, system bus, and internal CPU RAM
 - `rtl/cartridge` — generic cartridge shell and Mapper 0/NROM storage
+- `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
-- `rtl/apu`, `rtl/memory`, `rtl/controller` — reserved for later phases
+- `rtl/apu`, `rtl/memory` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches
 - `verification` and `tests/python` — Python reference infrastructure/tests
 - `constraints` — SDC timing constraints
