@@ -9,8 +9,17 @@ OUTPUT_DIR="$BUILD_DIR/output_files"
 RBF_PATH="$BUILD_DIR/${PROJECT_NAME}.rbf"
 
 mkdir -p "$OUTPUT_DIR"
-python3 "$ROOT_DIR/scripts/generate_phase4b_fixtures.py" \
-    "$ROOT_DIR/build/cartridge"
+PLAYABLE_ROM="$ROOT_DIR/roms/phase4db_playable_nrom128.nes"
+REGENERATED_ROM="$ROOT_DIR/build/cartridge/phase4db_regenerated.nes"
+PLAYABLE_PREFIX="$ROOT_DIR/build/cartridge/phase4db_playable_nrom128"
+python3 "$ROOT_DIR/scripts/generate_phase4db_playable_rom.py" \
+    "$REGENERATED_ROM"
+if ! cmp -s "$PLAYABLE_ROM" "$REGENERATED_ROM"; then
+    echo "ERROR: committed playable ROM differs from its project-owned source" >&2
+    exit 1
+fi
+python3 "$ROOT_DIR/scripts/prepare_phase4db_cartridge.py" \
+    "$PLAYABLE_ROM" "$PLAYABLE_PREFIX"
 cd "$PROJECT_DIR"
 quartus_sh --flow compile "$PROJECT_NAME"
 

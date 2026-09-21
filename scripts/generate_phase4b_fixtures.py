@@ -84,6 +84,29 @@ def pattern_chr() -> bytes:
     return bytes(data)
 
 
+def playable_demo_chr() -> bytes:
+    """CHR ROM for the project-owned Phase 4D-B playable demo."""
+
+    data = bytearray(CHR_BANK_SIZE)
+
+    # Tile 1: a quiet checkerboard background.
+    for row in range(8):
+        data[0x10 + row] = 0x44 if row & 1 else 0x11
+
+    # Tile 2: bordered player sprite.
+    player = (0x7E, 0x42, 0x5A, 0x5A, 0x42, 0x5A, 0x42, 0x7E)
+    for row, value in enumerate(player):
+        data[0x20 + row] = value
+
+    # Tile 3: visibly different action sprite selected by the B button.
+    action = (0x18, 0x3C, 0x7E, 0xDB, 0xFF, 0x7E, 0x3C, 0x18)
+    for row, value in enumerate(action):
+        data[0x30 + row] = value
+        data[0x38 + row] = value & 0x66
+
+    return bytes(data)
+
+
 def boot_prg() -> bytes:
     prg = bytearray([0xEA] * PRG_BANK_SIZE)
     reset = Program(0x8000)
@@ -232,6 +255,210 @@ def controller_display_prg() -> bytes:
     return bytes(prg)
 
 
+def dma_bus_master_prg() -> bytes:
+    """Owned program proving RAM, cartridge, and I/O-page OAM DMA."""
+
+    prg = bytearray([0xEA] * PRG_BANK_SIZE)
+    program = Program(0x8000)
+    program.emit(0x78, 0xD8)  # SEI; CLD
+    program.emit(0xA2, 0x00)  # LDX #0
+    program.label("fill_source")
+    program.emit(0x8A, 0x49, 0x5A)  # TXA; EOR #$5a
+    program.emit(0x9D, 0x00, 0x02)  # STA $0200,X
+    program.emit(0xE8)  # INX
+    program.branch(0xD0, "fill_source")
+
+    # Internal RAM source; execution must resume and write marker $11.
+    program.emit(0xA9, 0x00, 0x8D, 0x03, 0x20)  # OAMADDR=0
+    program.emit(0xA9, 0x02, 0x8D, 0x14, 0x40)  # DMA page $02
+    program.emit(0xA9, 0x11, 0x85, 0x13)
+
+    # This instruction sequence reaches the second trigger on the opposite
+    # CPU-cycle parity, covering the alternate 513/514-slot alignment case.
+    program.emit(0xA9, 0x00, 0x8D, 0x03, 0x20)
+    program.emit(0xA9, 0x80, 0x8D, 0x14, 0x40)  # cartridge page $80
+    program.emit(0xA9, 0x22, 0x85, 0x13)
+
+    # Page $40 crosses APU/DMA/controller/unmapped I/O and into cartridge
+    # space. Unsupported I/O bytes are deterministic zero and emit no strobes.
+    program.emit(0xA9, 0x00, 0x8D, 0x03, 0x20)
+    program.emit(0xA9, 0x40, 0x8D, 0x14, 0x40)
+    program.emit(0xA9, 0x33, 0x85, 0x13)
+    program.label("done")
+    program.absolute(0x4C, "done")
+
+    put(prg, 0x8000, program.resolve())
+    set_vectors(prg, nmi=0x8000, reset=0x8000, irq=0x8000)
+    return bytes(prg)
+
+
+def playable_demo_prg() -> bytes:
+    """Project-owned playable NROM demo using NMI, DMA, and all buttons."""
+
+    prg = bytearray([0xEA] * PRG_BANK_SIZE)
+    program = Program(0x8000)
+
+    # Normal NES startup: disable interrupts/rendering, establish the stack,
+    # and wait for two VBlanks before touching PPU memory.
+    program.emit(0x78, 0xD8)  # SEI; CLD
+    program.emit(0xA2, 0xFF, 0x9A)  # LDX #$ff; TXS
+    program.emit(0xA9, 0x00, 0x8D, 0x00, 0x20, 0x8D, 0x01, 0x20)
+    program.label("wait_vblank_1")
+    program.emit(0x2C, 0x02, 0x20)  # BIT $2002
+    program.branch(0x10, "wait_vblank_1")  # BPL
+    program.label("wait_vblank_2")
+    program.emit(0x2C, 0x02, 0x20)
+    program.branch(0x10, "wait_vblank_2")
+
+    # Clear all 2 KiB of CPU RAM deterministically.
+    program.emit(0xA9, 0x00, 0xA2, 0x00)  # LDA #0; LDX #0
+    program.label("clear_ram")
+    for page in range(8):
+        program.emit(0x9D, 0x00, page)  # STA $xx00,X
+    program.emit(0xE8)
+    program.branch(0xD0, "clear_ram")
+
+    # Hide every OAM entry, then establish the persistent player state.
+    program.emit(0xA9, 0xFF, 0xA2, 0x00)
+    program.label("hide_oam")
+    program.emit(0x9D, 0x00, 0x02, 0xE8)
+    program.branch(0xD0, "hide_oam")
+    program.emit(0xA9, 0x78, 0x85, 0x03)  # player X
+    program.emit(0xA9, 0x64, 0x85, 0x04)  # player Y after Start
+    program.emit(0xA9, 0xF0, 0x8D, 0x00, 0x02)  # hidden title-screen Y
+    program.emit(0xA9, 0x02, 0x8D, 0x01, 0x02)  # normal sprite tile
+    program.emit(0xA9, 0x00, 0x8D, 0x02, 0x02)
+    program.emit(0xA9, 0x78, 0x8D, 0x03, 0x02)
+
+    # Load all 32 palette bytes from PRG ROM.
+    program.emit(0xA9, 0x3F, 0x8D, 0x06, 0x20)
+    program.emit(0xA9, 0x00, 0x8D, 0x06, 0x20)
+    program.emit(0xA2, 0x00)
+    program.label("load_palette")
+    program.emit(0xBD, 0x00, 0x82, 0x8D, 0x07, 0x20, 0xE8, 0xE0, 0x20)
+    program.branch(0xD0, "load_palette")
+
+    # Fill one complete nametable. The final 64 bytes are deterministic
+    # attribute values too, so the background visibly exercises composition.
+    program.emit(0xA9, 0x20, 0x8D, 0x06, 0x20)
+    program.emit(0xA9, 0x00, 0x8D, 0x06, 0x20)
+    program.emit(0xA0, 0x04, 0xA2, 0x00, 0xA9, 0x01)
+    program.label("fill_nametable")
+    program.emit(0x8D, 0x07, 0x20, 0xE8)
+    program.branch(0xD0, "fill_nametable")
+    program.emit(0x88)
+    program.branch(0xD0, "fill_nametable")
+
+    # Zero scroll, enable VBlank NMI, and enable background/sprite rendering.
+    program.emit(0xA9, 0x00, 0x8D, 0x05, 0x20, 0x8D, 0x05, 0x20)
+    program.emit(0xA9, 0x80, 0x8D, 0x00, 0x20)
+    program.emit(0xA9, 0x1E, 0x8D, 0x01, 0x20)
+    program.emit(0xA9, 0xA5, 0x85, 0x0F)  # initialization marker
+
+    # The foreground loop advances exactly once for each NMI-produced frame
+    # token. It polls the real $4016/$4017 serial interface and updates state.
+    program.label("main_loop")
+    program.emit(0xA5, 0x00)
+    program.branch(0xF0, "main_loop")
+    program.emit(0xA9, 0x00, 0x85, 0x00)
+    emit_controller_poll(program)
+    program.emit(0xE6, 0x12)  # controller poll count
+
+    # new_press = current & ~previous; remember current for edge actions.
+    program.emit(0xA5, 0x13, 0x49, 0xFF, 0x25, 0x10, 0x85, 0x14)
+    program.emit(0xA5, 0x10, 0x85, 0x13)
+
+    # Start enters gameplay and makes the player visible.
+    program.emit(0xA5, 0x14, 0x29, 0x08)
+    program.branch(0xF0, "no_start")
+    program.emit(0xA9, 0x01, 0x85, 0x02)
+    program.emit(0xA5, 0x04, 0x8D, 0x00, 0x02)
+    program.label("no_start")
+
+    # A and Select choose distinct persistent sprite palettes.
+    program.emit(0xA5, 0x14, 0x29, 0x01)
+    program.branch(0xF0, "no_a")
+    program.emit(0xA9, 0x01, 0x85, 0x05, 0x8D, 0x02, 0x02)
+    program.label("no_a")
+    program.emit(0xA5, 0x14, 0x29, 0x04)
+    program.branch(0xF0, "no_select")
+    program.emit(0xA9, 0x02, 0x85, 0x05, 0x8D, 0x02, 0x02)
+    program.label("no_select")
+
+    # B selects the persistent action sprite tile.
+    program.emit(0xA5, 0x14, 0x29, 0x02)
+    program.branch(0xF0, "no_b")
+    program.emit(0xA9, 0x03, 0x85, 0x07, 0x8D, 0x01, 0x02)
+    program.label("no_b")
+
+    # Directional movement is level-sensitive and bounded to the visible
+    # playfield. No direction can wrap an eight-bit coordinate.
+    program.emit(0xA5, 0x02)
+    program.branch(0xF0, "movement_done")
+
+    program.emit(0xA5, 0x10, 0x29, 0x80)
+    program.branch(0xF0, "no_right")
+    program.emit(0xA5, 0x03, 0xC9, 0xF0)
+    program.branch(0xB0, "no_right")
+    program.emit(0x18, 0x69, 0x02, 0x85, 0x03, 0x8D, 0x03, 0x02)
+    program.label("no_right")
+
+    program.emit(0xA5, 0x10, 0x29, 0x40)
+    program.branch(0xF0, "no_left")
+    program.emit(0xA5, 0x03, 0xC9, 0x09)
+    program.branch(0x90, "no_left")
+    program.emit(0x38, 0xE9, 0x02, 0x85, 0x03, 0x8D, 0x03, 0x02)
+    program.label("no_left")
+
+    program.emit(0xA5, 0x10, 0x29, 0x10)
+    program.branch(0xF0, "no_up")
+    program.emit(0xA5, 0x04, 0xC9, 0x11)
+    program.branch(0x90, "no_up")
+    program.emit(0x38, 0xE9, 0x02, 0x85, 0x04, 0x8D, 0x00, 0x02)
+    program.label("no_up")
+
+    program.emit(0xA5, 0x10, 0x29, 0x20)
+    program.branch(0xF0, "no_down")
+    program.emit(0xA5, 0x04, 0xC9, 0xE0)
+    program.branch(0xB0, "no_down")
+    program.emit(0x18, 0x69, 0x02, 0x85, 0x04, 0x8D, 0x00, 0x02)
+    program.label("no_down")
+    program.label("movement_done")
+    program.absolute(0x4C, "main_loop")
+
+    put(prg, 0x8000, program.resolve())
+
+    palette = bytes(
+        (
+            0x0F, 0x01, 0x21, 0x31,
+            0x0F, 0x06, 0x16, 0x26,
+            0x0F, 0x09, 0x19, 0x29,
+            0x0F, 0x03, 0x13, 0x23,
+            0x0F, 0x2A, 0x1A, 0x0A,
+            0x0F, 0x27, 0x17, 0x07,
+            0x0F, 0x25, 0x15, 0x05,
+            0x0F, 0x2C, 0x1C, 0x0C,
+        )
+    )
+    put(prg, 0x8200, palette)
+
+    # NMI: preserve all registers, count the frame, DMA page $02 to OAM,
+    # publish one main-loop token, then return to interrupted execution.
+    nmi = Program(0x9000)
+    nmi.emit(0x48, 0x8A, 0x48, 0x98, 0x48)  # PHA; TXA/PHA; TYA/PHA
+    nmi.emit(0xE6, 0x01, 0xE6, 0x06)  # NMI and gameplay-frame counters
+    nmi.emit(0xA9, 0x00, 0x8D, 0x03, 0x20)  # OAMADDR=0
+    nmi.emit(0xA9, 0x02, 0x8D, 0x14, 0x40)  # OAM DMA from $0200
+    nmi.emit(0xA9, 0x01, 0x85, 0x00)  # publish frame token
+    nmi.emit(0x68, 0xA8, 0x68, 0xAA, 0x68, 0x40)  # restore; RTI
+    put(prg, 0x9000, nmi.resolve())
+
+    # A valid defensive IRQ/BRK handler records entry and returns.
+    put(prg, 0x9100, bytes((0xE6, 0x0E, 0x40)))
+    set_vectors(prg, nmi=0x9000, reset=0x8000, irq=0x9100)
+    return bytes(prg)
+
+
 def mapping_prg(size: int) -> bytes:
     data = bytearray(
         ((index * 37) ^ (index >> 8) ^ 0xA5) & 0xFF
@@ -317,6 +544,20 @@ def main() -> None:
         controller_display_prg(),
         chr_data,
         vertical=True,
+    )
+    write_fixture(
+        output_dir,
+        "phase4d_dma_nrom128",
+        dma_bus_master_prg(),
+        chr_data,
+        vertical=False,
+    )
+    write_fixture(
+        output_dir,
+        "phase4db_playable_nrom128",
+        playable_demo_prg(),
+        playable_demo_chr(),
+        vertical=False,
     )
 
 

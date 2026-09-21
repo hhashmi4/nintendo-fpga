@@ -120,3 +120,46 @@ def mirrored_ram_read(ram: bytes | bytearray, address: int) -> int:
     if len(ram) != 2048:
         raise ValueError("NES internal RAM must contain exactly 2048 bytes")
     return ram[address & 0x07FF]
+
+
+def dma_source_addresses(page: int) -> tuple[int, ...]:
+    """Return the exact 256-address sequence produced by an OAM DMA page."""
+
+    base = (page & 0xFF) << 8
+    return tuple(base | index for index in range(256))
+
+
+def dma_cycle_trace(started_odd: bool) -> tuple[DmaPhase, ...]:
+    """Return independently expected DMA phases for each stalled CPU slot."""
+
+    trace = [DmaPhase.DUMMY]
+    if started_odd:
+        trace.append(DmaPhase.ALIGN)
+    for _ in range(256):
+        trace.extend((DmaPhase.READ, DmaPhase.WRITE))
+    return tuple(trace)
+
+
+def dma_read_cpu_space(
+    address: int,
+    ram: bytes | bytearray,
+    *,
+    ppu_read: Callable[[int], int],
+    cartridge_read: Callable[[int], int],
+) -> int:
+    """Apply the project's DMA-source policy to one CPU-space address.
+
+    RAM uses its physical 2 KiB mirror. PPU and cartridge reads delegate to
+    their existing owners. APU, DMA, controller, and unmapped I/O deliberately
+    return zero rather than emitting CPU peripheral accesses.
+    """
+
+    address &= 0xFFFF
+    target, physical = decode_cpu_address(address)
+    if target == CpuTarget.RAM:
+        return mirrored_ram_read(ram, address)
+    if target == CpuTarget.PPU:
+        return ppu_read(physical) & 0xFF
+    if target == CpuTarget.CARTRIDGE:
+        return cartridge_read(address) & 0xFF
+    return 0

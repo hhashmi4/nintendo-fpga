@@ -112,6 +112,17 @@ verilator --lint-only --Wall \
     --top-module nes_cpu_ram \
     rtl/system/nes_cpu_ram.sv
 
+verilator --lint-only --Wall \
+    --top-module nes_oam_dma \
+    rtl/system/nes_system_pkg.sv \
+    rtl/dma/nes_oam_dma.sv
+
+verilator --lint-only --Wall \
+    --top-module nes_internal_bus_arbiter \
+    rtl/system/nes_system_pkg.sv \
+    rtl/system/nes_cpu_address_decoder.sv \
+    rtl/system/nes_internal_bus_arbiter.sv
+
 CONTROLLER_RTL_FILES=(
     rtl/controller/controller_input_sync.sv
     rtl/controller/nes_controller.sv
@@ -133,6 +144,8 @@ NES_RTL_FILES=(
     "${CPU_RTL_FILES[@]}"
     "${SYSTEM_BUS_RTL_FILES[@]}"
     rtl/system/nes_cpu_ram.sv
+    rtl/dma/nes_oam_dma.sv
+    rtl/system/nes_internal_bus_arbiter.sv
     rtl/ppu/ppu_timing.sv
     rtl/ppu/ppu_scroll.sv
     rtl/ppu/ppu_registers.sv

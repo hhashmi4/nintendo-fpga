@@ -128,6 +128,15 @@ def write_readmemh(data: bytes, path: str | Path) -> None:
     output.write_text("".join(f"{value:02x}\n" for value in data), encoding="ascii")
 
 
+def nrom_vector(prg_rom: bytes, vector_address: int) -> int:
+    """Return a little-endian CPU vector from an NROM PRG image."""
+
+    if vector_address not in (0xFFFA, 0xFFFC, 0xFFFE):
+        raise ValueError(f"unsupported vector address: {vector_address:#06x}")
+    offset = (vector_address - 0x8000) % len(prg_rom)
+    return prg_rom[offset] | (prg_rom[offset + 1] << 8)
+
+
 def convert_ines(path: str | Path, output_prefix: str | Path) -> dict[str, Path]:
     """Validate an iNES image and emit ROM initialization plus metadata."""
 
@@ -164,6 +173,9 @@ def convert_ines(path: str | Path, output_prefix: str | Path) -> dict[str, Path]
         "mirroring": image.mirroring,
         "mirroring_mode": 0 if image.mirroring == "vertical" else 1,
         "trainer_present": image.trainer_present,
+        "nmi_vector": nrom_vector(image.prg_rom, 0xFFFA),
+        "reset_vector": nrom_vector(image.prg_rom, 0xFFFC),
+        "irq_brk_vector": nrom_vector(image.prg_rom, 0xFFFE),
     }
     metadata_path.write_text(
         json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"

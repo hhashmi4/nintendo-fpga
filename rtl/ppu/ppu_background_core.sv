@@ -140,17 +140,22 @@ module ppu_background_core (
     logic background_memory_request;
     logic [13:0] background_memory_address;
     logic background_memory_grant;
+    logic sprite_fetch_window;
 
     always_comb begin
         cpu_memory_access = ppu_memory_read_request ||
                             ppu_memory_write_request;
         renderer_memory_request = background_memory_request ||
                                   sprite_memory_request;
-        // Preserve the Phase 3E observable address when neither renderer is
-        // requesting.  The sprite address replaces it only while the sprite
-        // client is the active renderer owner.
-        renderer_memory_address = sprite_memory_request &&
-                                  !background_memory_request ?
+        // Preserve the Phase 3E observable background address outside the
+        // sprite-fetch window.
+        // Keep the sprite address selected throughout its fetch window, not
+        // only on the sparse PPU clock-enable pulse.  Synchronous cartridge
+        // CHR memory then sees the address during the intervening fabric
+        // clocks and has data ready for the following capture phase.
+        sprite_fetch_window = scanline < 9'd240 &&
+                              dot >= 9'd257 && dot <= 9'd320;
+        renderer_memory_address = sprite_fetch_window ?
                                   sprite_memory_address :
                                   background_memory_address;
         renderer_memory_grant = renderer_memory_request &&
