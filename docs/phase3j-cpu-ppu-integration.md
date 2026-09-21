@@ -143,7 +143,8 @@ The integrated RTL test runs machine code on `cpu_core`; the testbench does not
 inject PPU-register or OAM writes. The program:
 
 1. fills CPU RAM page `$02` and writes sprite-zero Y/tile/attribute/X metadata;
-2. writes mirrored PPU registers, PPUSCROLL, PPUADDR, and PPUDATA;
+2. writes mirrored PPU registers and uses PPUSCROLL, PPUADDR, and PPUDATA,
+   including CPU `$2007` palette write/readback;
 3. performs two initial DMAs covering both parity lengths and OAMADDR wrapping;
 4. enables sprite rendering and VBlank NMI;
 5. increments a RAM counter in a real NMI handler and returns with RTI;
@@ -159,7 +160,7 @@ CPU instructions -> CPU RAM -> $4014 DMA -> primary OAM
 
 Across five frames the run produced 192 sprite-winning final pixels and two
 machine-checked consecutive frame movements of exactly eight pixels. The run
-used 358,367 fabric/PPU ticks, 119,455 scheduled CPU slots, 116,374 CPU run
+used 358,367 fabric/PPU ticks, 119,455 scheduled CPU slots, 116,373 CPU run
 cycles, six DMA transfers, 1,536 reads, 1,536 OAM writes, four PPU NMI events,
 and four completed CPU NMI handlers. All comparisons were exact.
 

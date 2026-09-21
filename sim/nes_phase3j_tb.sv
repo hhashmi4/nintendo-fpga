@@ -215,6 +215,11 @@ module nes_phase3j_tb;
         emit(8'ha9); emit(8'h3f); emit(8'h8d); emit(8'hfe); emit(8'h3f);
         emit(8'ha9); emit(8'h11); emit(8'h8d); emit(8'hfe); emit(8'h3f);
         emit(8'ha9); emit(8'h30); emit(8'h8d); emit(8'hff); emit(8'h3f);
+        // Re-address and read the palette byte back through real CPU $2007.
+        emit(8'ha9); emit(8'h3f); emit(8'h8d); emit(8'hfe); emit(8'h3f);
+        emit(8'ha9); emit(8'h11); emit(8'h8d); emit(8'hfe); emit(8'h3f);
+        emit(8'had); emit(8'hff); emit(8'h3f);
+        emit(8'h85); emit(8'h06);
         emit(8'ha9); emit(8'h80); emit(8'h8d); emit(8'h08); emit(8'h20);
         emit(8'ha9); emit(8'h14); emit(8'h8d); emit(8'hf9); emit(8'h3f);
         emit(8'ha9); emit(8'h5a); emit(8'h85); emit(8'h05);
@@ -253,6 +258,8 @@ module nes_phase3j_tb;
             else $fatal(1, "RAM mirror failed");
         assert (dut.internal_cpu_ram.memory[11'h005] == 8'h5a)
             else $fatal(1, "CPU did not finish initialization");
+        assert (dut.cpu_ram[11'h006] == 8'h30)
+            else $fatal(1, "CPU PPUDATA palette readback failed");
         assert (ppu_ctrl == 8'h80 && ppu_mask == 8'h14)
             else $fatal(1, "mirrored PPU writes failed %02x %02x",
                         ppu_ctrl, ppu_mask);
