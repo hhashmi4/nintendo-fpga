@@ -232,6 +232,43 @@ def controller_display_prg() -> bytes:
     return bytes(prg)
 
 
+def dma_bus_master_prg() -> bytes:
+    """Owned program proving RAM, cartridge, and I/O-page OAM DMA."""
+
+    prg = bytearray([0xEA] * PRG_BANK_SIZE)
+    program = Program(0x8000)
+    program.emit(0x78, 0xD8)  # SEI; CLD
+    program.emit(0xA2, 0x00)  # LDX #0
+    program.label("fill_source")
+    program.emit(0x8A, 0x49, 0x5A)  # TXA; EOR #$5a
+    program.emit(0x9D, 0x00, 0x02)  # STA $0200,X
+    program.emit(0xE8)  # INX
+    program.branch(0xD0, "fill_source")
+
+    # Internal RAM source; execution must resume and write marker $11.
+    program.emit(0xA9, 0x00, 0x8D, 0x03, 0x20)  # OAMADDR=0
+    program.emit(0xA9, 0x02, 0x8D, 0x14, 0x40)  # DMA page $02
+    program.emit(0xA9, 0x11, 0x85, 0x13)
+
+    # This instruction sequence reaches the second trigger on the opposite
+    # CPU-cycle parity, covering the alternate 513/514-slot alignment case.
+    program.emit(0xA9, 0x00, 0x8D, 0x03, 0x20)
+    program.emit(0xA9, 0x80, 0x8D, 0x14, 0x40)  # cartridge page $80
+    program.emit(0xA9, 0x22, 0x85, 0x13)
+
+    # Page $40 crosses APU/DMA/controller/unmapped I/O and into cartridge
+    # space. Unsupported I/O bytes are deterministic zero and emit no strobes.
+    program.emit(0xA9, 0x00, 0x8D, 0x03, 0x20)
+    program.emit(0xA9, 0x40, 0x8D, 0x14, 0x40)
+    program.emit(0xA9, 0x33, 0x85, 0x13)
+    program.label("done")
+    program.absolute(0x4C, "done")
+
+    put(prg, 0x8000, program.resolve())
+    set_vectors(prg, nmi=0x8000, reset=0x8000, irq=0x8000)
+    return bytes(prg)
+
+
 def mapping_prg(size: int) -> bytes:
     data = bytearray(
         ((index * 37) ^ (index >> 8) ^ 0xA5) & 0xFF
@@ -317,6 +354,13 @@ def main() -> None:
         controller_display_prg(),
         chr_data,
         vertical=True,
+    )
+    write_fixture(
+        output_dir,
+        "phase4d_dma_nrom128",
+        dma_bus_master_prg(),
+        chr_data,
+        vertical=False,
     )
 
 

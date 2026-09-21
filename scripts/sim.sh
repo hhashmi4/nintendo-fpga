@@ -29,6 +29,10 @@ mkdir -p \
     build/verilator/nes_phase4b_boot \
     build/verilator/nes_controller_phase4c \
     build/verilator/nes_phase4c_controller \
+    build/verilator/nes_oam_dma_phase4d \
+    build/verilator/nes_internal_bus_arbiter_phase4d \
+    build/verilator/nes_phase4d_dma_integration \
+    build/verilator/nes_phase4d_dma_nmi \
     build/verilator/nes_phase3j \
     build/verilator/nes_phase3j_nmi \
     build/verilator/vga_timing_phase3k \
@@ -99,6 +103,10 @@ MAPPER0_PHASE4B_WAVEFORM="build/sim/mapper0_phase4b.fst"
 NES_PHASE4B_BOOT_WAVEFORM="build/sim/nes_phase4b_boot.fst"
 NES_CONTROLLER_PHASE4C_WAVEFORM="build/sim/nes_controller_phase4c.fst"
 NES_PHASE4C_CONTROLLER_WAVEFORM="build/sim/nes_phase4c_controller.fst"
+NES_OAM_DMA_PHASE4D_WAVEFORM="build/sim/nes_oam_dma_phase4d.fst"
+NES_INTERNAL_BUS_ARBITER_PHASE4D_WAVEFORM="build/sim/nes_internal_bus_arbiter_phase4d.fst"
+NES_PHASE4D_DMA_INTEGRATION_WAVEFORM="build/sim/nes_phase4d_dma_integration.fst"
+NES_PHASE4D_DMA_NMI_WAVEFORM="build/sim/nes_phase4d_dma_nmi.fst"
 NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
 VGA_PHASE3K_WAVEFORM="build/sim/vga_phase3k.fst"
 VGA_PHASE3K_TRACE="build/sim/vga_phase3k_pixels.txt"
@@ -168,6 +176,10 @@ rm -f \
     "$NES_PHASE4B_BOOT_WAVEFORM" \
     "$NES_CONTROLLER_PHASE4C_WAVEFORM" \
     "$NES_PHASE4C_CONTROLLER_WAVEFORM" \
+    "$NES_OAM_DMA_PHASE4D_WAVEFORM" \
+    "$NES_INTERNAL_BUS_ARBITER_PHASE4D_WAVEFORM" \
+    "$NES_PHASE4D_DMA_INTEGRATION_WAVEFORM" \
+    "$NES_PHASE4D_DMA_NMI_WAVEFORM" \
     "$NES_PHASE3J_WAVEFORM" \
     "$VGA_PHASE3K_WAVEFORM" \
     "$VGA_PHASE3K_TRACE" \
@@ -629,6 +641,8 @@ NES_PHASE3J_RTL_FILES=(
     rtl/system/nes_cpu_address_decoder.sv
     rtl/system/nes_cpu_ram.sv
     rtl/system/nes_cpu_bus.sv
+    rtl/dma/nes_oam_dma.sv
+    rtl/system/nes_internal_bus_arbiter.sv
     rtl/ppu/ppu_timing.sv
     rtl/ppu/ppu_scroll.sv
     rtl/ppu/ppu_registers.sv
@@ -644,6 +658,39 @@ NES_PHASE3J_RTL_FILES=(
     rtl/ppu/ppu_sprite_core.sv
     rtl/nes_core.sv
 )
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_oam_dma_phase4d \
+    --top-module nes_oam_dma_phase4d_tb \
+    -o nes_oam_dma_phase4d_tb \
+    rtl/system/nes_system_pkg.sv \
+    rtl/dma/nes_oam_dma.sv \
+    sim/nes_oam_dma_phase4d_tb.sv
+
+build/verilator/nes_oam_dma_phase4d/nes_oam_dma_phase4d_tb
+
+if [[ ! -s "$NES_OAM_DMA_PHASE4D_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_OAM_DMA_PHASE4D_WAVEFORM" >&2
+    exit 1
+fi
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_internal_bus_arbiter_phase4d \
+    --top-module nes_internal_bus_arbiter_phase4d_tb \
+    -o nes_internal_bus_arbiter_phase4d_tb \
+    rtl/system/nes_system_pkg.sv \
+    rtl/system/nes_cpu_address_decoder.sv \
+    rtl/system/nes_internal_bus_arbiter.sv \
+    sim/nes_internal_bus_arbiter_phase4d_tb.sv
+
+build/verilator/nes_internal_bus_arbiter_phase4d/nes_internal_bus_arbiter_phase4d_tb
+
+if [[ ! -s "$NES_INTERNAL_BUS_ARBITER_PHASE4D_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_INTERNAL_BUS_ARBITER_PHASE4D_WAVEFORM" >&2
+    exit 1
+fi
 
 verilator --binary --timing --trace-fst --Wall \
     --assert \
@@ -677,6 +724,45 @@ build/verilator/nes_phase4c_controller/nes_phase4c_controller_tb
 
 if [[ ! -s "$NES_PHASE4C_CONTROLLER_WAVEFORM" ]]; then
     echo "ERROR: simulation did not generate a non-empty $NES_PHASE4C_CONTROLLER_WAVEFORM" >&2
+    exit 1
+fi
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_phase4d_dma_integration \
+    --top-module nes_phase4d_dma_integration_tb \
+    -o nes_phase4d_dma_integration_tb \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0.sv \
+    rtl/cartridge/nes_cartridge.sv \
+    sim/nes_phase4d_dma_integration_tb.sv
+
+build/verilator/nes_phase4d_dma_integration/nes_phase4d_dma_integration_tb
+
+if [[ ! -s "$NES_PHASE4D_DMA_INTEGRATION_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_PHASE4D_DMA_INTEGRATION_WAVEFORM" >&2
+    exit 1
+fi
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_phase4d_dma_nmi \
+    --top-module nes_phase4d_dma_nmi_tb \
+    -o nes_phase4d_dma_nmi_tb \
+    rtl/cpu/cpu_pkg.sv \
+    rtl/cpu/cpu_alu.sv \
+    rtl/cpu/cpu_decoder.sv \
+    rtl/cpu/cpu_address_gen.sv \
+    rtl/cpu/cpu_core.sv \
+    rtl/system/nes_system_pkg.sv \
+    rtl/dma/nes_oam_dma.sv \
+    sim/nes_phase4d_dma_nmi_tb.sv
+
+build/verilator/nes_phase4d_dma_nmi/nes_phase4d_dma_nmi_tb
+
+if [[ ! -s "$NES_PHASE4D_DMA_NMI_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_PHASE4D_DMA_NMI_WAVEFORM" >&2
     exit 1
 fi
 
@@ -1038,6 +1124,10 @@ echo "Mapper 0 Phase 4B waveform: $ROOT_DIR/$MAPPER0_PHASE4B_WAVEFORM"
 echo "NES Phase 4B boot waveform: $ROOT_DIR/$NES_PHASE4B_BOOT_WAVEFORM"
 echo "NES controller Phase 4C waveform: $ROOT_DIR/$NES_CONTROLLER_PHASE4C_WAVEFORM"
 echo "NES Phase 4C integrated controller waveform: $ROOT_DIR/$NES_PHASE4C_CONTROLLER_WAVEFORM"
+echo "NES standalone OAM DMA Phase 4D-A waveform: $ROOT_DIR/$NES_OAM_DMA_PHASE4D_WAVEFORM"
+echo "NES internal bus arbiter Phase 4D-A waveform: $ROOT_DIR/$NES_INTERNAL_BUS_ARBITER_PHASE4D_WAVEFORM"
+echo "NES integrated DMA Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_INTEGRATION_WAVEFORM"
+echo "NES DMA/NMI Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_NMI_WAVEFORM"
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"

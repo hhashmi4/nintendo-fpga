@@ -1,8 +1,12 @@
 from verification.nes_system import (
     CpuTarget,
+    DmaPhase,
     OamDmaModel,
     Scheduler,
     decode_cpu_address,
+    dma_cycle_trace,
+    dma_read_cpu_space,
+    dma_source_addresses,
     mirrored_ram_read,
 )
 import random
@@ -103,6 +107,118 @@ def test_dma_never_duplicates_or_skips_an_address() -> None:
     model.run(read)
     assert addresses == list(range(0x7F00, 0x8000))
     assert model.reads == model.writes == 256
+
+
+def test_dma_source_sequence_is_exhaustive_for_every_page() -> None:
+    observed: list[int] = []
+    for page in range(256):
+        addresses = dma_source_addresses(page)
+        assert len(addresses) == len(set(addresses)) == 256
+        assert addresses[0] == page << 8
+        assert addresses[-1] == (page << 8) | 0xFF
+        observed.extend(addresses)
+    assert observed == list(range(0x10000))
+
+
+def test_dma_cycle_trace_independently_proves_513_and_514_slots() -> None:
+    even = dma_cycle_trace(False)
+    odd = dma_cycle_trace(True)
+    assert len(even) == 513
+    assert len(odd) == 514
+    assert even[0] == odd[0] == DmaPhase.DUMMY
+    assert even[1] == DmaPhase.READ
+    assert odd[1:3] == (DmaPhase.ALIGN, DmaPhase.READ)
+    assert even.count(DmaPhase.READ) == even.count(DmaPhase.WRITE) == 256
+    assert odd.count(DmaPhase.READ) == odd.count(DmaPhase.WRITE) == 256
+
+
+def test_dma_source_policy_preserves_all_internal_ram_mirrors() -> None:
+    ram = bytearray((index * 73 + 0x19) & 0xFF for index in range(2048))
+
+    def forbidden(_: int) -> int:
+        raise AssertionError("RAM source delegated to a peripheral")
+
+    for base_page in range(8):
+        reference = bytes(
+            dma_read_cpu_space(
+                address,
+                ram,
+                ppu_read=forbidden,
+                cartridge_read=forbidden,
+            )
+            for address in dma_source_addresses(base_page)
+        )
+        for mirror_page in (base_page, base_page + 8,
+                            base_page + 16, base_page + 24):
+            mirrored = bytes(
+                dma_read_cpu_space(
+                    address,
+                    ram,
+                    ppu_read=forbidden,
+                    cartridge_read=forbidden,
+                )
+                for address in dma_source_addresses(mirror_page)
+            )
+            assert mirrored == reference
+
+
+def test_dma_ppu_and_cartridge_delegate_to_existing_owners() -> None:
+    ram = bytes(2048)
+    ppu_addresses: list[int] = []
+    cartridge_addresses: list[int] = []
+
+    def ppu_read(register: int) -> int:
+        ppu_addresses.append(register)
+        return 0x80 | register
+
+    def cartridge_read(address: int) -> int:
+        cartridge_addresses.append(address)
+        return address ^ (address >> 8) ^ 0x5A
+
+    assert dma_read_cpu_space(
+        0x2000, ram, ppu_read=ppu_read,
+        cartridge_read=cartridge_read,
+    ) == 0x80
+    assert dma_read_cpu_space(
+        0x3FFF, ram, ppu_read=ppu_read,
+        cartridge_read=cartridge_read,
+    ) == 0x87
+    cartridge_bytes = bytes(
+        dma_read_cpu_space(
+            address,
+            ram,
+            ppu_read=ppu_read,
+            cartridge_read=cartridge_read,
+        )
+        for address in dma_source_addresses(0x80)
+    )
+    assert ppu_addresses == [0, 7]
+    assert cartridge_addresses == list(range(0x8000, 0x8100))
+    assert cartridge_bytes[0] == 0xDA
+    assert cartridge_bytes[-1] == 0x25
+
+
+def test_dma_apu_controller_and_unmapped_io_are_zero_without_delegation() -> None:
+    ram = bytes(2048)
+
+    def forbidden(_: int) -> int:
+        raise AssertionError("unsupported I/O source emitted a read")
+
+    unsupported = [
+        *range(0x4000, 0x4016),
+        0x4016,
+        0x4017,
+        *range(0x4018, 0x4020),
+    ]
+    assert all(
+        dma_read_cpu_space(
+            address,
+            ram,
+            ppu_read=forbidden,
+            cartridge_read=forbidden,
+        ) == 0
+        for address in unsupported
+    )
 
 
 def test_future_io_and_unmapped_regions_are_deterministically_decoded() -> None:

@@ -34,8 +34,10 @@ reset-vector boot path. APU, advanced mappers, physical cartridge loading,
 and audio remain future work. Phase 4C adds two authentic NES serial
 controller ports, an abstract synchronized input boundary, DE1-SoC Controller
 1 switch mapping, exhaustive protocol verification, and a cartridge program
-that polls both ports into CPU RAM. Native HDMI and physical VGA observation
-remain outstanding.
+that polls both ports into CPU RAM. Phase 4D-A extracts the verified OAM DMA
+sequencer into a standalone internal bus master with explicit CPU/DMA
+arbitration, cartridge-source reads, and expanded passive diagnostics. Native
+HDMI and physical VGA observation remain outstanding.
 
 ## Phase 1 foundation
 
@@ -401,6 +403,22 @@ The protocol, board mapping, synchronization/debounce decision, end-to-end
 data flow, verification, physical procedure, and Phase 4D boundary are in
 [`docs/phase4c-controllers.md`](docs/phase4c-controllers.md).
 
+## Phase 4D-A OAM DMA bus master
+
+- Existing 513/514-slot sequencer extracted into `nes_oam_dma`
+- Explicit CPU/DMA ownership in `nes_internal_bus_arbiter`
+- Preserved dummy, optional alignment, read/write, and completion behavior
+- Full 256-byte source sequence and `$2004` destination semantics
+- CPU RAM mirror, PPU-register, cartridge, and deterministic I/O-source policy
+- Verified cartridge-page DMA through the existing Mapper 0 interface
+- Stable CPU architectural state during stalls and exact post-DMA resume
+- NMI tests before, during, near completion, and immediately after DMA
+- Controller isolation and passive owner/source/phase diagnostics
+
+The preserved behavior, arbitration rules, verification, and Phase 4D-B
+playable-ROM recommendation are documented in
+[`docs/phase4d-a-oam-dma-bus-master.md`](docs/phase4d-a-oam-dma-bus-master.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -435,7 +453,8 @@ Run the normal suite from the repository root:
 
 This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
-Phase 4C exhaustive controller and integrated cartridge-poll tests, PPU
+Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
+4D-A standalone/arbiter/integrated DMA and NMI tests, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -448,7 +467,10 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_sprite_renderer.fst`, `ppu_phase3g.fst`, `ppu_phase3h.fst`,
 `ppu_phase3i.fst`, `nes_phase4a_bus.fst`, `mapper0_phase4b.fst`,
 `nes_phase4b_boot.fst`, `nes_controller_phase4c.fst`,
-`nes_phase4c_controller.fst`, `nes_phase3j.fst`, `vga_phase3k.fst`,
+`nes_phase4c_controller.fst`, `nes_oam_dma_phase4d.fst`,
+`nes_internal_bus_arbiter_phase4d.fst`,
+`nes_phase4d_dma_integration.fst`, `nes_phase4d_dma_nmi.fst`,
+`nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -535,8 +557,8 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4C DE1-SoC NES/VGA/controller SOF/RBF and run its
-fitter/timing checks:
+Build the current Phase 4D-A DE1-SoC NES/VGA image and run its fitter/timing
+checks:
 
 ```bash
 ./scripts/build_de1_soc_nes_vga_quartus.sh
@@ -576,6 +598,7 @@ before use.
 - `rtl/system` — NES CPU address decoder, system bus, and internal CPU RAM
 - `rtl/cartridge` — generic cartridge shell and Mapper 0/NROM storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
+- `rtl/dma` — standalone OAM DMA bus master
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
 - `rtl/apu`, `rtl/memory` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches

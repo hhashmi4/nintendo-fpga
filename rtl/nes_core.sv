@@ -73,6 +73,15 @@ module nes_core (
     output logic        dma_read_event,
     output logic        dma_write_event,
     output logic        dma_complete_event,
+    output logic        dma_start_event,
+    output logic        dma_cpu_stall,
+    output logic [15:0] dma_source_address,
+    output logic [7:0]  dma_source_data,
+    output logic        dma_started_odd,
+    output logic        dma_dummy_cycle,
+    output logic        dma_alignment_cycle,
+    output nes_system_pkg::nes_cpu_target_t dma_source_target,
+    output nes_system_pkg::nes_bus_master_t internal_bus_owner,
 
     output logic [8:0]  ppu_dot,
     output logic [8:0]  ppu_scanline,
@@ -101,21 +110,10 @@ module nes_core (
 );
     import nes_system_pkg::*;
 
-    localparam logic [2:0] DMA_IDLE  = 3'd0;
-    localparam logic [2:0] DMA_DUMMY = 3'd1;
-    localparam logic [2:0] DMA_ALIGN = 3'd2;
-    localparam logic [2:0] DMA_READ  = 3'd3;
-    localparam logic [2:0] DMA_WRITE = 3'd4;
-
     logic cpu_cycle_parity;
-    logic dma_start_odd;
-    logic [15:0] dma_source_address;
-    logic [7:0] dma_source_read_data;
+    logic dma_source_read_request;
     logic [10:0] shared_ram_read_address;
     logic [7:0] cpu_ram_read_data;
-    nes_cpu_target_t dma_source_target;
-    logic [10:0] dma_ram_address;
-    logic [2:0] dma_ppu_register;
 
     logic [7:0] ppu_cpu_read_data;
     logic ppu_cpu_enable;
@@ -147,26 +145,10 @@ module nes_core (
 
     assign ppu_enable = !reset && nes_enable;
     assign cpu_cycle_slot = ppu_enable && scheduler_phase == 2'd2;
-    assign cpu_enable = cpu_cycle_slot && !dma_active;
+    assign cpu_enable = cpu_cycle_slot && !dma_cpu_stall;
     assign cpu_read_enable = !reset && cpu_bus_valid && !cpu_write_enable;
 
     assign dma_trigger = bus_dma_write;
-
-    assign dma_source_address = {dma_page, dma_index};
-
-    nes_cpu_address_decoder dma_source_decoder (
-        .address      (dma_source_address),
-        .write_enable(1'b0),
-        .target       (dma_source_target),
-        .ram_address  (dma_ram_address),
-        .ppu_register (dma_ppu_register)
-    );
-
-    // The CPU is stalled during DMA, so one muxed registered read port is
-    // sufficient for both clients and avoids replicating the 2 KiB RAM.
-    assign shared_ram_read_address = dma_active && dma_phase == DMA_READ ?
-                                     dma_ram_address :
-                                     cpu_ram_address;
 
     nes_cpu_ram internal_cpu_ram (
         .clk          (clk),
@@ -220,124 +202,82 @@ module nes_core (
         .cartridge_access         (cpu_cartridge_access)
     );
 
-    always_comb begin
-        dma_source_read_data = 8'h00;
-        case (dma_source_target)
-            NES_CPU_TARGET_RAM: dma_source_read_data = cpu_ram_read_data;
-            NES_CPU_TARGET_PPU: dma_source_read_data = ppu_cpu_read_data;
-            NES_CPU_TARGET_CARTRIDGE:
-                dma_source_read_data = cart_cpu_read_data;
-            default: dma_source_read_data = 8'h00;
-        endcase
-    end
+    nes_oam_dma oam_dma (
+        .clk                (clk),
+        .reset              (reset),
+        .cpu_cycle_slot     (cpu_cycle_slot),
+        .cpu_cycle_odd      (cpu_cycle_parity),
+        .trigger            (dma_trigger),
+        .trigger_page       (bus_dma_write_data),
+        .source_read_data   (dma_source_data),
+        .source_address     (dma_source_address),
+        .source_read_request(dma_source_read_request),
+        .source_read_event  (dma_read_event),
+        .oam_write_data     (dma_data),
+        .oam_write_strobe   (dma_write_event),
+        .active             (dma_active),
+        .cpu_stall          (dma_cpu_stall),
+        .phase              (dma_phase),
+        .source_page        (dma_page),
+        .byte_index         (dma_index),
+        .started_odd        (dma_started_odd),
+        .start_event        (dma_start_event),
+        .complete_event     (dma_complete_event),
+        .dummy_cycle        (dma_dummy_cycle),
+        .alignment_cycle    (dma_alignment_cycle),
+        .elapsed_cpu_cycles (dma_stall_cycles),
+        .read_count         (dma_read_count),
+        .write_count        (dma_write_count)
+    );
 
-    always_comb begin
-        // The real CPU owns the PPU register port except for DMA source reads
-        // from $2000-$3fff and DMA destination writes to $2004.
-        ppu_cpu_enable = cpu_enable;
-        ppu_cpu_valid = bus_ppu_read || bus_ppu_write;
-        ppu_cpu_write = bus_ppu_write;
-        ppu_cpu_address = bus_ppu_address;
-        ppu_cpu_write_data = cpu_write_data;
-        if (dma_active) begin
-            ppu_cpu_enable = cpu_cycle_slot;
-            ppu_cpu_valid = 1'b0;
-            ppu_cpu_write = 1'b0;
-            ppu_cpu_address = {13'h400, dma_ppu_register};
-            ppu_cpu_write_data = 8'h00;
-            if (dma_phase == DMA_READ &&
-                dma_source_target == NES_CPU_TARGET_PPU) begin
-                ppu_cpu_valid = 1'b1;
-            end else if (dma_phase == DMA_WRITE) begin
-                ppu_cpu_valid = 1'b1;
-                ppu_cpu_write = 1'b1;
-                ppu_cpu_address = 16'h2004;
-                ppu_cpu_write_data = dma_data;
-            end
-        end
-    end
-
-    always_comb begin
-        cart_cpu_address = bus_cart_address;
-        cart_cpu_read = bus_cart_read;
-        cart_cpu_write = bus_cart_write;
-        cart_cpu_write_data = bus_cart_write_data;
-        if (dma_active && dma_phase == DMA_READ && cpu_cycle_slot &&
-            dma_source_target == NES_CPU_TARGET_CARTRIDGE) begin
-            cart_cpu_address = dma_source_address;
-            cart_cpu_read = 1'b1;
-            cart_cpu_write = 1'b0;
-            cart_cpu_write_data = 8'h00;
-        end
-    end
-
-    assign dma_read_event = dma_active && cpu_cycle_slot &&
-                            dma_phase == DMA_READ;
-    assign dma_write_event = dma_active && cpu_cycle_slot &&
-                             dma_phase == DMA_WRITE;
+    nes_internal_bus_arbiter internal_bus_arbiter (
+        .reset                   (reset),
+        .cpu_ram_read_address    (cpu_ram_address),
+        .cpu_ppu_enable          (cpu_enable),
+        .cpu_ppu_valid           (bus_ppu_read || bus_ppu_write),
+        .cpu_ppu_write           (bus_ppu_write),
+        .cpu_ppu_address         (bus_ppu_address),
+        .cpu_ppu_write_data      (cpu_write_data),
+        .cpu_cart_address        (bus_cart_address),
+        .cpu_cart_read           (bus_cart_read),
+        .cpu_cart_write          (bus_cart_write),
+        .cpu_cart_write_data     (bus_cart_write_data),
+        .dma_active              (dma_active),
+        .dma_cycle_slot          (cpu_cycle_slot),
+        .dma_source_read_request (dma_source_read_request),
+        .dma_source_read_event   (dma_read_event),
+        .dma_oam_write_event     (dma_write_event),
+        .dma_source_address      (dma_source_address),
+        .dma_oam_write_data      (dma_data),
+        .ram_read_data           (cpu_ram_read_data),
+        .ppu_read_data           (ppu_cpu_read_data),
+        .cart_read_data          (cart_cpu_read_data),
+        .bus_owner               (internal_bus_owner),
+        .dma_source_target       (dma_source_target),
+        .shared_ram_read_address (shared_ram_read_address),
+        .dma_source_read_data    (dma_source_data),
+        .ppu_enable              (ppu_cpu_enable),
+        .ppu_valid               (ppu_cpu_valid),
+        .ppu_write               (ppu_cpu_write),
+        .ppu_address             (ppu_cpu_address),
+        .ppu_write_data          (ppu_cpu_write_data),
+        .cart_address            (cart_cpu_address),
+        .cart_read               (cart_cpu_read),
+        .cart_write              (cart_cpu_write),
+        .cart_write_data         (cart_cpu_write_data)
+    );
 
     always_ff @(posedge clk) begin
         if (reset) begin
             scheduler_phase   <= 2'd0;
             cpu_cycle_parity  <= 1'b0;
-            dma_active        <= 1'b0;
-            dma_phase         <= DMA_IDLE;
-            dma_page          <= 8'h00;
-            dma_index         <= 8'h00;
-            dma_data          <= 8'h00;
-            dma_start_odd     <= 1'b0;
-            dma_stall_cycles  <= 10'd0;
-            dma_read_count    <= 9'd0;
-            dma_write_count   <= 9'd0;
-            dma_complete_event <= 1'b0;
         end else begin
-            dma_complete_event <= 1'b0;
-
             if (nes_enable)
                 scheduler_phase <= scheduler_phase == 2'd2 ? 2'd0 :
                                    scheduler_phase + 2'd1;
 
             if (cpu_cycle_slot)
                 cpu_cycle_parity <= !cpu_cycle_parity;
-
-            if (dma_trigger) begin
-                dma_active       <= 1'b1;
-                dma_phase        <= DMA_DUMMY;
-                dma_page         <= bus_dma_write_data;
-                dma_index        <= 8'h00;
-                dma_start_odd    <= cpu_cycle_parity;
-                dma_stall_cycles <= 10'd0;
-                dma_read_count   <= 9'd0;
-                dma_write_count  <= 9'd0;
-            end else if (dma_active && cpu_cycle_slot) begin
-                dma_stall_cycles <= dma_stall_cycles + 10'd1;
-                case (dma_phase)
-                    DMA_DUMMY: begin
-                        dma_phase <= dma_start_odd ? DMA_ALIGN : DMA_READ;
-                    end
-                    DMA_ALIGN: dma_phase <= DMA_READ;
-                    DMA_READ: begin
-                        dma_data <= dma_source_read_data;
-                        dma_read_count <= dma_read_count + 9'd1;
-                        dma_phase <= DMA_WRITE;
-                    end
-                    DMA_WRITE: begin
-                        dma_write_count <= dma_write_count + 9'd1;
-                        if (dma_index == 8'hff) begin
-                            dma_active <= 1'b0;
-                            dma_phase <= DMA_IDLE;
-                            dma_complete_event <= 1'b1;
-                        end else begin
-                            dma_index <= dma_index + 8'd1;
-                            dma_phase <= DMA_READ;
-                        end
-                    end
-                    default: begin
-                        dma_active <= 1'b0;
-                        dma_phase <= DMA_IDLE;
-                    end
-                endcase
-            end
         end
     end
 
@@ -429,18 +369,20 @@ module nes_core (
                       previous_scheduler_phase + 2'd1) :
                      previous_scheduler_phase));
             assert (!(cpu_enable && dma_active));
+            assert (internal_bus_owner ==
+                    (dma_active ? NES_BUS_MASTER_DMA : NES_BUS_MASTER_CPU));
             assert (!(cart_cpu_read && cart_cpu_write));
             assert (!(cpu_ram_read && cpu_ram_write));
             assert (!(dma_read_event && dma_write_event));
-            assert (dma_phase <= DMA_WRITE);
+            assert (dma_phase <= NES_DMA_WRITE);
             if (dma_write_event)
                 assert (ppu_cpu_enable && ppu_cpu_valid && ppu_cpu_write &&
                         ppu_cpu_address == 16'h2004);
             if (dma_complete_event) begin
                 assert (dma_read_count == 9'd256);
                 assert (dma_write_count == 9'd256);
-                assert (dma_stall_cycles == (dma_start_odd ? 10'd514 :
-                                                              10'd513));
+                assert (dma_stall_cycles == (dma_started_odd ? 10'd514 :
+                                                               10'd513));
             end
             if (previous_dma_active && dma_active)
                 assert (!cpu_enable);
