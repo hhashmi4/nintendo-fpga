@@ -29,6 +29,7 @@ set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
 set_location_assignment PIN_AF14 -to clk
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk
 set_instance_assignment -name VIRTUAL_PIN ON -to reset
+set_instance_assignment -name VIRTUAL_PIN ON -to nes_enable
 set_instance_assignment -name VIRTUAL_PIN ON -to irq
 set_instance_assignment -name VIRTUAL_PIN ON -to mirroring_mode[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_address[*]

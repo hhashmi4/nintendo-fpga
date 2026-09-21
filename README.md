@@ -22,8 +22,11 @@ and sprite candidates, reads palette RAM, emits final six-bit NES colors plus
 emphasis metadata, and implements sprite-zero hit. Phase 3I adds VBlank/NMI
 condition timing and boundary suppression. Phase 3J integrates the CPU, PPU,
 2 KiB CPU RAM, NES bus decode, 3:1 scheduler, cartridge boundaries, NMI, and
-513/514-cycle OAM DMA as one NES core. RGB conversion, APU, mapper, video
-output, and controllers do not exist yet.
+513/514-cycle OAM DMA as one NES core. Phase 3K adds real-rate NES enables, a
+triple M10K framebuffer, safe NES/VGA frame handoff, 2x scaling, deterministic
+NES-to-RGB conversion, and a synthesized 640x480 DE1-SoC VGA board image. APU,
+mapper, cartridge loading, controllers, audio, and native HDMI do not exist
+yet; physical VGA observation remains outstanding.
 
 ## Phase 1 foundation
 
@@ -326,6 +329,21 @@ verification evidence, synthesis results, and deferred video/controller work
 are documented in
 [`docs/phase3j-cpu-ppu-integration.md`](docs/phase3j-cpu-ppu-integration.md).
 
+## Phase 3K DE1-SoC VGA output
+
+- NTSC-average PPU/CPU enables at 5.369318182/1.789772727 MHz with exact 3:1
+- PLL-derived 25.2 MHz, 800x525, active-low-sync 640x480p60 VGA
+- Three 256x240x9 dual-clock M10K framebuffers with frame-safe CDC ownership
+- Exact centered 2x scaling to 512x480 and two black 64-pixel side borders
+- Deterministic 64-color RGB palette and digital emphasis approximation
+- Independent switch-selected color bars and CPU/PPU/DMA-driven NES scene
+- Two complete 307,200-pixel Python comparisons with zero mismatches
+- Dedicated board top and SOF/RBF flow; physical monitor confirmation pending
+
+Architecture, board pins, clocking, framebuffer handoff, tests, build data,
+Mac programming commands, physical expectations, and troubleshooting are in
+[`docs/phase3k-de1soc-vga.md`](docs/phase3k-de1soc-vga.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -361,14 +379,15 @@ Run the normal suite from the repository root:
 This runs pytest, synthesizable RTL lint, and the self-checking platform, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
-Phase 2K board-program simulation, plus the Phase 3J integrated system and NMI
-sampling programs.
+Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
+and Phase 3K timing, framebuffer, CDC, full-frame, and integrated NES/VGA
+programs.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
 `ppu_oam.fst`, `ppu_phase3f.fst`,
 `ppu_sprite_renderer.fst`, `ppu_phase3g.fst`, `ppu_phase3h.fst`,
-`ppu_phase3i.fst`, `nes_phase3j.fst`,
+`ppu_phase3i.fst`, `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -453,6 +472,12 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 
 ```bash
 ./scripts/build_nes_phase3j_quartus.sh
+```
+
+Build the Phase 3K DE1-SoC VGA SOF/RBF and run its fitter/timing checks:
+
+```bash
+./scripts/build_de1_soc_nes_vga_quartus.sh
 ```
 
 Build the SOF and RBF locally:

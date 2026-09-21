@@ -31,6 +31,7 @@ module nes_phase3j_nmi_tb;
     nes_core dut (
         .clk                  (clk),
         .reset                (reset),
+        .nes_enable           (1'b1),
         .irq                  (1'b0),
         .mirroring_mode       (2'b00),
         .cart_cpu_address     (cart_cpu_address),

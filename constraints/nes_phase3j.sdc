@@ -3,7 +3,7 @@
 create_clock -name clk -period 20.000 [get_ports {clk}]
 
 set_false_path -from [get_ports {
-    reset irq mirroring_mode[*] cart_cpu_read_data[*] chr_read_data[*]
+    reset nes_enable irq mirroring_mode[*] cart_cpu_read_data[*] chr_read_data[*]
 }]
 
 set_false_path -to [get_ports {
