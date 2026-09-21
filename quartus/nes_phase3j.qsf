@@ -7,6 +7,10 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_alu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_decoder.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_address_gen.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_system_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_address_decoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_ram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_timing.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_scroll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_registers.sv
@@ -37,6 +41,16 @@ set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_read
 set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_write
 set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_write_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cart_cpu_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to apu_cpu_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to apu_cpu_read
+set_instance_assignment -name VIRTUAL_PIN ON -to apu_cpu_write
+set_instance_assignment -name VIRTUAL_PIN ON -to apu_cpu_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to apu_cpu_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to controller_port
+set_instance_assignment -name VIRTUAL_PIN ON -to controller_cpu_read
+set_instance_assignment -name VIRTUAL_PIN ON -to controller_cpu_write
+set_instance_assignment -name VIRTUAL_PIN ON -to controller_cpu_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to controller_cpu_read_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to chr_addr[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to chr_read
 set_instance_assignment -name VIRTUAL_PIN ON -to chr_write
@@ -50,12 +64,23 @@ set_instance_assignment -name VIRTUAL_PIN ON -to cpu_address[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_write_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_read_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_write_enable
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_read_enable
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_bus_valid
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_a[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_x[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_y[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_sp[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_pc[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_debug_status[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_bus_target[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_ram_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_ppu_register[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_ram_access
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_ppu_access
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_apu_access
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_dma_access
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_controller_access
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_cartridge_access
 set_instance_assignment -name VIRTUAL_PIN ON -to dma_active
 set_instance_assignment -name VIRTUAL_PIN ON -to dma_phase[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to dma_page[*]

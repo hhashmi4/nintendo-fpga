@@ -24,6 +24,7 @@ mkdir -p \
     build/verilator/ppu_pixel_mixer \
     build/verilator/ppu_phase3h \
     build/verilator/ppu_phase3i \
+    build/verilator/nes_phase4a_bus \
     build/verilator/nes_phase3j \
     build/verilator/nes_phase3j_nmi \
     build/verilator/vga_timing_phase3k \
@@ -88,6 +89,8 @@ PPU_PHASE3H_STATS="build/sim/ppu_phase3h_frame_stats.txt"
 PPU_PHASE3I_WAVEFORM="build/sim/ppu_phase3i.fst"
 PPU_PHASE3I_REFERENCE="build/sim/ppu_phase3i_reference.txt"
 PPU_PHASE3I_STATS="build/sim/ppu_phase3i_stats.txt"
+NES_PHASE4A_BUS_WAVEFORM="build/sim/nes_phase4a_bus.fst"
+NES_PHASE4A_BUS_REFERENCE="build/sim/nes_phase4a_bus_reference.txt"
 NES_PHASE3J_WAVEFORM="build/sim/nes_phase3j.fst"
 VGA_PHASE3K_WAVEFORM="build/sim/vga_phase3k.fst"
 VGA_PHASE3K_TRACE="build/sim/vga_phase3k_pixels.txt"
@@ -151,6 +154,8 @@ rm -f \
     "$PPU_PHASE3I_WAVEFORM" \
     "$PPU_PHASE3I_REFERENCE" \
     "$PPU_PHASE3I_STATS" \
+    "$NES_PHASE4A_BUS_WAVEFORM" \
+    "$NES_PHASE4A_BUS_REFERENCE" \
     "$NES_PHASE3J_WAVEFORM" \
     "$VGA_PHASE3K_WAVEFORM" \
     "$VGA_PHASE3K_TRACE" \
@@ -188,6 +193,26 @@ build/verilator/platform/platform_foundation_tb
 
 if [[ ! -s "$PLATFORM_WAVEFORM" ]]; then
     echo "ERROR: simulation did not generate a non-empty $PLATFORM_WAVEFORM" >&2
+    exit 1
+fi
+
+python3 scripts/generate_nes_phase4a_vectors.py "$NES_PHASE4A_BUS_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_phase4a_bus \
+    --top-module nes_phase4a_bus_tb \
+    -o nes_phase4a_bus_tb \
+    rtl/system/nes_system_pkg.sv \
+    rtl/system/nes_cpu_address_decoder.sv \
+    rtl/system/nes_cpu_ram.sv \
+    rtl/system/nes_cpu_bus.sv \
+    sim/nes_phase4a_bus_tb.sv
+
+build/verilator/nes_phase4a_bus/nes_phase4a_bus_tb
+
+if [[ ! -s "$NES_PHASE4A_BUS_WAVEFORM" ]]; then
+    echo "ERROR: simulation did not generate a non-empty $NES_PHASE4A_BUS_WAVEFORM" >&2
     exit 1
 fi
 
@@ -554,6 +579,10 @@ NES_PHASE3J_RTL_FILES=(
     rtl/cpu/cpu_decoder.sv
     rtl/cpu/cpu_address_gen.sv
     rtl/cpu/cpu_core.sv
+    rtl/system/nes_system_pkg.sv
+    rtl/system/nes_cpu_address_decoder.sv
+    rtl/system/nes_cpu_ram.sv
+    rtl/system/nes_cpu_bus.sv
     rtl/ppu/ppu_timing.sv
     rtl/ppu/ppu_scroll.sv
     rtl/ppu/ppu_registers.sv
@@ -923,6 +952,7 @@ echo "PPU sprite renderer waveform: $ROOT_DIR/$PPU_SPRITE_RENDERER_WAVEFORM"
 echo "PPU Phase 3G waveform: $ROOT_DIR/$PPU_PHASE3G_WAVEFORM"
 echo "PPU Phase 3H waveform: $ROOT_DIR/$PPU_PHASE3H_WAVEFORM"
 echo "PPU Phase 3I waveform: $ROOT_DIR/$PPU_PHASE3I_WAVEFORM"
+echo "NES Phase 4A bus waveform: $ROOT_DIR/$NES_PHASE4A_BUS_WAVEFORM"
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"

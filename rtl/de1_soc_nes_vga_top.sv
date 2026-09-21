@@ -136,6 +136,7 @@ module de1_soc_nes_vga_top (
     );
 
     /* verilator lint_off PINCONNECTEMPTY */
+    /* verilator lint_off PINMISSING */
     nes_core nes (
         .clk(CLOCK_50),
         .reset(system_reset),
@@ -147,6 +148,16 @@ module de1_soc_nes_vga_top (
         .cart_cpu_write(cart_cpu_write),
         .cart_cpu_write_data(cart_cpu_write_data),
         .cart_cpu_read_data(cart_cpu_read_data),
+        .apu_cpu_address(),
+        .apu_cpu_read(),
+        .apu_cpu_write(),
+        .apu_cpu_write_data(),
+        .apu_cpu_read_data(8'h00),
+        .controller_port(),
+        .controller_cpu_read(),
+        .controller_cpu_write(),
+        .controller_cpu_write_data(),
+        .controller_cpu_read_data(8'h00),
         .chr_addr(chr_address),
         .chr_read(chr_read),
         .chr_write(chr_write),
@@ -160,12 +171,23 @@ module de1_soc_nes_vga_top (
         .cpu_write_data(),
         .cpu_read_data(),
         .cpu_write_enable(),
+        .cpu_read_enable(),
         .cpu_bus_valid(),
         .cpu_debug_a(),
         .cpu_debug_x(),
         .cpu_debug_y(),
         .cpu_debug_sp(),
         .cpu_debug_pc(cpu_debug_pc),
+        .cpu_debug_status(),
+        .cpu_bus_target(),
+        .cpu_ram_address(),
+        .cpu_ppu_register(),
+        .cpu_ram_access(),
+        .cpu_ppu_access(),
+        .cpu_apu_access(),
+        .cpu_dma_access(),
+        .cpu_controller_access(),
+        .cpu_cartridge_access(),
         .dma_active(),
         .dma_phase(),
         .dma_page(),
@@ -201,6 +223,7 @@ module de1_soc_nes_vga_top (
         .pixel_color_emphasis(pixel_emphasis),
         .pixel_source()
     );
+    /* verilator lint_on PINMISSING */
     /* verilator lint_on PINCONNECTEMPTY */
 
     nes_vga_diag_memory diagnostic_cartridge (

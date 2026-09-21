@@ -11,6 +11,10 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_alu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_decoder.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_address_gen.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cpu/cpu_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_system_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_address_decoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_ram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_timing.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_scroll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_registers.sv

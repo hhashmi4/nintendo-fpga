@@ -24,7 +24,10 @@ condition timing and boundary suppression. Phase 3J integrates the CPU, PPU,
 2 KiB CPU RAM, NES bus decode, 3:1 scheduler, cartridge boundaries, NMI, and
 513/514-cycle OAM DMA as one NES core. Phase 3K adds real-rate NES enables, a
 triple M10K framebuffer, safe NES/VGA frame handoff, 2x scaling, deterministic
-NES-to-RGB conversion, and a synthesized 640x480 DE1-SoC VGA board image. APU,
+NES-to-RGB conversion, and a synthesized 640x480 DE1-SoC VGA board image.
+Phase 4A separates the NES CPU bus, complete memory decode, mirrored 2 KiB RAM,
+and future APU/controller/cartridge boundaries while preserving the verified
+CPU, PPU, and DMA behavior. APU,
 mapper, cartridge loading, controllers, audio, and native HDMI do not exist
 yet; physical VGA observation remains outstanding.
 
@@ -344,6 +347,21 @@ Architecture, board pins, clocking, framebuffer handoff, tests, build data,
 Mac programming commands, physical expectations, and troubleshooting are in
 [`docs/phase3k-de1soc-vga.md`](docs/phase3k-de1soc-vga.md).
 
+## Phase 4A system bus integration
+
+- Dedicated CPU decoder/router with one-owner read-data arbitration
+- One physical 2 KiB CPU RAM mirrored through `$1FFF`
+- Existing eight PPU registers mirrored through `$3FFF` without duplication
+- Direction-correct APU, `$4014` DMA, and `$4016/$4017` controller boundaries
+- Replaceable full-address cartridge CPU interface for `$4020-$FFFF`
+- Passive CPU, PPU, DMA, and selected-target diagnostic outputs
+- Exhaustive 65,536-address Python checks and 131,072 read/write RTL vectors
+- Preserved one-clock, clock-enable-only 3:1 PPU/CPU relationship
+
+The memory map, interfaces, reset/clock contracts, verification, and future
+VGA/debug/HDMI architecture are documented in
+[`docs/phase4a-system-bus.md`](docs/phase4a-system-bus.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -376,7 +394,8 @@ Run the normal suite from the repository root:
 ./scripts/test.sh
 ```
 
-This runs pytest, synthesizable RTL lint, and the self-checking platform, PPU
+This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
+4A exhaustive system-bus/RAM test, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -387,7 +406,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
 `ppu_oam.fst`, `ppu_phase3f.fst`,
 `ppu_sprite_renderer.fst`, `ppu_phase3g.fst`, `ppu_phase3h.fst`,
-`ppu_phase3i.fst`, `nes_phase3j.fst`, `vga_phase3k.fst`,
+`ppu_phase3i.fst`, `nes_phase4a_bus.fst`, `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
 `cpu_phase2e.fst`, `cpu_phase2f.fst`, `cpu_phase2g.fst`, and
@@ -511,6 +530,7 @@ before use.
 - `rtl/diagnostic` — removable hardware diagnostic
 - `rtl/cpu` — CPU state, ALU, addressing, decoder, and shared instruction sequencer
 - `rtl/ppu` — PPU timing, CPU registers, memory map, and integrated cores
+- `rtl/system` — NES CPU address decoder, system bus, and internal CPU RAM
 - `rtl/apu` — reserved for later phases
 - `rtl/memory`, `rtl/cartridge`, `rtl/controller`, `rtl/video` — reserved
 - `sim` — self-checking SystemVerilog testbenches

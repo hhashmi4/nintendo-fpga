@@ -20,10 +20,12 @@ def test_cpu_decode_is_exhaustive_and_one_hot() -> None:
         elif target == CpuTarget.CARTRIDGE:
             assert physical == address
     assert counts == {
+        CpuTarget.NONE: 0x0008,
         CpuTarget.RAM: 0x2000,
         CpuTarget.PPU: 0x2000,
-        CpuTarget.DMA: 1,
-        CpuTarget.OPEN: 0x1F,
+        CpuTarget.APU: 0x0015,
+        CpuTarget.DMA: 0x0001,
+        CpuTarget.CONTROLLER: 0x0002,
         CpuTarget.CARTRIDGE: 0xBFE0,
     }
 
@@ -103,9 +105,13 @@ def test_dma_never_duplicates_or_skips_an_address() -> None:
     assert model.reads == model.writes == 256
 
 
-def test_open_bus_region_is_deterministically_decoded() -> None:
-    for address in (*range(0x4000, 0x4014), *range(0x4015, 0x4020)):
-        assert decode_cpu_address(address) == (CpuTarget.OPEN, 0)
+def test_future_io_and_unmapped_regions_are_deterministically_decoded() -> None:
+    for address in (*range(0x4000, 0x4014), 0x4015):
+        assert decode_cpu_address(address)[0] == CpuTarget.APU
+    assert decode_cpu_address(0x4016)[0] == CpuTarget.CONTROLLER
+    assert decode_cpu_address(0x4017)[0] == CpuTarget.CONTROLLER
+    for address in range(0x4018, 0x4020):
+        assert decode_cpu_address(address) == (CpuTarget.NONE, 0)
 
 
 def test_deterministic_randomized_scheduler_bus_and_dma_reference() -> None:

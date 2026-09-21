@@ -98,12 +98,28 @@ CPU_RTL_FILES=(
     rtl/cpu/cpu_core.sv
 )
 
+SYSTEM_BUS_RTL_FILES=(
+    rtl/system/nes_system_pkg.sv
+    rtl/system/nes_cpu_address_decoder.sv
+    rtl/system/nes_cpu_bus.sv
+)
+
+verilator --lint-only --Wall \
+    --top-module nes_cpu_bus \
+    "${SYSTEM_BUS_RTL_FILES[@]}"
+
+verilator --lint-only --Wall \
+    --top-module nes_cpu_ram \
+    rtl/system/nes_cpu_ram.sv
+
 verilator --lint-only --Wall -Wno-fatal \
     --top-module cpu_core \
     "${CPU_RTL_FILES[@]}"
 
 NES_RTL_FILES=(
     "${CPU_RTL_FILES[@]}"
+    "${SYSTEM_BUS_RTL_FILES[@]}"
+    rtl/system/nes_cpu_ram.sv
     rtl/ppu/ppu_timing.sv
     rtl/ppu/ppu_scroll.sv
     rtl/ppu/ppu_registers.sv
