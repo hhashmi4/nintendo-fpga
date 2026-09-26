@@ -109,12 +109,26 @@ package nes_debug_snapshot_pkg;
     } nes_system_debug_snapshot_t;
 
     typedef struct packed {
+        logic [2:0] state;
+        logic [2:0] last_command;
+        logic [15:0] sequence_id;
+        logic [1:0] result;
+        logic [15:0] instruction_steps;
+        logic [15:0] frame_steps;
+        logic [2:0] boundary;
+        logic [15:0] pc_before;
+        logic [15:0] pc_after;
+        logic [15:0] frame_overrun;
+    } nes_debugger_snapshot_t;
+
+    typedef struct packed {
         nes_cpu_debug_snapshot_t        cpu;
         nes_ppu_debug_snapshot_t        ppu;
         nes_cartridge_debug_snapshot_t  cartridge;
         nes_controller_debug_snapshot_t controller;
         nes_dma_debug_snapshot_t        dma;
         nes_system_debug_snapshot_t     system;
+        nes_debugger_snapshot_t          debugger;
     } nes_debug_snapshot_t;
 
     localparam int unsigned NES_CPU_DEBUG_SNAPSHOT_BITS =

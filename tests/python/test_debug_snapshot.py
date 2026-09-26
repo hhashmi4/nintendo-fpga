@@ -19,8 +19,9 @@ def test_snapshot_group_and_total_widths_match_rtl() -> None:
         "controller": 46,
         "dma": 90,
         "system": 320,
+        "debugger": 107,
     }
-    assert SNAPSHOT_WIDTH == 711
+    assert SNAPSHOT_WIDTH == 818
 
 
 def test_snapshot_pack_round_trip_and_boundaries() -> None:

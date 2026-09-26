@@ -48,6 +48,11 @@ FIELD_WIDTHS: dict[str, dict[str, int]] = {
         "prg_read_count": 32, "chr_read_count": 32,
         "missed_capture_count": 32,
     },
+    "debugger": {
+        "state": 3, "last_command": 3, "sequence_id": 16, "result": 2,
+        "instruction_steps": 16, "frame_steps": 16, "boundary": 3,
+        "pc_before": 16, "pc_after": 16, "frame_overrun": 16,
+    },
 }
 
 GROUP_WIDTHS = {

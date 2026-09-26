@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from dataclasses import replace
 import sys
 from pathlib import Path
 
@@ -51,7 +52,12 @@ def main() -> None:
     for page in range(5):
         trace = args.trace_directory / f"phase4ed_page{page}_combined_pixels.txt"
         observed = read_trace(trace)
-        reference = render_combined_frame(game, DemoSnapshot(), page=page)
+        fixture = replace(DemoSnapshot(), debugger_state=page,
+                          debugger_command=2, debugger_sequence=0x1234,
+                          debugger_result=2, instruction_steps=17, frame_steps=3,
+                          pause_boundary=2, step_pc_before=0x8000,
+                          step_pc_after=0x8030, frame_overrun=123)
+        reference = render_combined_frame(game, fixture, page=page)
         if len(observed) != len(reference):
             raise SystemExit(
                 f"page {page}: frame length mismatch: observed={len(observed)} "

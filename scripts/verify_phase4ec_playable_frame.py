@@ -37,6 +37,17 @@ def load_snapshot(path: Path) -> DemoSnapshot:
         dma_index=values["dma_index"], snapshot_id=values["snapshot_id"],
         source_frame=values["source_frame"], nmi_count=values["nmi_count"],
         dma_count=values["dma_count"],
+        debugger_state=values.get("debugger_state", 0),
+        debugger_command=values.get("debugger_command", 0),
+        debugger_result=values.get("debugger_result", 0),
+        debugger_sequence=values.get("debugger_sequence", 0),
+        instruction_steps=values.get("instruction_steps", 0),
+        frame_steps=values.get("frame_steps", 0),
+        step_pc_before=values.get("step_pc_before", 0),
+        step_pc_after=values.get("step_pc_after", 0),
+        frame_overrun=values.get("frame_overrun", 0),
+        pause_boundary=values.get("pause_boundary", 0),
+
     )
 
 

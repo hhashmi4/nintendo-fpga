@@ -938,6 +938,56 @@ module nes_debug_panel_renderer #(
         end
     end
 
+    function automatic logic [7:0] debugger_state_character(input logic [3:0] index);
+        case (snapshot.debugger.state)
+            3'd0: debugger_state_character = literal_character("RUN", 5'd3, index);
+            3'd1: debugger_state_character = literal_character("WAIT", 5'd4, index);
+            3'd2: debugger_state_character = literal_character("PAUSE", 5'd5, index);
+            3'd3: debugger_state_character = literal_character("STEP-I", 5'd6, index);
+            3'd4: debugger_state_character = literal_character("STEP-F", 5'd6, index);
+            default: debugger_state_character = 8'h3f;
+        endcase
+    endfunction
+
+    function automatic logic [7:0] debugger_character(
+        input logic [4:0] row, input logic [3:0] column);
+        logic [127:0] label_text;
+        logic [4:0] label_length;
+        logic [15:0] value;
+        begin
+            label_text = '0;
+            label_length = 5'd0;
+            value = 16'd0;
+            case (row)
+                5'd0: begin label_text = "DEBUG"; label_length = 5'd5; end
+                5'd2: begin label_text = "SEQ"; label_length = 5'd3; value = snapshot.debugger.sequence_id; end
+                5'd3: begin label_text = "STEP-I"; label_length = 5'd6; value = snapshot.debugger.instruction_steps; end
+                5'd4: begin label_text = "STEP-F"; label_length = 5'd6; value = snapshot.debugger.frame_steps; end
+                5'd5: begin label_text = "PRE"; label_length = 5'd3; value = snapshot.debugger.pc_before; end
+                5'd6: begin label_text = "POST"; label_length = 5'd4; value = snapshot.debugger.pc_after; end
+                5'd7: begin label_text = "OVER"; label_length = 5'd4; value = snapshot.debugger.frame_overrun; end
+                5'd8: begin label_text = "BOUND"; label_length = 5'd5; value = {13'd0, snapshot.debugger.boundary}; end
+                default: begin end
+            endcase
+            debugger_character = 8'h20;
+            if (column >= 4'd1 && {1'b0,column} <= label_length)
+                debugger_character = literal_character(label_text, label_length, column - 4'd1);
+            if (row >= 5'd2 && column >= 4'd9 && column < 4'd13)
+                debugger_character = value_hex_character({16'd0,value},4'd4,{1'b0,column} - 5'd9);
+            if (row == 5'd1) begin
+                case (column)
+                    4'd1: debugger_character = "S";
+                    4'd2: debugger_character = debug_hex_char({1'b0,snapshot.debugger.state});
+                    4'd4: debugger_character = "C";
+                    4'd5: debugger_character = debug_hex_char({1'b0,snapshot.debugger.last_command});
+                    4'd7: debugger_character = "R";
+                    4'd8: debugger_character = debug_hex_char({2'd0,snapshot.debugger.result});
+                    default: begin end
+                endcase
+            end
+        end
+    endfunction
+
     always_comb begin
         inside_panel = active_video && (scan_x >= 10'd512) &&
                        (scan_x < 10'd640) && (scan_y < 10'd480);
@@ -1268,6 +1318,18 @@ module nes_debug_panel_renderer #(
             end
         end
 
+        if (inside_panel && cell_row == 5'd1 && cell_column >= 4'd9) begin
+            display_character = debugger_state_character(cell_column - 4'd9);
+            foreground_color = COLOR_TEXT;
+        end
+        if (inside_panel &&
+            ((page_select == 3'd1 && cell_row >= 5'd18 && cell_row <= 5'd26) ||
+             (page_select == 3'd4 && cell_row >= 5'd19 && cell_row <= 5'd27))) begin
+            display_character = debugger_character(
+                cell_row - (page_select == 3'd1 ? 5'd18 : 5'd19), cell_column);
+            foreground_color = cell_row == (page_select == 3'd1 ? 5'd18 : 5'd19) ?
+                               COLOR_SECTION : COLOR_TEXT;
+        end
         glyph_row = debug_font_row(display_character, glyph_row_index);
         separator_pixel = (scan_y == 10'd32) || (scan_y == 10'd120) ||
                           (scan_y == 10'd200) || (scan_y == 10'd280) ||

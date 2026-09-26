@@ -181,6 +181,10 @@ verilator --lint-only --Wall \
     rtl/debug/nes_debug_snapshot.sv
 
 verilator --lint-only --Wall \
+    --top-module nes_debug_command_cdc \
+    rtl/debug/nes_debug_command_cdc.sv
+
+verilator --lint-only --Wall \
     --top-module nes_debug_page_select \
     rtl/debug/nes_debug_page_select.sv
 
@@ -260,6 +264,9 @@ PHASE3K_RTL_FILES=(
     rtl/video/nes_vga_video.sv
     rtl/video/nes_developer_compositor.sv
     rtl/video/video_pll.sv
+    rtl/debug/nes_debugger_pkg.sv
+    rtl/debug/nes_debug_command_cdc.sv
+    rtl/debug/nes_debugger.sv
     rtl/de1_soc_nes_vga_top.sv
 )
 

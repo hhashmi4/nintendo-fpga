@@ -157,6 +157,7 @@ module nes_vga_phase4db_tb;
         .cpu_debug_x(), .cpu_debug_y(), .cpu_debug_sp(),
         .cpu_debug_pc(cpu_debug_pc), .cpu_debug_status(),
         .cpu_debug_instruction(),
+        .cpu_debug_execution_state(),
         .cpu_bus_target(), .cpu_ram_address(), .cpu_ppu_register(),
         .cpu_ram_access(), .cpu_ppu_access(), .cpu_apu_access(),
         .cpu_dma_access(), .cpu_controller_access(),

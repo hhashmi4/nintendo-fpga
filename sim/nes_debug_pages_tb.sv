@@ -188,6 +188,15 @@ module nes_debug_pages_tb;
             snapshot.system.ppu_cycle_count = 32'h0197a4a8;
             snapshot.system.prg_read_count = 32'h00034567;
             snapshot.system.chr_read_count = 32'h00045678;
+            snapshot.debugger.last_command = 3'd2;
+            snapshot.debugger.sequence_id = 16'h1234;
+            snapshot.debugger.result = 2'd2;
+            snapshot.debugger.instruction_steps = 16'd17;
+            snapshot.debugger.frame_steps = 16'd3;
+            snapshot.debugger.boundary = 3'd2;
+            snapshot.debugger.pc_before = 16'h8000;
+            snapshot.debugger.pc_after = 16'h8030;
+            snapshot.debugger.frame_overrun = 16'd123;
         end
     endtask
 
@@ -245,6 +254,7 @@ module nes_debug_pages_tb;
         // is disabled here to keep the required FST compact.
         $dumpoff;
         for (page = 0; page < 5; page = page + 1) begin
+            snapshot.debugger.state = page[2:0];
             queue_direct_page(page[2:0]);
             pulse_frame_start();
             assert (active_page == page[2:0]);

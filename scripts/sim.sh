@@ -822,6 +822,8 @@ verilator --binary --timing --trace-fst --Wall \
     "${NES_PHASE3J_RTL_FILES[@]}" \
     rtl/debug/nes_debug_snapshot_pkg.sv \
     rtl/debug/nes_debug_snapshot.sv \
+    rtl/debug/nes_debugger_pkg.sv \
+    rtl/debug/nes_debugger.sv \
     rtl/controller/controller_input_sync.sv \
     rtl/controller/nes_controller.sv \
     rtl/cartridge/nes_mapper0.sv \
@@ -1302,6 +1304,9 @@ PHASE4EC_TOP_RTL_FILES=(
     "${VIDEO_PHASE3K_RTL_FILES[@]}"
     rtl/video/nes_developer_compositor.sv
     rtl/video/video_pll.sv
+    rtl/debug/nes_debugger_pkg.sv
+    rtl/debug/nes_debug_command_cdc.sv
+    rtl/debug/nes_debugger.sv
     rtl/de1_soc_nes_vga_top.sv
 )
 

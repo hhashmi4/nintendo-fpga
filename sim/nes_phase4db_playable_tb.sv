@@ -55,6 +55,9 @@ module nes_phase4db_playable_tb;
     logic [15:0] cpu_debug_pc;
     logic [7:0] cpu_debug_status;
     logic [7:0] cpu_debug_instruction;
+    logic [5:0] cpu_debug_execution_state;
+    logic debugger_authorized;
+    nes_debugger_snapshot_t debugger_status;
 
     logic dma_active;
     logic [2:0] dma_phase;
@@ -226,10 +229,22 @@ module nes_phase4db_playable_tb;
         .debug_chr_write(cartridge_debug_chr_write)
     );
 
+    // Normal-mode hashes and all 300 frames exercise the real debugger RUN
+    // authorization path, with no command tokens submitted.
+    nes_debugger running_debugger (
+        .clk(clk), .reset(reset), .command_valid(1'b0), .command(3'd0),
+        .command_sequence(16'd0), .command_done(), .response_state(),
+        .response_result(), .snapshot_ready(1'b1), .cpu_enable(cpu_enable),
+        .cpu_execution_state(cpu_debug_execution_state), .cpu_pc(cpu_debug_pc),
+        .dma_active(dma_active), .ppu_enable(ppu_enable), .frame_start(ppu_frame_start),
+        .scheduler_authorized(debugger_authorized), .status_changed(),
+        .status(debugger_status)
+    );
+
     nes_core nes (
         .clk(clk),
         .reset(reset),
-        .nes_enable(1'b1),
+        .nes_enable(debugger_authorized),
         .irq(1'b0),
         .mirroring_mode(cartridge_mirroring),
         .cart_cpu_address(cart_cpu_address),
@@ -263,6 +278,7 @@ module nes_phase4db_playable_tb;
         .cpu_debug_pc(cpu_debug_pc),
         .cpu_debug_status(cpu_debug_status),
         .cpu_debug_instruction(cpu_debug_instruction),
+        .cpu_debug_execution_state(cpu_debug_execution_state),
         .cpu_bus_target(), .cpu_ram_address(), .cpu_ppu_register(),
         .cpu_ram_access(), .cpu_ppu_access(), .cpu_apu_access(),
         .cpu_dma_access(), .cpu_controller_access(),
@@ -305,6 +321,7 @@ module nes_phase4db_playable_tb;
 
     always_comb begin
         debug_observations = '0;
+        debug_observations.debugger = debugger_status;
         debug_observations.cpu.pc = cpu_debug_pc;
         debug_observations.cpu.a = cpu_debug_a;
         debug_observations.cpu.x = cpu_debug_x;
@@ -441,6 +458,7 @@ module nes_phase4db_playable_tb;
         if (!reset && debug_destination_update) begin
             debug_update_count <= debug_update_count + 1;
             assert (debug_destination_valid);
+            assert (debug_destination_snapshot.debugger == '0);
             assert (debug_destination_snapshot.system.snapshot_id ==
                     32'(debug_update_count + 1));
             assert (debug_destination_snapshot.system.source_frame_number ==
@@ -483,6 +501,7 @@ module nes_phase4db_playable_tb;
     always @(posedge clk) begin
         logic in_nmi;
         if (!reset) begin
+            assert (debugger_authorized && debugger_status == '0);
             fabric_cycles <= fabric_cycles + 1;
             if (ppu_enable)
                 ppu_cycles <= ppu_cycles + 1;

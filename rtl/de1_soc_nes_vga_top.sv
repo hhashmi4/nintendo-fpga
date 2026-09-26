@@ -206,6 +206,75 @@ module de1_soc_nes_vga_top #(
     logic debug_source_busy;
     logic debug_destination_update;
     logic debug_destination_valid;
+    // Source-side virtual controls live in the continuing video domain.
+    (* preserve, noprune *) logic debugger_request_valid;
+    (* preserve, noprune *) logic [2:0] debugger_request_command;
+    logic debugger_request_ready, debugger_request_busy, debugger_ack;
+    logic [15:0] debugger_ack_sequence;
+    logic [2:0] debugger_ack_state;
+    logic [1:0] debugger_ack_result;
+    // Retain a small video-domain JTAG status readback word even before a
+    // physical JTAG producer is bound. This keeps acknowledgement outputs
+    // from being optimized away merely because they have no board pins.
+    (* preserve, noprune *) logic [23:0] debugger_command_readback;
+    logic debugger_command_valid, debugger_command_done;
+    logic [2:0] debugger_command, debugger_response_state;
+    logic [15:0] debugger_command_sequence;
+    logic [1:0] debugger_response_result;
+    logic debugger_authorized, debugger_status_changed;
+    logic [5:0] cpu_debug_execution_state;
+    logic nes_core_cpu_enable;
+    nes_debug_snapshot_pkg::nes_debugger_snapshot_t debugger_status;
+    logic debug_capture_pending;
+    logic [18:0] debug_pause_heartbeat;
+
+    nes_debug_command_cdc debugger_mailbox (
+        .source_clk(pixel_clk), .source_reset(video_reset),
+        .source_valid(debugger_request_valid),
+        .source_command(debugger_request_command),
+        .source_ready(debugger_request_ready), .source_busy(debugger_request_busy),
+        .source_ack(debugger_ack), .source_ack_sequence(debugger_ack_sequence),
+        .source_ack_state(debugger_ack_state), .source_ack_result(debugger_ack_result),
+        .destination_clk(CLOCK_50), .destination_reset(system_reset),
+        .destination_valid(debugger_command_valid),
+        .destination_command(debugger_command),
+        .destination_sequence(debugger_command_sequence),
+        .destination_done(debugger_command_done),
+        .destination_state(debugger_response_state),
+        .destination_result(debugger_response_result)
+    );
+    nes_debugger debugger (
+        .clk(CLOCK_50), .reset(system_reset),
+        .command_valid(debugger_command_valid), .command(debugger_command),
+        .command_sequence(debugger_command_sequence),
+        .command_done(debugger_command_done), .response_state(debugger_response_state),
+        .response_result(debugger_response_result),
+        .snapshot_ready(!debug_capture_pending && !debug_source_busy &&
+                        !debugger_status_changed),
+        .cpu_enable(nes_core_cpu_enable), .cpu_execution_state(cpu_debug_execution_state),
+        .cpu_pc(cpu_debug_pc), .dma_active(dma_debug_active),
+        .ppu_enable(nes_core_ppu_enable), .frame_start(ppu_frame_start),
+        .scheduler_authorized(debugger_authorized),
+        .status_changed(debugger_status_changed), .status(debugger_status)
+    );
+    // Retry status/pause captures through a busy mailbox. A paused heartbeat
+    // keeps CDC health observable without advancing any NES event counter.
+    always_ff @(posedge CLOCK_50) begin
+        if (system_reset) begin
+            debug_capture_pending <= 1'b0;
+            debug_pause_heartbeat <= '0;
+        end else begin
+            if (debug_source_capture_accepted)
+                debug_capture_pending <= 1'b0;
+            if (debugger_status.state == nes_debugger_pkg::DBG_PAUSED)
+                debug_pause_heartbeat <= debug_pause_heartbeat + 19'd1;
+            else
+                debug_pause_heartbeat <= '0;
+            if (debugger_status_changed || &debug_pause_heartbeat)
+                debug_capture_pending <= 1'b1;
+        end
+    end
+
 
     video_pll pixel_clock_source (
         .ref_clk(CLOCK_50),
@@ -234,15 +303,23 @@ module de1_soc_nes_vga_top #(
     // The production image uses the default zero; simulation can set one.
     always_ff @(posedge pixel_clk) begin
         if (video_reset) begin
+            debugger_command_readback <= 24'd0;
             developer_mode_enable <= DEVELOPER_MODE_DEFAULT;
             developer_page_next_request <= 1'b0;
             developer_page_select_valid <= 1'b0;
             developer_page_request <= DEVELOPER_PAGE_DEFAULT;
+            debugger_request_valid <= 1'b0;
+            debugger_request_command <= 3'd0;
         end else begin
+            debugger_command_readback <= {debugger_request_ready,
+                debugger_request_busy, debugger_ack, debugger_ack_sequence,
+                debugger_ack_state, debugger_ack_result};
             developer_mode_enable <= developer_mode_enable;
             developer_page_next_request <= developer_page_next_request;
             developer_page_select_valid <= developer_page_select_valid;
             developer_page_request <= developer_page_request;
+            debugger_request_valid <= debugger_request_valid;
+            debugger_request_command <= debugger_request_command;
         end
     end
 
@@ -306,7 +383,7 @@ module de1_soc_nes_vga_top #(
     nes_core nes (
         .clk(CLOCK_50),
         .reset(system_reset),
-        .nes_enable(nes_ppu_ce),
+        .nes_enable(nes_ppu_ce && debugger_authorized),
         .irq(1'b0),
         .mirroring_mode(cartridge_mirroring_mode),
         .cart_cpu_address(cart_cpu_address),
@@ -331,7 +408,7 @@ module de1_soc_nes_vga_top #(
         .chr_read_data(chr_read_data),
         .ppu_enable(nes_core_ppu_enable),
         .cpu_cycle_slot(nes_core_cpu_cycle_slot),
-        .cpu_enable(),
+        .cpu_enable(nes_core_cpu_enable),
         .scheduler_phase(),
         .cpu_address(cpu_debug_bus_address),
         .cpu_write_data(cpu_debug_bus_write_data),
@@ -346,6 +423,7 @@ module de1_soc_nes_vga_top #(
         .cpu_debug_pc(cpu_debug_pc),
         .cpu_debug_status(cpu_debug_status),
         .cpu_debug_instruction(cpu_debug_instruction),
+        .cpu_debug_execution_state(cpu_debug_execution_state),
         .cpu_bus_target(),
         .cpu_ram_address(),
         .cpu_ppu_register(),
@@ -520,6 +598,7 @@ module de1_soc_nes_vga_top #(
 
     always_comb begin
         debug_observations = '0;
+        debug_observations.debugger = debugger_status;
 
         debug_observations.cpu.pc = cpu_debug_pc;
         debug_observations.cpu.a = cpu_debug_a;
@@ -617,7 +696,7 @@ module de1_soc_nes_vga_top #(
         .source_clk(CLOCK_50),
         .source_reset(system_reset),
         .source_frame_capture(ppu_frame_start),
-        .manual_capture(1'b0),
+        .manual_capture(debug_capture_pending && !debug_source_busy),
         .observations(debug_observations),
         .nmi_event(ppu_nmi_event),
         .nmi_suppressed_event(ppu_nmi_suppressed),

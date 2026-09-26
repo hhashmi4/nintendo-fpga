@@ -153,6 +153,16 @@ class DemoSnapshot:
     prg_reads: int = 0x00034567
     chr_reads: int = 0x00045678
     missed_captures: int = 0
+    debugger_state: int = 0
+    debugger_command: int = 0
+    debugger_result: int = 0
+    debugger_sequence: int = 0
+    instruction_steps: int = 0
+    frame_steps: int = 0
+    step_pc_before: int = 0
+    step_pc_after: int = 0
+    frame_overrun: int = 0
+    pause_boundary: int = 0
 
 
 def hex_value(value: int, digits: int) -> str:
@@ -455,6 +465,22 @@ def build_panel_character_grid(
         put(15, 1, "SNAPSHOT", SECTION)
         put(16, 1, "INVALID" if not valid else "STALE" if stale else "VALID",
             BAD if (not valid or stale) else GOOD)
+    put(1, 9, {0: "RUN", 1: "WAIT", 2: "PAUSE", 3: "STEP-I", 4: "STEP-F"}.get(snapshot.debugger_state, "???????"))
+    if page in (1, 4):
+        base = 18 if page == 1 else 19
+        put(base, 1, "DEBUG", SECTION)
+        put(base + 1, 1, f"S{hex_value(snapshot.debugger_state, 1)} C{hex_value(snapshot.debugger_command, 1)} R{hex_value(snapshot.debugger_result, 1)}")
+        for row, label, value in (
+            (2, "SEQ", snapshot.debugger_sequence),
+            (3, "STEP-I", snapshot.instruction_steps),
+            (4, "STEP-F", snapshot.frame_steps),
+            (5, "PRE", snapshot.step_pc_before),
+            (6, "POST", snapshot.step_pc_after),
+            (7, "OVER", snapshot.frame_overrun),
+            (8, "BOUND", snapshot.pause_boundary),
+        ):
+            put(base + row, 1, label)
+            put(base + row, 9, hex_value(value, 4))
     return grid, colors
 
 

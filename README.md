@@ -50,7 +50,9 @@ assigned; no physical control mapping changed. Phase 4E-C adds the simultaneous
 512x480 exact-2x playable game region and 128x480 compact snapshot panel, with
 an explicit boundary compositor and the same pixel-identical normal bypass.
 Phase 4E-D adds five frame-latched panel pages that reuse the coherent snapshot,
-font, formatter, colors, compositor, and fixed 512/128 geometry.
+font, formatter, colors, compositor, and fixed 512/128 geometry. Phase 4E-E adds
+acknowledged RUN/PAUSE/instruction-step/frame-step commands, safe full-NES
+suspension, and an 818-bit coherent status snapshot while VGA stays active.
 
 ## Phase 1 foundation
 
@@ -519,6 +521,22 @@ Architecture, controls, layouts, verification, resources, timing, and the
 Phase 4E-E debugger-control recommendation are documented in
 [`docs/phase4e-d-devmode-pages.md`](docs/phase4e-d-devmode-pages.md).
 
+## Phase 4E-E interactive Developer debugger
+
+- Dedicated execution controller authorizes existing scheduler enables; no clock gating.
+- PAUSE drains the instruction/interrupt entry and OAM DMA before freezing NES progression.
+- STEP-I retires one opcode, including its bus/stack cycles and resulting DMA.
+- STEP-F crosses the next scanline 0/dot 0 event, then drains in-flight work;
+  its possible post-boundary overrun is measured in the pause snapshot.
+- Acknowledged event CDC, sequence/result readback, and abstract virtual controls
+  preserve all existing physical switch/reset assignments.
+- Paused snapshots, page navigation, scanout, and stale-fault detection stay active.
+- Three framebuffer banks retain completed frames across pause-induced scanout phase shifts.
+
+Architecture, exact NMI/frame-step contracts, timing hardening, baseline/final
+verification, and the Phase 4F-A HPS interface recommendation are documented in
+[`docs/phase4e-e-interactive-debugger.md`](docs/phase4e-e-interactive-debugger.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -559,7 +577,9 @@ boot/controller/frame/VGA and 300-frame sustained tests, the Phase 4E-A
 snapshot/CDC/reset test, the Phase 4E-B glyph/renderer/compositor/full-frame
 comparison, the Phase 4E-C panel/compositor full-frame and real playable-ROM
 combined-frame comparisons, the Phase 4E-D page-selector and five-page
-pixel-perfect comparisons, and playable integration checks, PPU
+pixel-perfect comparisons, Phase 4E-E command CDC, deterministic instruction/DMA/NMI
+steps, frame completion overruns, paused framebuffer/health checks, mixed playable
+debugger long run, and playable integration checks, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -665,7 +685,7 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4E-D page-enabled playable-ROM DE1-SoC NES/VGA
+Build the current Phase 4E-E debugger-enabled playable-ROM DE1-SoC NES/VGA
 image and run its strict ROM regeneration/import, fitter, assembler, timing,
 and RBF generation checks:
 
