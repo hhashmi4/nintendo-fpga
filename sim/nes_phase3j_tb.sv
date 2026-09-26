@@ -258,7 +258,7 @@ module nes_phase3j_tb;
             else $fatal(1, "RAM mirror failed");
         assert (dut.internal_cpu_ram.memory[11'h005] == 8'h5a)
             else $fatal(1, "CPU did not finish initialization");
-        assert (dut.cpu_ram[11'h006] == 8'h30)
+        assert (dut.internal_cpu_ram.memory[11'h006] == 8'h30)
             else $fatal(1, "CPU PPUDATA palette readback failed");
         assert (ppu_ctrl == 8'h80 && ppu_mask == 8'h14)
             else $fatal(1, "mirrored PPU writes failed %02x %02x",
