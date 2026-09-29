@@ -272,7 +272,7 @@ board image until the Phase 4F-B storage/reset integration exists.
 No physical DE1-SoC, HPS bridge, Linux process, JTAG session, or microSD card is
 required or claimed for Phase 4F-A.
 
-## Known limitations and exact Phase 4F-B step
+## Known limitations and Phase 4F continuation
 
 - No bytes are stored by Phase 4F-A; the output write transaction is only the
   validated control boundary.
@@ -284,9 +284,10 @@ required or claimed for Phase 4F-A.
 - Only PRG and CHR targets and NROM-sized ranges are supported. No mapper was
   added.
 
-Phase 4F-B must add runtime-writable Mapper 0 PRG/CHR staging storage behind
-the validated write interface, define supported NROM image sizes and transfer
-coverage, activate only a complete image, and connect `nes_hold_reset` into the
-functional NES reset/hold path. It must retain the existing CPU/PPU read timing
-and the build-time ROM behavior when runtime loading is unused. The physical
-Cyclone V HPS bridge and its CDC/register adapter remain later Phase 4F work.
+Phase 4F-B subsequently added runtime-writable Mapper 0 PRG/CHR storage behind
+the validated write interface while retaining the existing build-time ROM
+path. Its architecture and verification are documented in
+[`phase4f-b-runtime-cartridge-storage.md`](phase4f-b-runtime-cartridge-storage.md).
+Complete-transfer validation is Phase 4F-C; atomic activation and functional
+NES reset/hold integration are Phase 4F-D. The physical Cyclone V HPS bridge
+and its CDC/register adapter remain later Phase 4F work.

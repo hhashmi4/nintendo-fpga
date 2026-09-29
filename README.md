@@ -55,9 +55,12 @@ acknowledged RUN/PAUSE/instruction-step/frame-step commands, safe full-NES
 suspension, and an 818-bit coherent status snapshot while VGA stays active.
 Phase 4F-A adds the FPGA-side runtime-loader protocol/control foundation: typed
 PRG/CHR byte writes, explicit ready/valid backpressure, deterministic error
-states, and a fail-safe NES hold/reset request. Runtime cartridge memory, the
-physical Cyclone V HPS bridge, Linux software, and microSD loading remain future
-work.
+states, and a fail-safe NES hold/reset request. Phase 4F-B adds a runtime-
+writable 32 KiB PRG/8 KiB CHR endpoint, runtime-selectable NROM-128/NROM-256
+translation, preserved CHR-ROM/RAM behavior, and deterministic reset/collision
+semantics. Complete-image validation, atomic activation/reset integration, the
+physical Cyclone V HPS bridge, Linux software, and microSD loading remain
+future work.
 
 ## Phase 1 foundation
 
@@ -561,6 +564,23 @@ communication are not implemented. Architecture and exact protocol semantics
 are documented in
 [`docs/phase4f-a-hps-runtime-loader.md`](docs/phase4f-a-hps-runtime-loader.md).
 
+## Phase 4F-B — Runtime Mapper-0 cartridge storage
+
+- 32 KiB PRG and 8 KiB CHR byte stores written by validated Phase 4F-A writes
+- Runtime-selectable NROM-128 16 KiB mirroring and NROM-256 direct mapping
+- Real loader → storage → Mapper-0 → CPU/PPU integration path
+- Preserved CHR-ROM ignored-write and CHR-RAM PPU-write behavior
+- Reset-masked reads with retained storage contents
+- Explicit same-address write-first reads and loader priority over PPU writes
+- Independent model, 12,021 fixed-seed operations, directed RTL boundaries,
+  full regression coverage, and standalone Cyclone V timing/resource proof
+- Existing build-time playable cartridge and production board path unchanged
+
+Runtime cartridge byte storage and Mapper-0 reads are implemented and verified.
+Image completeness and activation are intentionally deferred. Architecture,
+collision/reset contracts, verification, and synthesis results are documented
+in [`docs/phase4f-b-runtime-cartridge-storage.md`](docs/phase4f-b-runtime-cartridge-storage.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -603,8 +623,9 @@ comparison, the Phase 4E-C panel/compositor full-frame and real playable-ROM
 combined-frame comparisons, the Phase 4E-D page-selector and five-page
 pixel-perfect comparisons, Phase 4E-E command CDC, deterministic instruction/DMA/NMI
 steps, frame completion overruns, paused framebuffer/health checks, mixed playable
-debugger long run, playable integration checks, and the Phase 4F-A runtime-loader
-protocol/model/backpressure test, PPU
+debugger long run, playable integration checks, the Phase 4F-A runtime-loader
+protocol/model/backpressure test, and the Phase 4F-B runtime storage/Mapper-0
+model and integration test, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -623,6 +644,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_phase4db_playable.fst`, `nes_debug_snapshot.fst`,
 `nes_debug_renderer.fst`, `nes_developer_side_panel.fst`,
 `nes_debug_pages.fst`, `nes_runtime_loader_phase4fa.fst`,
+`nes_runtime_cartridge_phase4fb.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -651,6 +673,13 @@ changing the board top or cartridge storage:
 
 ```bash
 ./scripts/build_runtime_loader_quartus.sh
+```
+
+Run the standalone Phase 4F-B runtime-cartridge fit, M10K-inference, and timing
+proof:
+
+```bash
+./scripts/build_runtime_cartridge_quartus.sh
 ```
 
 Run the standalone Phase 3A PPU timing-core synthesis and timing proof:
@@ -757,7 +786,7 @@ before use.
 - `rtl/cpu` — CPU state, ALU, addressing, decoder, and shared instruction sequencer
 - `rtl/ppu` — PPU timing, CPU registers, memory map, and integrated cores
 - `rtl/system` — NES CPU address decoder, system bus, and internal CPU RAM
-- `rtl/cartridge` — generic cartridge shell and Mapper 0/NROM storage
+- `rtl/cartridge` — build-time and runtime Mapper 0/NROM cartridge storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — standalone OAM DMA bus master
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer

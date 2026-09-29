@@ -181,6 +181,14 @@ verilator --lint-only --Wall \
     rtl/loader/nes_runtime_loader.sv
 
 verilator --lint-only --Wall \
+    --top-module nes_runtime_cartridge \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader.sv \
+    rtl/cartridge/nes_runtime_cartridge_storage.sv \
+    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_cartridge.sv
+
+verilator --lint-only --Wall \
     --top-module nes_debug_snapshot \
     rtl/debug/nes_debug_snapshot_pkg.sv \
     rtl/debug/nes_debug_snapshot.sv
