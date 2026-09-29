@@ -195,6 +195,7 @@ Phase 4F-B does not implement:
 - HPS register mapping, CDC, Linux software, or microSD access;
 - any mapper other than Mapper 0.
 
-Phase 4F-C is the next planned step and will validate a manifest and complete
-transfer. It must build on this endpoint without weakening the byte-level and
-Mapper-0 guarantees established here.
+Phase 4F-C subsequently added manifest and complete-transfer validation without
+weakening the byte-level and Mapper-0 guarantees established here. Its design
+is documented in
+[`phase4f-c-runtime-image-validation.md`](phase4f-c-runtime-image-validation.md).

@@ -4,7 +4,12 @@
 // storage adapter use this same clock. A future physical HPS bridge owns CDC
 // into this domain; this module neither receives asynchronous pulses nor
 // accesses the NES CPU bus.
-module nes_runtime_loader (
+module nes_runtime_loader #(
+    // Historical Phase 4F-A/B benches use the pre-manifest protocol to
+    // preserve their focused proofs. All real integrations use the safe
+    // default and must supply a complete Phase 4F-C manifest.
+    parameter bit IMAGE_VALIDATION_ENABLE = 1'b1
+) (
     input  logic                                      clk,
     input  logic                                      reset,
 
@@ -16,6 +21,15 @@ module nes_runtime_loader (
     input  logic [7:0]                                command_data,
     output logic                                      command_ready,
     output logic                                      command_accepted,
+
+    // BEGIN samples this manifest. The future HPS/iNES parser supplies
+    // exact byte counts; no container parsing occurs in FPGA logic.
+    input  logic                                      manifest_valid,
+    input  logic [7:0]                                manifest_mapper,
+    input  logic [15:0]                               manifest_prg_bytes,
+    input  logic [15:0]                               manifest_chr_bytes,
+    input  logic                                      manifest_chr_is_ram,
+    input  logic [1:0]                                manifest_mirroring,
 
     output logic                                      storage_write_valid,
     output nes_runtime_loader_pkg::loader_target_t    storage_write_target,
@@ -29,7 +43,14 @@ module nes_runtime_loader (
     output logic                                      completed,
     output logic                                      error,
     output nes_runtime_loader_pkg::loader_error_t     error_code,
-    output logic                                      nes_hold_reset
+    output logic                                      nes_hold_reset,
+
+    output logic                                      image_valid,
+    output logic [7:0]                                image_mapper,
+    output logic [15:0]                               image_prg_bytes,
+    output logic [15:0]                               image_chr_bytes,
+    output logic                                      image_chr_is_ram,
+    output logic [1:0]                                image_mirroring
 );
     import nes_runtime_loader_pkg::*;
 
@@ -38,7 +59,24 @@ module nes_runtime_loader (
     logic write_seen;
     logic target_valid;
     logic address_valid;
+    logic declared_target_valid;
+    logic declared_address_valid;
+    logic expected_address_valid;
     logic legal_active_write;
+    logic begin_payload_valid;
+    logic manifest_mirroring_valid;
+    logic manifest_prg_valid;
+    logic manifest_chr_valid;
+    loader_error_t begin_manifest_error;
+
+    logic session_manifest_valid;
+    logic [7:0] image_mapper_register;
+    logic [15:0] image_prg_bytes_register;
+    logic [15:0] image_chr_bytes_register;
+    logic image_chr_is_ram_register;
+    logic [1:0] image_mirroring_register;
+    logic [15:0] next_prg_address;
+    logic [15:0] next_chr_address;
 
     always_comb begin
         target_valid = command_target == LOADER_TARGET_PRG ||
@@ -55,10 +93,72 @@ module nes_runtime_loader (
         endcase
     end
 
-    assign legal_active_write = !reset && command_valid &&
-                                command == LOADER_COMMAND_WRITE &&
-                                state_register == LOADER_STATE_LOADING &&
-                                target_valid && address_valid;
+    always_comb begin
+        begin_payload_valid = command_target == LOADER_TARGET_NONE &&
+                              command_address == 16'h0000 &&
+                              command_data == 8'h00;
+        manifest_mirroring_valid =
+            manifest_mirroring == LOADER_MIRROR_VERTICAL ||
+            manifest_mirroring == LOADER_MIRROR_HORIZONTAL;
+        manifest_prg_valid =
+            manifest_prg_bytes == LOADER_PRG_NROM128_BYTES ||
+            manifest_prg_bytes == LOADER_PRG_NROM256_BYTES;
+        manifest_chr_valid =
+            (manifest_chr_is_ram && manifest_chr_bytes == 16'h0000) ||
+            (!manifest_chr_is_ram &&
+             manifest_chr_bytes == LOADER_CHR_ROM_BYTES);
+
+        begin_manifest_error = LOADER_ERROR_NONE;
+        if (!manifest_valid || !begin_payload_valid ||
+            !manifest_mirroring_valid)
+            begin_manifest_error = LOADER_ERROR_INVALID_MANIFEST;
+        else if (manifest_mapper != 8'd0)
+            begin_manifest_error = LOADER_ERROR_UNSUPPORTED_MAPPER;
+        else if (!manifest_prg_valid)
+            begin_manifest_error = LOADER_ERROR_UNSUPPORTED_PRG;
+        else if (!manifest_chr_valid)
+            begin_manifest_error = LOADER_ERROR_UNSUPPORTED_CHR;
+    end
+
+    always_comb begin
+        declared_target_valid = target_valid;
+        declared_address_valid = 1'b0;
+        expected_address_valid = 1'b0;
+        case (command_target)
+            LOADER_TARGET_PRG: begin
+                declared_address_valid =
+                    command_address < image_prg_bytes_register;
+                expected_address_valid =
+                    command_address == next_prg_address;
+            end
+            LOADER_TARGET_CHR: begin
+                declared_target_valid =
+                    target_valid && !image_chr_is_ram_register;
+                declared_address_valid =
+                    command_address < image_chr_bytes_register;
+                expected_address_valid =
+                    command_address == next_chr_address;
+            end
+            default: begin
+                declared_target_valid = 1'b0;
+                declared_address_valid = 1'b0;
+                expected_address_valid = 1'b0;
+            end
+        endcase
+    end
+
+    always_comb begin
+        legal_active_write = !reset && command_valid &&
+                             command == LOADER_COMMAND_WRITE &&
+                             state_register == LOADER_STATE_LOADING &&
+                             target_valid && address_valid;
+        if (IMAGE_VALIDATION_ENABLE)
+            legal_active_write = legal_active_write &&
+                                 session_manifest_valid &&
+                                 declared_target_valid &&
+                                 declared_address_valid &&
+                                 expected_address_valid;
+    end
 
     // Invalid commands are accepted immediately so they receive a
     // deterministic disposition. A legal write applies downstream
@@ -88,12 +188,27 @@ module nes_runtime_loader (
     assign error = !reset && state_register == LOADER_STATE_ERROR;
     assign error_code = reset ? LOADER_ERROR_NONE : error_register;
     assign nes_hold_reset = reset || state_register != LOADER_STATE_READY;
+    assign image_valid = IMAGE_VALIDATION_ENABLE && completed;
+    assign image_mapper = reset ? 8'h00 : image_mapper_register;
+    assign image_prg_bytes = reset ? 16'h0000 : image_prg_bytes_register;
+    assign image_chr_bytes = reset ? 16'h0000 : image_chr_bytes_register;
+    assign image_chr_is_ram = !reset && image_chr_is_ram_register;
+    assign image_mirroring = reset ? LOADER_MIRROR_VERTICAL :
+                                     image_mirroring_register;
 
     always_ff @(posedge clk) begin
         if (reset) begin
             state_register <= LOADER_STATE_IDLE;
             error_register <= LOADER_ERROR_NONE;
             write_seen <= 1'b0;
+            session_manifest_valid <= 1'b0;
+            image_mapper_register <= 8'h00;
+            image_prg_bytes_register <= 16'h0000;
+            image_chr_bytes_register <= 16'h0000;
+            image_chr_is_ram_register <= 1'b0;
+            image_mirroring_register <= LOADER_MIRROR_VERTICAL;
+            next_prg_address <= 16'h0000;
+            next_chr_address <= 16'h0000;
         end else if (command_accepted) begin
             // Preserve the first failure until reset or a fresh BEGIN.
             if (state_register == LOADER_STATE_ERROR &&
@@ -105,10 +220,41 @@ module nes_runtime_loader (
                         if (state_register == LOADER_STATE_LOADING) begin
                             state_register <= LOADER_STATE_ERROR;
                             error_register <= LOADER_ERROR_BEGIN_BUSY;
+                        end else if (IMAGE_VALIDATION_ENABLE &&
+                                     begin_manifest_error !=
+                                     LOADER_ERROR_NONE) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <= begin_manifest_error;
+                            write_seen <= 1'b0;
+                            session_manifest_valid <= 1'b0;
+                            image_mapper_register <= 8'h00;
+                            image_prg_bytes_register <= 16'h0000;
+                            image_chr_bytes_register <= 16'h0000;
+                            image_chr_is_ram_register <= 1'b0;
+                            image_mirroring_register <=
+                                LOADER_MIRROR_VERTICAL;
+                            next_prg_address <= 16'h0000;
+                            next_chr_address <= 16'h0000;
                         end else begin
                             state_register <= LOADER_STATE_LOADING;
                             error_register <= LOADER_ERROR_NONE;
                             write_seen <= 1'b0;
+                            next_prg_address <= 16'h0000;
+                            next_chr_address <= 16'h0000;
+                            if (IMAGE_VALIDATION_ENABLE) begin
+                                session_manifest_valid <= 1'b1;
+                                image_mapper_register <= manifest_mapper;
+                                image_prg_bytes_register <=
+                                    manifest_prg_bytes;
+                                image_chr_bytes_register <=
+                                    manifest_chr_bytes;
+                                image_chr_is_ram_register <=
+                                    manifest_chr_is_ram;
+                                image_mirroring_register <=
+                                    manifest_mirroring;
+                            end else begin
+                                session_manifest_valid <= 1'b0;
+                            end
                         end
                     end
 
@@ -122,9 +268,34 @@ module nes_runtime_loader (
                         end else if (!address_valid) begin
                             state_register <= LOADER_STATE_ERROR;
                             error_register <= LOADER_ERROR_BAD_ADDRESS;
+                        end else if (IMAGE_VALIDATION_ENABLE &&
+                                     !session_manifest_valid) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <= LOADER_ERROR_INVALID_MANIFEST;
+                        end else if (IMAGE_VALIDATION_ENABLE &&
+                                     !declared_target_valid) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <= LOADER_ERROR_BAD_TARGET;
+                        end else if (IMAGE_VALIDATION_ENABLE &&
+                                     !declared_address_valid) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <= LOADER_ERROR_BAD_ADDRESS;
+                        end else if (IMAGE_VALIDATION_ENABLE &&
+                                     !expected_address_valid) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <=
+                                LOADER_ERROR_UNEXPECTED_ADDRESS;
                         end else begin
                             // command_accepted also proves downstream ready.
                             write_seen <= 1'b1;
+                            if (IMAGE_VALIDATION_ENABLE) begin
+                                if (command_target == LOADER_TARGET_PRG)
+                                    next_prg_address <=
+                                        next_prg_address + 16'd1;
+                                else
+                                    next_chr_address <=
+                                        next_chr_address + 16'd1;
+                            end
                         end
                     end
 
@@ -132,7 +303,22 @@ module nes_runtime_loader (
                         if (state_register != LOADER_STATE_LOADING) begin
                             state_register <= LOADER_STATE_ERROR;
                             error_register <= LOADER_ERROR_WRONG_STATE;
-                        end else if (!write_seen) begin
+                        end else if (IMAGE_VALIDATION_ENABLE &&
+                                     !session_manifest_valid) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <= LOADER_ERROR_INVALID_MANIFEST;
+                        end else if (IMAGE_VALIDATION_ENABLE &&
+                                     next_prg_address !=
+                                     image_prg_bytes_register) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <= LOADER_ERROR_PRG_INCOMPLETE;
+                        end else if (IMAGE_VALIDATION_ENABLE &&
+                                     next_chr_address !=
+                                     image_chr_bytes_register) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <= LOADER_ERROR_CHR_INCOMPLETE;
+                        end else if (!IMAGE_VALIDATION_ENABLE &&
+                                     !write_seen) begin
                             state_register <= LOADER_STATE_ERROR;
                             error_register <= LOADER_ERROR_EMPTY_LOAD;
                         end else begin
@@ -168,17 +354,30 @@ module nes_runtime_loader (
             assert (command_valid && command == LOADER_COMMAND_WRITE);
             assert (target_valid && address_valid);
             assert (command_accepted == storage_write_ready);
+            if (IMAGE_VALIDATION_ENABLE) begin
+                assert (session_manifest_valid);
+                assert (declared_target_valid && declared_address_valid);
+                assert (expected_address_valid);
+            end
         end
         if (completed) begin
             assert (!nes_hold_reset);
-            assert (write_seen);
+            if (IMAGE_VALIDATION_ENABLE) begin
+                assert (session_manifest_valid);
+                assert (next_prg_address == image_prg_bytes_register);
+                assert (next_chr_address == image_chr_bytes_register);
+            end else begin
+                assert (write_seen);
+            end
         end
+        assert (image_valid == (IMAGE_VALIDATION_ENABLE && completed));
         if (busy || error || state == LOADER_STATE_IDLE)
             assert (nes_hold_reset);
         if (reset) begin
             assert (!command_ready && !command_accepted);
             assert (!storage_write_valid);
             assert (!busy && !completed && !error);
+            assert (!image_valid);
             assert (nes_hold_reset);
         end
     end

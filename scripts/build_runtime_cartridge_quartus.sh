@@ -17,49 +17,49 @@ STA_SUMMARY="$OUTPUT_DIR/${PROJECT_NAME}.sta.summary"
 
 for required in "$MAP_REPORT" "$FIT_REPORT" "$STA_REPORT" "$STA_SUMMARY"; do
     if [[ ! -f "$required" ]]; then
-        echo "ERROR: Phase 4F-B Quartus build did not produce $required" >&2
+        echo "ERROR: Phase 4F-C Quartus build did not produce $required" >&2
         exit 1
     fi
 done
 
 if ! grep -q "Analysis & Synthesis was successful" "$MAP_REPORT"; then
-    echo "ERROR: Phase 4F-B analysis and synthesis did not succeed" >&2
+    echo "ERROR: Phase 4F-C analysis and synthesis did not succeed" >&2
     exit 1
 fi
 if ! grep -q "Fitter was successful" "$FIT_REPORT"; then
-    echo "ERROR: Phase 4F-B fitter did not succeed" >&2
+    echo "ERROR: Phase 4F-C fitter did not succeed" >&2
     exit 1
 fi
 if ! grep -q "Design is fully constrained for setup requirements" "$STA_REPORT" ||
    ! grep -q "Design is fully constrained for hold requirements" "$STA_REPORT"; then
-    echo "ERROR: Phase 4F-B timing report has unconstrained setup or hold paths" >&2
+    echo "ERROR: Phase 4F-C timing report has unconstrained setup or hold paths" >&2
     exit 1
 fi
 if ! awk '
     /^Slack :/ { seen = 1; if (($3 + 0) < 0) failed = 1 }
     END { exit !(seen && !failed) }
 ' "$STA_SUMMARY"; then
-    echo "ERROR: Phase 4F-B timing report has negative or missing slack" >&2
+    echo "ERROR: Phase 4F-C timing report has negative or missing slack" >&2
     exit 1
 fi
 if grep -Eqi "inferred latch|multiple constant drivers|multiple drivers" \
     "$MAP_REPORT"; then
-    echo "ERROR: Phase 4F-B synthesis has a latch or multiple-driver warning" >&2
+    echo "ERROR: Phase 4F-C synthesis has a latch or multiple-driver warning" >&2
     exit 1
 fi
 if ! grep -q "prg_memory" "$MAP_REPORT" ||
    ! grep -q "chr_memory" "$MAP_REPORT" ||
    ! grep -q "Simple Dual Port" "$MAP_REPORT"; then
-    echo "ERROR: Phase 4F-B PRG/CHR storage was not inferred as block RAM" >&2
+    echo "ERROR: Phase 4F-C PRG/CHR storage was not inferred as block RAM" >&2
     exit 1
 fi
 if ! grep -q "Total PLLs[[:space:]]*; 0" "$FIT_REPORT"; then
-    echo "ERROR: Phase 4F-B build unexpectedly uses a PLL" >&2
+    echo "ERROR: Phase 4F-C build unexpectedly uses a PLL" >&2
     exit 1
 fi
 
-echo "Phase 4F-B runtime-cartridge synthesis: $FIT_REPORT"
-echo "Phase 4F-B timing: fully constrained with non-negative reported slack"
+echo "Phase 4F-C runtime-cartridge synthesis: $FIT_REPORT"
+echo "Phase 4F-C timing: fully constrained with non-negative reported slack"
 grep -E "^; (Logic utilization|Combinational ALUT usage|Memory ALUT usage|Dedicated logic registers|Total registers|M10K blocks|Total MLAB memory bits|Total block memory bits|Total RAM Blocks|Total DSP Blocks|Total PLLs)" \
     "$FIT_REPORT" || true
 cat "$STA_SUMMARY"

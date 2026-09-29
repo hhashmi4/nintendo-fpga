@@ -12,6 +12,12 @@ module nes_runtime_loader_phase4fa_tb;
     logic [7:0] command_data = 8'h00;
     logic command_ready;
     logic command_accepted;
+    logic manifest_valid = 1'b0;
+    logic [7:0] manifest_mapper = 8'h00;
+    logic [15:0] manifest_prg_bytes = 16'h0000;
+    logic [15:0] manifest_chr_bytes = 16'h0000;
+    logic manifest_chr_is_ram = 1'b0;
+    logic [1:0] manifest_mirroring = LOADER_MIRROR_VERTICAL;
     logic storage_write_valid;
     loader_target_t storage_write_target;
     logic [LOADER_ADDRESS_BITS-1:0] storage_write_address;
@@ -23,6 +29,14 @@ module nes_runtime_loader_phase4fa_tb;
     logic error;
     loader_error_t error_code;
     logic nes_hold_reset;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic image_valid;
+    logic [7:0] image_mapper;
+    logic [15:0] image_prg_bytes;
+    logic [15:0] image_chr_bytes;
+    logic image_chr_is_ram;
+    logic [1:0] image_mirroring;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     loader_target_t observed_target [0:255];
     logic [LOADER_ADDRESS_BITS-1:0] observed_address [0:255];
@@ -50,12 +64,14 @@ module nes_runtime_loader_phase4fa_tb;
     logic expected_busy;
     logic expected_completed;
     logic expected_error;
-    logic [2:0] expected_error_code;
+    logic [3:0] expected_error_code;
     logic expected_hold;
 
     always #5 clk <= !clk;
 
-    nes_runtime_loader dut (.*);
+    nes_runtime_loader #(
+        .IMAGE_VALIDATION_ENABLE(1'b0)
+    ) dut (.*);
 
     always_ff @(posedge clk) begin
         if (storage_write_valid && storage_write_ready && !reset) begin

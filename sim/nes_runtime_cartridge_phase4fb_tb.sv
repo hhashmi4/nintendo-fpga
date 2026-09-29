@@ -16,6 +16,12 @@ module nes_runtime_cartridge_phase4fb_tb;
     logic [7:0] command_data = 8'h00;
     logic command_ready;
     logic command_accepted;
+    logic manifest_valid = 1'b0;
+    logic [7:0] manifest_mapper = 8'h00;
+    logic [15:0] manifest_prg_bytes = 16'h0000;
+    logic [15:0] manifest_chr_bytes = 16'h0000;
+    logic manifest_chr_is_ram = 1'b0;
+    logic [1:0] manifest_mirroring = LOADER_MIRROR_VERTICAL;
 
     logic nrom_256 = 1'b0;
     logic chr_is_ram = 1'b0;
@@ -36,6 +42,14 @@ module nes_runtime_cartridge_phase4fb_tb;
     logic loader_error;
     loader_error_t loader_error_code;
     logic nes_hold_reset;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic image_valid;
+    logic [7:0] image_mapper;
+    logic [15:0] image_prg_bytes;
+    logic [15:0] image_chr_bytes;
+    logic image_chr_is_ram;
+    logic [1:0] image_mirroring;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     logic [14:0] debug_prg_address;
     logic [7:0] debug_prg_data;
@@ -54,7 +68,9 @@ module nes_runtime_cartridge_phase4fb_tb;
     integer vector_loader_writes = 0;
     integer vector_ppu_writes = 0;
 
-    nes_runtime_cartridge dut (.*);
+    nes_runtime_cartridge #(
+        .IMAGE_VALIDATION_ENABLE(1'b0)
+    ) dut (.*);
 
     always #5 clk <= ~clk;
 

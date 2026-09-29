@@ -26,6 +26,12 @@ set_instance_assignment -name VIRTUAL_PIN ON -to command_address[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to command_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to command_ready
 set_instance_assignment -name VIRTUAL_PIN ON -to command_accepted
+set_instance_assignment -name VIRTUAL_PIN ON -to manifest_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to manifest_mapper[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to manifest_prg_bytes[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to manifest_chr_bytes[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to manifest_chr_is_ram
+set_instance_assignment -name VIRTUAL_PIN ON -to manifest_mirroring[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to nrom_256
 set_instance_assignment -name VIRTUAL_PIN ON -to chr_is_ram
 set_instance_assignment -name VIRTUAL_PIN ON -to cpu_address[*]
@@ -44,6 +50,12 @@ set_instance_assignment -name VIRTUAL_PIN ON -to loader_completed
 set_instance_assignment -name VIRTUAL_PIN ON -to loader_error
 set_instance_assignment -name VIRTUAL_PIN ON -to loader_error_code[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to nes_hold_reset
+set_instance_assignment -name VIRTUAL_PIN ON -to image_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to image_mapper[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to image_prg_bytes[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to image_chr_bytes[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to image_chr_is_ram
+set_instance_assignment -name VIRTUAL_PIN ON -to image_mirroring[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to debug_prg_address[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to debug_prg_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to debug_chr_address[*]
