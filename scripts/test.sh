@@ -16,7 +16,7 @@ python3 -m pytest
 echo "[2/4] Verilator RTL lint"
 scripts/lint.sh
 
-echo "[3/4] Verilator platform, PPU, CPU, Phase 3J-4E-D system/cartridge/controller/DMA/video/debug, ALU, address, and Phase 2D-2K simulations"
+echo "[3/4] Verilator platform, PPU, CPU, Phase 3J-4F-A system/cartridge/controller/DMA/video/debug/loader, ALU, address, and Phase 2D-2K simulations"
 scripts/sim.sh
 
 echo "[4/4] Phase 4E-E debugger command CDC, execution control, and playable integration"

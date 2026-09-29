@@ -176,6 +176,11 @@ verilator --lint-only --Wall \
     "${CARTRIDGE_RTL_FILES[@]}"
 
 verilator --lint-only --Wall \
+    --top-module nes_runtime_loader \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader.sv
+
+verilator --lint-only --Wall \
     --top-module nes_debug_snapshot \
     rtl/debug/nes_debug_snapshot_pkg.sv \
     rtl/debug/nes_debug_snapshot.sv
