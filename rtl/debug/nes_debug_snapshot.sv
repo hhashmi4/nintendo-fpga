@@ -214,7 +214,7 @@ module nes_debug_snapshot (
         assert (NES_CONTROLLER_DEBUG_SNAPSHOT_BITS == 46);
         assert (NES_DMA_DEBUG_SNAPSHOT_BITS == 90);
         assert (NES_SYSTEM_DEBUG_SNAPSHOT_BITS == 320);
-        assert (NES_DEBUG_SNAPSHOT_BITS == 711);
+        assert (NES_DEBUG_SNAPSHOT_BITS == 818);
     end
 
     nes_debug_snapshot_t previous_source_snapshot;

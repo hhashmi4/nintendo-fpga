@@ -4,6 +4,7 @@ module nes_vga_video (
     input  logic        pixel_clk,
     input  logic        reset,
     input  logic        test_pattern,
+    input  logic        developer_layout,
     input  logic        framebuffer_valid,
     input  logic [8:0]  framebuffer_pixel,
     output logic [15:0] framebuffer_address,
@@ -12,6 +13,9 @@ module nes_vga_video (
     output logic        line_start,
     output logic [9:0]  scan_x,
     output logic [9:0]  scan_y,
+    output logic [9:0]  render_x,
+    output logic [9:0]  render_y,
+    output logic        render_active,
     output logic [7:0]  source_nes_x,
     output logic [7:0]  source_nes_y,
     output logic        active_video,
@@ -43,6 +47,7 @@ module nes_vga_video (
     logic [7:0] delayed_nes_x;
     logic [7:0] delayed_nes_y;
     logic delayed_test_pattern;
+    logic delayed_developer_layout;
     logic delayed_framebuffer_valid;
     logic [9:0] output_x;
     logic [9:0] output_y;
@@ -76,6 +81,7 @@ module nes_vga_video (
         .vga_x(timing_x),
         .vga_y(timing_y),
         .active_video(timing_active),
+        .developer_layout(developer_layout),
         .nes_region(scaler_nes_region),
         .nes_x(scaler_nes_x),
         .nes_y(scaler_nes_y),
@@ -101,6 +107,7 @@ module nes_vga_video (
             delayed_nes_x <= 8'd0;
             delayed_nes_y <= 8'd0;
             delayed_test_pattern <= 1'b0;
+            delayed_developer_layout <= 1'b0;
             delayed_framebuffer_valid <= 1'b0;
             output_x <= 10'd0;
             output_y <= 10'd0;
@@ -122,6 +129,7 @@ module nes_vga_video (
             delayed_nes_x <= scaler_nes_x;
             delayed_nes_y <= scaler_nes_y;
             delayed_test_pattern <= test_pattern;
+            delayed_developer_layout <= developer_layout;
             delayed_framebuffer_valid <= framebuffer_valid;
             // A second pipeline stage registers DAC data and the matching
             // metadata. RGB then has a half pixel clock to settle before the
@@ -140,7 +148,8 @@ module nes_vga_video (
     end
 
     always_comb begin
-        pattern_bar = 3'((delayed_x - 10'd64) >> 6);
+        pattern_bar = delayed_developer_layout ? 3'(delayed_x >> 6) :
+                                                 3'((delayed_x - 10'd64) >> 6);
         next_red = 8'h00;
         next_green = 8'h00;
         next_blue = 8'h00;
@@ -171,6 +180,11 @@ module nes_vga_video (
 
     assign scan_x = output_x;
     assign scan_y = output_y;
+    // One-stage-earlier coordinates let independent renderers register their
+    // RGB on the same edge as the normal game RGB without shifting pixels.
+    assign render_x = delayed_x;
+    assign render_y = delayed_y;
+    assign render_active = delayed_active;
     assign source_nes_x = output_nes_x;
     assign source_nes_y = output_nes_y;
     assign active_video = output_active;

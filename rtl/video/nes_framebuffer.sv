@@ -54,6 +54,7 @@ module nes_framebuffer (
     logic accept_write;
     logic [1:0] selected_write_bank;
     logic [15:0] selected_expected_address;
+    logic completed_waiting;
 
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
     logic [1:0] acknowledge_sync;
@@ -95,6 +96,7 @@ module nes_framebuffer (
         endcase
     end
     assign start_capture = write_frame_start && !capture_active &&
+                           !completed_waiting &&
                            !capture_freeze;
     assign accept_write = write_valid && (capture_active || start_capture);
     assign selected_write_bank = capture_active ? write_bank :
@@ -122,7 +124,20 @@ module nes_framebuffer (
             write_range_error <= 1'b0;
             write_sequence_error <= 1'b0;
             expected_write_address <= 16'd0;
+            completed_waiting <= 1'b0;
         end else begin
+            // Debugger pauses can shift source/video phase enough that a
+            // second frame completes before the first handoff is acknowledged.
+            // Retain it in the third bank and publish after that acknowledgement.
+            // Skip capture starts while waiting; never stall NES progression or
+            // overwrite a queued/displayed bank, and never publish a partial frame.
+            if (completed_waiting && !capture_pending) begin
+                completed_bank <= write_bank;
+                request_toggle <= !request_toggle;
+                capture_complete <= 1'b1;
+                captured_frames <= captured_frames + 16'd1;
+                completed_waiting <= 1'b0;
+            end
             if (start_capture) begin
                 write_bank <= free_bank(read_bank_sync, completed_bank,
                                         capture_pending);
@@ -157,11 +172,7 @@ module nes_framebuffer (
                         capture_complete <= 1'b1;
                         captured_frames <= captured_frames + 16'd1;
                     end else begin
-                        // At the specified NES/VGA rates the acknowledgement
-                        // arrives near frame start, long before this point.
-                        // Treat failure to drain the one-entry handoff as an
-                        // explicit fault rather than overwriting queued data.
-                        write_sequence_error <= 1'b1;
+                        completed_waiting <= 1'b1;
                     end
                 end else
                     expected_write_address <= expected_write_address + 16'd1;

@@ -8,7 +8,10 @@ module nes_debug_renderer #(
     input  logic                                      developer_mode_enable,
     input  logic                                      snapshot_valid,
     input  logic                                      snapshot_update,
+    // Full-screen legacy view intentionally omits the debugger extension.
+    /* verilator lint_off UNUSEDSIGNAL */
     input  nes_debug_snapshot_pkg::nes_debug_snapshot_t snapshot,
+    /* verilator lint_on UNUSEDSIGNAL */
     input  logic                                      frame_start,
     input  logic [9:0]                                scan_x,
     input  logic [9:0]                                scan_y,

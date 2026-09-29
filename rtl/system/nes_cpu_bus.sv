@@ -62,6 +62,7 @@ module nes_cpu_bus (
     logic accepted_access;
     logic accepted_read;
     logic accepted_write;
+    logic ppu_address_selected;
 
     nes_cpu_address_decoder decoder (
         .address      (cpu_address),
@@ -75,6 +76,13 @@ module nes_cpu_bus (
     assign accepted_read = accepted_access && !cpu_write_enable;
     assign accepted_write = accepted_access && cpu_write_enable;
 
+    // The PPU range is exactly $2000-$3FFF. Keep its functional strobes
+    // independent of the encoded diagnostic target and the finer $40xx
+    // decode: CPU-address -> PPU arbitration -> CIRAM -> sprite capture is
+    // a single-cycle timing path. This is the same combinational decode,
+    // with no extra register, bus cycle, or change to peripheral priority.
+    assign ppu_address_selected = cpu_address[15:13] == 3'b001;
+
     assign selected_target = reset ? NES_CPU_TARGET_NONE : decoded_target;
     assign ram_address = decoded_ram_address;
     assign ppu_register = decoded_ppu_register;
@@ -82,7 +90,7 @@ module nes_cpu_bus (
     assign ram_access = accepted_access &&
                         decoded_target == NES_CPU_TARGET_RAM;
     assign ppu_access = accepted_access &&
-                        decoded_target == NES_CPU_TARGET_PPU;
+                        ppu_address_selected;
     assign apu_access = accepted_access &&
                         decoded_target == NES_CPU_TARGET_APU;
     assign dma_select = accepted_access &&
@@ -98,8 +106,8 @@ module nes_cpu_bus (
     // Canonicalize every CPU-visible PPU alias to $2000-$2007. The PPU owns
     // the only copy of each register and sees the original access exactly once.
     assign ppu_address = {13'h400, decoded_ppu_register};
-    assign ppu_read = accepted_read && decoded_target == NES_CPU_TARGET_PPU;
-    assign ppu_write = accepted_write && decoded_target == NES_CPU_TARGET_PPU;
+    assign ppu_read = accepted_read && ppu_address_selected;
+    assign ppu_write = accepted_write && ppu_address_selected;
 
     assign apu_address = cpu_address;
     assign apu_read = accepted_read && decoded_target == NES_CPU_TARGET_APU;

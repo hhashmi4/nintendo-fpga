@@ -1,10 +1,15 @@
 `timescale 1ns/1ps
 
-// Phase 4D-B physical top. The NES stays in the 50 MHz fabric domain and is
+// Phase 4E-D physical top. The NES stays in the 50 MHz fabric domain and is
 // advanced by an NTSC-rate clock enable; the VGA reader uses a PLL-derived
 // 25.2 MHz clock and crosses only through nes_framebuffer's handoff protocol.
 module de1_soc_nes_vga_top #(
-    parameter logic DEVELOPER_MODE_DEFAULT = 1'b0
+    parameter logic DEVELOPER_MODE_DEFAULT = 1'b0,
+    parameter logic [2:0] DEVELOPER_PAGE_DEFAULT = 3'd0,
+    parameter string PRG_INIT_FILE =
+        "../build/cartridge/phase4db_playable_nrom128.prg.hex",
+    parameter string CHR_INIT_FILE =
+        "../build/cartridge/phase4db_playable_nrom128.chr.hex"
 ) (
     input  logic       CLOCK_50,
     input  logic       KEY0,
@@ -162,6 +167,9 @@ module de1_soc_nes_vga_top #(
     logic [15:0] displayed_frames;
     logic [9:0] scan_x;
     logic [9:0] scan_y;
+    logic [9:0] panel_render_x;
+    logic [9:0] panel_render_y;
+    logic panel_render_active;
     logic [7:0] source_nes_x;
     logic [7:0] source_nes_y;
     logic active_video;
@@ -170,11 +178,11 @@ module de1_soc_nes_vga_top #(
     logic [7:0] normal_vga_red;
     logic [7:0] normal_vga_green;
     logic [7:0] normal_vga_blue;
-    logic [7:0] developer_vga_red;
-    logic [7:0] developer_vga_green;
-    logic [7:0] developer_vga_blue;
+    logic [7:0] panel_vga_red;
+    logic [7:0] panel_vga_green;
+    logic [7:0] panel_vga_blue;
     logic debug_snapshot_stale;
-    (* preserve, noprune *) logic [23:0] debug_renderer_retention;
+    (* preserve, noprune *) logic [23:0] debug_panel_retention;
 
     logic capture_heartbeat;
     logic vga_heartbeat;
@@ -184,15 +192,89 @@ module de1_soc_nes_vga_top #(
     // All ten slide switches already have Phase 4D-B functions. The parameter
     // gives simulation a clean renderer control while the board image keeps
     // Developer Mode hard-disabled until a non-conflicting control exists.
-    logic developer_mode_enable;
+    (* preserve *) logic developer_mode_enable;
+    // Virtual/testbench hooks. They intentionally have no physical board
+    // mapping because SW0..SW9 and KEY0 are all retained Phase 4D-B controls.
+    (* preserve, noprune *) logic developer_page_next_request;
+    (* preserve, noprune *) logic developer_page_select_valid;
+    (* preserve, noprune *) logic [2:0] developer_page_request;
+    (* preserve, noprune *) logic [2:0] developer_page_active;
+    (* preserve, noprune *) logic developer_page_request_pending;
     nes_debug_snapshot_pkg::nes_debug_snapshot_t debug_observations;
     nes_debug_snapshot_pkg::nes_debug_snapshot_t debug_destination_snapshot;
     logic debug_source_capture_accepted;
     logic debug_source_busy;
     logic debug_destination_update;
     logic debug_destination_valid;
+    // Source-side virtual controls live in the continuing video domain.
+    (* preserve, noprune *) logic debugger_request_valid;
+    (* preserve, noprune *) logic [2:0] debugger_request_command;
+    logic debugger_request_ready, debugger_request_busy, debugger_ack;
+    logic [15:0] debugger_ack_sequence;
+    logic [2:0] debugger_ack_state;
+    logic [1:0] debugger_ack_result;
+    // Retain a small video-domain JTAG status readback word even before a
+    // physical JTAG producer is bound. This keeps acknowledgement outputs
+    // from being optimized away merely because they have no board pins.
+    (* preserve, noprune *) logic [23:0] debugger_command_readback;
+    logic debugger_command_valid, debugger_command_done;
+    logic [2:0] debugger_command, debugger_response_state;
+    logic [15:0] debugger_command_sequence;
+    logic [1:0] debugger_response_result;
+    logic debugger_authorized, debugger_status_changed;
+    logic [5:0] cpu_debug_execution_state;
+    logic nes_core_cpu_enable;
+    nes_debug_snapshot_pkg::nes_debugger_snapshot_t debugger_status;
+    logic debug_capture_pending;
+    logic [18:0] debug_pause_heartbeat;
 
-    assign developer_mode_enable = DEVELOPER_MODE_DEFAULT;
+    nes_debug_command_cdc debugger_mailbox (
+        .source_clk(pixel_clk), .source_reset(video_reset),
+        .source_valid(debugger_request_valid),
+        .source_command(debugger_request_command),
+        .source_ready(debugger_request_ready), .source_busy(debugger_request_busy),
+        .source_ack(debugger_ack), .source_ack_sequence(debugger_ack_sequence),
+        .source_ack_state(debugger_ack_state), .source_ack_result(debugger_ack_result),
+        .destination_clk(CLOCK_50), .destination_reset(system_reset),
+        .destination_valid(debugger_command_valid),
+        .destination_command(debugger_command),
+        .destination_sequence(debugger_command_sequence),
+        .destination_done(debugger_command_done),
+        .destination_state(debugger_response_state),
+        .destination_result(debugger_response_result)
+    );
+    nes_debugger debugger (
+        .clk(CLOCK_50), .reset(system_reset),
+        .command_valid(debugger_command_valid), .command(debugger_command),
+        .command_sequence(debugger_command_sequence),
+        .command_done(debugger_command_done), .response_state(debugger_response_state),
+        .response_result(debugger_response_result),
+        .snapshot_ready(!debug_capture_pending && !debug_source_busy &&
+                        !debugger_status_changed),
+        .cpu_enable(nes_core_cpu_enable), .cpu_execution_state(cpu_debug_execution_state),
+        .cpu_pc(cpu_debug_pc), .dma_active(dma_debug_active),
+        .ppu_enable(nes_core_ppu_enable), .frame_start(ppu_frame_start),
+        .scheduler_authorized(debugger_authorized),
+        .status_changed(debugger_status_changed), .status(debugger_status)
+    );
+    // Retry status/pause captures through a busy mailbox. A paused heartbeat
+    // keeps CDC health observable without advancing any NES event counter.
+    always_ff @(posedge CLOCK_50) begin
+        if (system_reset) begin
+            debug_capture_pending <= 1'b0;
+            debug_pause_heartbeat <= '0;
+        end else begin
+            if (debug_source_capture_accepted)
+                debug_capture_pending <= 1'b0;
+            if (debugger_status.state == nes_debugger_pkg::DBG_PAUSED)
+                debug_pause_heartbeat <= debug_pause_heartbeat + 19'd1;
+            else
+                debug_pause_heartbeat <= '0;
+            if (debugger_status_changed || &debug_pause_heartbeat)
+                debug_capture_pending <= 1'b1;
+        end
+    end
+
 
     video_pll pixel_clock_source (
         .ref_clk(CLOCK_50),
@@ -213,6 +295,45 @@ module de1_soc_nes_vga_top #(
         .clk(pixel_clk),
         .async_reset_n(reset_request_n),
         .reset(video_reset)
+    );
+
+    // No Phase 4D-B board control is repurposed. This retained self-holding
+    // video-domain register makes the complete Developer Mode datapath real
+    // synthesized logic while selecting the parameter default after reset.
+    // The production image uses the default zero; simulation can set one.
+    always_ff @(posedge pixel_clk) begin
+        if (video_reset) begin
+            debugger_command_readback <= 24'd0;
+            developer_mode_enable <= DEVELOPER_MODE_DEFAULT;
+            developer_page_next_request <= 1'b0;
+            developer_page_select_valid <= 1'b0;
+            developer_page_request <= DEVELOPER_PAGE_DEFAULT;
+            debugger_request_valid <= 1'b0;
+            debugger_request_command <= 3'd0;
+        end else begin
+            debugger_command_readback <= {debugger_request_ready,
+                debugger_request_busy, debugger_ack, debugger_ack_sequence,
+                debugger_ack_state, debugger_ack_result};
+            developer_mode_enable <= developer_mode_enable;
+            developer_page_next_request <= developer_page_next_request;
+            developer_page_select_valid <= developer_page_select_valid;
+            developer_page_request <= developer_page_request;
+            debugger_request_valid <= debugger_request_valid;
+            debugger_request_command <= debugger_request_command;
+        end
+    end
+
+    nes_debug_page_select #(
+        .RESET_PAGE(DEVELOPER_PAGE_DEFAULT)
+    ) debug_page_select (
+        .pixel_clk(pixel_clk),
+        .reset(video_reset),
+        .frame_start(vga_frame_start),
+        .page_next_request(developer_page_next_request),
+        .page_select_valid(developer_page_select_valid),
+        .requested_page(developer_page_request),
+        .active_page(developer_page_active),
+        .request_pending(developer_page_request_pending)
     );
 
     level_sync test_pattern_video_sync (
@@ -262,7 +383,7 @@ module de1_soc_nes_vga_top #(
     nes_core nes (
         .clk(CLOCK_50),
         .reset(system_reset),
-        .nes_enable(nes_ppu_ce),
+        .nes_enable(nes_ppu_ce && debugger_authorized),
         .irq(1'b0),
         .mirroring_mode(cartridge_mirroring_mode),
         .cart_cpu_address(cart_cpu_address),
@@ -287,7 +408,7 @@ module de1_soc_nes_vga_top #(
         .chr_read_data(chr_read_data),
         .ppu_enable(nes_core_ppu_enable),
         .cpu_cycle_slot(nes_core_cpu_cycle_slot),
-        .cpu_enable(),
+        .cpu_enable(nes_core_cpu_enable),
         .scheduler_phase(),
         .cpu_address(cpu_debug_bus_address),
         .cpu_write_data(cpu_debug_bus_write_data),
@@ -302,6 +423,7 @@ module de1_soc_nes_vga_top #(
         .cpu_debug_pc(cpu_debug_pc),
         .cpu_debug_status(cpu_debug_status),
         .cpu_debug_instruction(cpu_debug_instruction),
+        .cpu_debug_execution_state(cpu_debug_execution_state),
         .cpu_bus_target(),
         .cpu_ram_address(),
         .cpu_ppu_register(),
@@ -387,8 +509,8 @@ module de1_soc_nes_vga_top #(
         .CHR_IS_RAM    (1'b0),
         .PRG_RAM_ENABLE(1'b0),
         .MIRRORING_MODE(2'd1),
-        .PRG_INIT_FILE ("../build/cartridge/phase4db_playable_nrom128.prg.hex"),
-        .CHR_INIT_FILE ("../build/cartridge/phase4db_playable_nrom128.chr.hex")
+        .PRG_INIT_FILE (PRG_INIT_FILE),
+        .CHR_INIT_FILE (CHR_INIT_FILE)
     ) cartridge (
         .clk(CLOCK_50),
         .reset(system_reset),
@@ -451,6 +573,7 @@ module de1_soc_nes_vga_top #(
         .pixel_clk(pixel_clk),
         .reset(video_reset),
         .test_pattern(test_pattern),
+        .developer_layout(developer_mode_enable),
         .framebuffer_valid(framebuffer_valid),
         .framebuffer_pixel(framebuffer_pixel),
         .framebuffer_address(framebuffer_address),
@@ -459,6 +582,9 @@ module de1_soc_nes_vga_top #(
         .line_start(vga_line_start),
         .scan_x(scan_x),
         .scan_y(scan_y),
+        .render_x(panel_render_x),
+        .render_y(panel_render_y),
+        .render_active(panel_render_active),
         .source_nes_x(source_nes_x),
         .source_nes_y(source_nes_y),
         .active_video(active_video),
@@ -472,6 +598,7 @@ module de1_soc_nes_vga_top #(
 
     always_comb begin
         debug_observations = '0;
+        debug_observations.debugger = debugger_status;
 
         debug_observations.cpu.pc = cpu_debug_pc;
         debug_observations.cpu.a = cpu_debug_a;
@@ -569,7 +696,7 @@ module de1_soc_nes_vga_top #(
         .source_clk(CLOCK_50),
         .source_reset(system_reset),
         .source_frame_capture(ppu_frame_start),
-        .manual_capture(1'b0),
+        .manual_capture(debug_capture_pending && !debug_source_busy),
         .observations(debug_observations),
         .nmi_event(ppu_nmi_event),
         .nmi_suppressed_event(ppu_nmi_suppressed),
@@ -591,50 +718,48 @@ module de1_soc_nes_vga_top #(
         .destination_snapshot(debug_destination_snapshot)
     );
 
-    // The renderer observes only the Phase 4E-A video-domain stable bank. It
-    // has no path back into NES execution or framebuffer capture. Passing a
-    // constant one here requests its raw page; the explicit mux below is the
-    // sole mode compositor and therefore the normal path is a hard bypass.
-    nes_debug_renderer debug_renderer (
+    // The compact renderer observes only the Phase 4E-A video-domain stable
+    // bank. It has no NES-pixel input and no path back into execution.
+    nes_debug_panel_renderer debug_panel_renderer (
         .pixel_clk(pixel_clk),
         .reset(video_reset),
-        .developer_mode_enable(1'b1),
         .snapshot_valid(debug_destination_valid),
         .snapshot_update(debug_destination_update),
         .snapshot(debug_destination_snapshot),
+        .page_select(developer_page_active),
         .frame_start(vga_frame_start),
-        .scan_x(scan_x),
-        .scan_y(scan_y),
-        .active_video(active_video),
-        .normal_red(8'h00),
-        .normal_green(8'h00),
-        .normal_blue(8'h00),
+        .scan_x(panel_render_x),
+        .scan_y(panel_render_y),
+        .active_video(panel_render_active),
         .snapshot_stale(debug_snapshot_stale),
-        .red(developer_vga_red),
-        .green(developer_vga_green),
-        .blue(developer_vga_blue)
+        .red(panel_vga_red),
+        .green(panel_vga_green),
+        .blue(panel_vga_blue)
     );
 
-    always_comb begin
-        if (developer_mode_enable) begin
-            VGA_R = developer_vga_red;
-            VGA_G = developer_vga_green;
-            VGA_B = developer_vga_blue;
-        end else begin
-            VGA_R = normal_vga_red;
-            VGA_G = normal_vga_green;
-            VGA_B = normal_vga_blue;
-        end
-    end
+    nes_developer_compositor developer_compositor (
+        .developer_mode_enable(developer_mode_enable),
+        .scan_x(scan_x),
+        .active_video(active_video),
+        .game_red(normal_vga_red),
+        .game_green(normal_vga_green),
+        .game_blue(normal_vga_blue),
+        .panel_red(panel_vga_red),
+        .panel_green(panel_vga_green),
+        .panel_blue(panel_vga_blue),
+        .red(VGA_R),
+        .green(VGA_G),
+        .blue(VGA_B)
+    );
 
-    // Retain the future-selectable renderer in the hard-disabled board image
-    // so Phase 4E-B synthesis measures the real logic and timing cost.
+    // Retain the panel output explicitly in the hard-disabled production
+    // image so Phase 4E-D synthesis measures the implemented renderer.
     always_ff @(posedge pixel_clk) begin
         if (video_reset)
-            debug_renderer_retention <= '0;
+            debug_panel_retention <= '0;
         else
-            debug_renderer_retention <= {
-                developer_vga_red, developer_vga_green, developer_vga_blue
+            debug_panel_retention <= {
+                panel_vga_red, panel_vga_green, panel_vga_blue
             };
     end
 
@@ -730,7 +855,7 @@ module de1_soc_nes_vga_top #(
                            ^dma_debug_source_address ||
                            ^dma_debug_source_data || ^dma_debug_bus_owner ||
                            developer_mode_enable ||
-                           debug_snapshot_stale || ^debug_renderer_retention ||
+                           debug_snapshot_stale || ^debug_panel_retention ||
                            debug_source_capture_accepted || debug_source_busy ||
                            debug_destination_update || debug_destination_valid ||
                            ^debug_destination_snapshot;

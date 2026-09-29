@@ -180,6 +180,14 @@ verilator --lint-only --Wall \
     rtl/debug/nes_debug_snapshot_pkg.sv \
     rtl/debug/nes_debug_snapshot.sv
 
+verilator --lint-only --Wall \
+    --top-module nes_debug_command_cdc \
+    rtl/debug/nes_debug_command_cdc.sv
+
+verilator --lint-only --Wall \
+    --top-module nes_debug_page_select \
+    rtl/debug/nes_debug_page_select.sv
+
 verilator --lint-only --Wall -Wno-UNUSEDPARAM \
     --top-module nes_debug_renderer \
     rtl/debug/nes_debug_snapshot_pkg.sv \
@@ -237,8 +245,10 @@ verilator --lint-only --Wall -Wno-fatal \
 PHASE3K_RTL_FILES=(
     rtl/debug/nes_debug_snapshot_pkg.sv
     rtl/debug/nes_debug_snapshot.sv
+    rtl/debug/nes_debug_page_select.sv
     rtl/debug/debug_font_pkg.sv
     rtl/debug/nes_debug_renderer.sv
+    rtl/debug/nes_debug_panel_renderer.sv
     rtl/platform/platform_config_pkg.sv
     rtl/platform/reset_sync.sv
     rtl/platform/level_sync.sv
@@ -252,7 +262,11 @@ PHASE3K_RTL_FILES=(
     rtl/video/nes_palette_rgb.sv
     rtl/video/nes_framebuffer.sv
     rtl/video/nes_vga_video.sv
+    rtl/video/nes_developer_compositor.sv
     rtl/video/video_pll.sv
+    rtl/debug/nes_debugger_pkg.sv
+    rtl/debug/nes_debug_command_cdc.sv
+    rtl/debug/nes_debugger.sv
     rtl/de1_soc_nes_vga_top.sv
 )
 
