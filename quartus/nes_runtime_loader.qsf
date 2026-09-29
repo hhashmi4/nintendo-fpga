@@ -1,0 +1,10 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY nes_runtime_loader
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader.sv
+
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_runtime_loader/output_files
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"

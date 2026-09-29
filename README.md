@@ -53,6 +53,11 @@ Phase 4E-D adds five frame-latched panel pages that reuse the coherent snapshot,
 font, formatter, colors, compositor, and fixed 512/128 geometry. Phase 4E-E adds
 acknowledged RUN/PAUSE/instruction-step/frame-step commands, safe full-NES
 suspension, and an 818-bit coherent status snapshot while VGA stays active.
+Phase 4F-A adds the FPGA-side runtime-loader protocol/control foundation: typed
+PRG/CHR byte writes, explicit ready/valid backpressure, deterministic error
+states, and a fail-safe NES hold/reset request. Runtime cartridge memory, the
+physical Cyclone V HPS bridge, Linux software, and microSD loading remain future
+work.
 
 ## Phase 1 foundation
 
@@ -537,6 +542,25 @@ Architecture, exact NMI/frame-step contracts, timing hardening, baseline/final
 verification, and the Phase 4F-A HPS interface recommendation are documented in
 [`docs/phase4e-e-interactive-debugger.md`](docs/phase4e-e-interactive-debugger.md).
 
+## Phase 4F-A — HPS ↔ FPGA Runtime Loader Interface
+
+- Separate loader command/data path; the HPS never impersonates the NES CPU
+- Typed `BEGIN`, `WRITE`, and `COMMIT` commands with PRG/CHR targets
+- Explicit 16-bit byte offsets: PRG `$0000-$7FFF`, CHR `$0000-$1FFF`
+- Ready/valid backpressure propagated from the future storage endpoint
+- Latched, classified errors with recovery through reset or a fresh `BEGIN`
+- Fail-safe NES hold/reset request asserted in IDLE, LOADING, and ERROR
+- Isolated integration boundary leaves the existing cartridge and board image
+  unchanged until Phase 4F-B adds runtime-writable storage
+- Independent Python model, fixed-seed randomized vectors, directed RTL tests,
+  Verilator assertions, and standalone Cyclone V synthesis check
+
+FPGA-side runtime-loader protocol/control foundation implemented and verified
+in simulation. Runtime `.nes` loading, microSD access, and physical HPS
+communication are not implemented. Architecture and exact protocol semantics
+are documented in
+[`docs/phase4f-a-hps-runtime-loader.md`](docs/phase4f-a-hps-runtime-loader.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -579,7 +603,8 @@ comparison, the Phase 4E-C panel/compositor full-frame and real playable-ROM
 combined-frame comparisons, the Phase 4E-D page-selector and five-page
 pixel-perfect comparisons, Phase 4E-E command CDC, deterministic instruction/DMA/NMI
 steps, frame completion overruns, paused framebuffer/health checks, mixed playable
-debugger long run, and playable integration checks, PPU
+debugger long run, playable integration checks, and the Phase 4F-A runtime-loader
+protocol/model/backpressure test, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -597,7 +622,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_phase4d_dma_integration.fst`, `nes_phase4d_dma_nmi.fst`,
 `nes_phase4db_playable.fst`, `nes_debug_snapshot.fst`,
 `nes_debug_renderer.fst`, `nes_developer_side_panel.fst`,
-`nes_debug_pages.fst`,
+`nes_debug_pages.fst`, `nes_runtime_loader_phase4fa.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -619,6 +644,13 @@ Run standalone CPU analysis and synthesis without changing the board top:
 
 ```bash
 ./scripts/build_cpu_quartus.sh
+```
+
+Run standalone Phase 4F-A runtime-loader analysis and synthesis without
+changing the board top or cartridge storage:
+
+```bash
+./scripts/build_runtime_loader_quartus.sh
 ```
 
 Run the standalone Phase 3A PPU timing-core synthesis and timing proof:
@@ -729,6 +761,7 @@ before use.
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — standalone OAM DMA bus master
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
+- `rtl/loader` — FPGA-side runtime-loader protocol and control foundation
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
 - `rtl/apu`, `rtl/memory` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches

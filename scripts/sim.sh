@@ -34,6 +34,7 @@ mkdir -p \
     build/verilator/nes_phase4d_dma_integration \
     build/verilator/nes_phase4d_dma_nmi \
     build/verilator/nes_phase4db_playable \
+    build/verilator/nes_runtime_loader_phase4fa \
     build/verilator/nes_debug_snapshot \
     build/verilator/nes_debug_renderer \
     build/verilator/nes_developer_side_panel \
@@ -116,6 +117,8 @@ NES_PHASE4D_DMA_INTEGRATION_WAVEFORM="build/sim/nes_phase4d_dma_integration.fst"
 NES_PHASE4D_DMA_NMI_WAVEFORM="build/sim/nes_phase4d_dma_nmi.fst"
 NES_PHASE4DB_WAVEFORM="build/sim/nes_phase4db_playable.fst"
 NES_PHASE4DB_BOOT_TRACE="build/sim/phase4db_boot_trace.txt"
+NES_RUNTIME_LOADER_PHASE4FA_WAVEFORM="build/sim/nes_runtime_loader_phase4fa.fst"
+NES_RUNTIME_LOADER_PHASE4FA_REFERENCE="build/sim/runtime_loader_reference.txt"
 NES_DEBUG_SNAPSHOT_WAVEFORM="build/sim/nes_debug_snapshot.fst"
 NES_DEBUG_RENDERER_WAVEFORM="build/sim/nes_debug_renderer.fst"
 NES_DEBUG_RENDERER_FONT_REFERENCE="build/sim/debug_font_reference.txt"
@@ -205,6 +208,8 @@ rm -f \
     "$NES_PHASE4D_DMA_NMI_WAVEFORM" \
     "$NES_PHASE4DB_WAVEFORM" \
     "$NES_PHASE4DB_BOOT_TRACE" \
+    "$NES_RUNTIME_LOADER_PHASE4FA_WAVEFORM" \
+    "$NES_RUNTIME_LOADER_PHASE4FA_REFERENCE" \
     "$NES_DEBUG_SNAPSHOT_WAVEFORM" \
     "$NES_DEBUG_RENDERER_WAVEFORM" \
     "$NES_DEBUG_RENDERER_FONT_REFERENCE" \
@@ -255,6 +260,25 @@ build/verilator/platform/platform_foundation_tb
 
 if [[ ! -s "$PLATFORM_WAVEFORM" ]]; then
     echo "ERROR: simulation did not generate a non-empty $PLATFORM_WAVEFORM" >&2
+    exit 1
+fi
+
+python3 scripts/generate_runtime_loader_vectors.py \
+    "$NES_RUNTIME_LOADER_PHASE4FA_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_runtime_loader_phase4fa \
+    --top-module nes_runtime_loader_phase4fa_tb \
+    -o nes_runtime_loader_phase4fa_tb \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader.sv \
+    sim/nes_runtime_loader_phase4fa_tb.sv
+
+build/verilator/nes_runtime_loader_phase4fa/nes_runtime_loader_phase4fa_tb
+
+if [[ ! -s "$NES_RUNTIME_LOADER_PHASE4FA_WAVEFORM" ]]; then
+    echo "ERROR: Phase 4F-A loader waveform is missing" >&2
     exit 1
 fi
 
@@ -1357,6 +1381,7 @@ echo "NES integrated DMA Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_INTEGRA
 echo "NES DMA/NMI Phase 4D-A waveform: $ROOT_DIR/$NES_PHASE4D_DMA_NMI_WAVEFORM"
 echo "NES playable Phase 4D-B waveform: $ROOT_DIR/$NES_PHASE4DB_WAVEFORM"
 echo "NES playable Phase 4D-B boot trace: $ROOT_DIR/$NES_PHASE4DB_BOOT_TRACE"
+echo "NES runtime loader Phase 4F-A waveform: $ROOT_DIR/$NES_RUNTIME_LOADER_PHASE4FA_WAVEFORM"
 echo "NES debug snapshot Phase 4E-A waveform: $ROOT_DIR/$NES_DEBUG_SNAPSHOT_WAVEFORM"
 echo "NES debug renderer Phase 4E-B waveform: $ROOT_DIR/$NES_DEBUG_RENDERER_WAVEFORM"
 echo "NES debug renderer Phase 4E-B frame: $ROOT_DIR/$NES_DEBUG_RENDERER_FRAME"
