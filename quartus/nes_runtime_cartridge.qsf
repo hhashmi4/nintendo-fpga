@@ -1,0 +1,56 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY nes_runtime_cartridge
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_cartridge_storage.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_mapper0.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_cartridge.sv
+set_global_assignment -name SDC_FILE ../constraints/nes_runtime_cartridge.sdc
+set_global_assignment -name VERILOG_MACRO "ALTERA_SYNTHESIS=1"
+
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_runtime_cartridge/output_files
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS "AS INPUT TRI-STATED"
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
+
+set_location_assignment PIN_AF14 -to clk
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk
+set_instance_assignment -name VIRTUAL_PIN ON -to reset
+set_instance_assignment -name VIRTUAL_PIN ON -to command_valid
+set_instance_assignment -name VIRTUAL_PIN ON -to command[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to command_target[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to command_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to command_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to command_ready
+set_instance_assignment -name VIRTUAL_PIN ON -to command_accepted
+set_instance_assignment -name VIRTUAL_PIN ON -to nrom_256
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_is_ram
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_read
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_write
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_read
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_write
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_write_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to chr_read_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to loader_state[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to loader_busy
+set_instance_assignment -name VIRTUAL_PIN ON -to loader_completed
+set_instance_assignment -name VIRTUAL_PIN ON -to loader_error
+set_instance_assignment -name VIRTUAL_PIN ON -to loader_error_code[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to nes_hold_reset
+set_instance_assignment -name VIRTUAL_PIN ON -to debug_prg_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to debug_prg_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to debug_chr_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to debug_chr_data[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to debug_prg_read
+set_instance_assignment -name VIRTUAL_PIN ON -to debug_prg_write
+set_instance_assignment -name VIRTUAL_PIN ON -to debug_chr_read
+set_instance_assignment -name VIRTUAL_PIN ON -to debug_chr_write
+
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"
