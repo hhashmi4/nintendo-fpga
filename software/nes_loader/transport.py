@@ -4,6 +4,47 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+import time
+
+from .mmio import RawMmio
+from .mmio_registers import (
+    CONTROL_CLEAR_SUBMIT_REJECTED,
+    ERROR_CODE_MASK,
+    ERROR_CODE_SHIFT,
+    ERROR_RESPONSE_FAILED,
+    ERROR_SUBMIT_REJECTED,
+    MANIFEST_CHR_IS_RAM_SHIFT,
+    MANIFEST_MAPPER_SHIFT,
+    MANIFEST_MIRRORING_SHIFT,
+    MANIFEST_VALID_SHIFT,
+    MMIO_CAPABILITIES,
+    MMIO_MAGIC,
+    MMIO_VERSION_MAJOR,
+    REG_ADDRESS,
+    REG_CAPABILITIES,
+    REG_COMMAND,
+    REG_COMPLETED_COUNT,
+    REG_CONTROL,
+    REG_ERROR,
+    REG_MAGIC,
+    REG_MANIFEST,
+    REG_MANIFEST_CHR_BYTES,
+    REG_MANIFEST_PRG_BYTES,
+    REG_STATUS,
+    REG_TARGET,
+    REG_VERSION,
+    REG_WRITE_DATA,
+    STATUS_ACTIVATION_IN_PROGRESS,
+    STATUS_BRIDGE_READY,
+    STATUS_COMMAND_PENDING,
+    STATUS_IMAGE_VALID,
+    STATUS_LOADER_ERROR,
+    STATUS_NES_HELD_RESET,
+    STATUS_RUNTIME_ACTIVE,
+    STATUS_STATE_MASK,
+    STATUS_STATE_SHIFT,
+    STATUS_SUBMIT_REJECTED,
+)
 
 from .protocol import (
     CHR_LAST_ADDRESS,
@@ -31,6 +72,10 @@ class TransportProtocolError(TransportError):
     """The endpoint reported a Phase 4F protocol error."""
 
 
+class TransportIdentityError(TransportError):
+    """The mapped endpoint is absent or contract-incompatible."""
+
+
 class RuntimeLoaderTransport(ABC):
     """Logical interface that Phase 4F-F can implement over a real bridge."""
 
@@ -49,6 +94,203 @@ class RuntimeLoaderTransport(ABC):
     @abstractmethod
     def wait_for_active(self, *, timeout_s: float) -> RuntimeStatus:
         """Wait for active runtime execution/reset release or timeout."""
+
+
+class MmioRuntimeLoaderTransport(RuntimeLoaderTransport):
+    """Production Phase 4F-F transport over the versioned MMIO register bank."""
+
+    def __init__(
+        self,
+        mmio: RawMmio,
+        *,
+        poll_interval_s: float = 0.0001,
+        monotonic: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        if poll_interval_s <= 0:
+            raise ValueError("poll_interval_s must be positive")
+        self.mmio = mmio
+        self.poll_interval_s = poll_interval_s
+        self._monotonic = monotonic
+        self._sleep = sleep
+        self._verify_identity()
+
+    def _verify_identity(self) -> None:
+        magic = self.mmio.read32(REG_MAGIC)
+        if magic != MMIO_MAGIC:
+            raise TransportIdentityError(
+                f"FPGA loader bridge magic mismatch: expected 0x{MMIO_MAGIC:08x}, "
+                f"read 0x{magic:08x}"
+            )
+        version = self.mmio.read32(REG_VERSION)
+        major = version >> 16
+        if major != MMIO_VERSION_MAJOR:
+            raise TransportIdentityError(
+                f"FPGA loader bridge major version {major} is incompatible with "
+                f"software major version {MMIO_VERSION_MAJOR}"
+            )
+        capabilities = self.mmio.read32(REG_CAPABILITIES)
+        missing = MMIO_CAPABILITIES & ~capabilities
+        if missing:
+            raise TransportIdentityError(
+                f"FPGA loader bridge lacks required capabilities 0x{missing:08x}"
+            )
+
+    def _validate_timeout(self, timeout_s: float) -> float:
+        if timeout_s < 0:
+            raise ValueError("timeouts must be non-negative")
+        return self._monotonic() + timeout_s
+
+    def _pause(self, deadline: float) -> None:
+        remaining = deadline - self._monotonic()
+        if remaining > 0:
+            self._sleep(min(self.poll_interval_s, remaining))
+
+    @staticmethod
+    def _error_message(stage: str, code: LoaderErrorCode) -> str:
+        label = code.name.lower().replace("_", " ")
+        return f"FPGA rejected {stage}: {label} ({code.name}, error {int(code)})"
+
+    def _read_error(self) -> tuple[LoaderErrorCode, bool, bool]:
+        word = self.mmio.read32(REG_ERROR)
+        value = (word & ERROR_CODE_MASK) >> ERROR_CODE_SHIFT
+        try:
+            code = LoaderErrorCode(value)
+        except ValueError as error:
+            raise TransportProtocolError(
+                f"FPGA loader bridge returned unknown error code {value}"
+            ) from error
+        return code, bool(word & ERROR_RESPONSE_FAILED), bool(
+            word & ERROR_SUBMIT_REJECTED
+        )
+
+    def _wait_ready(self, command: LoaderCommand, deadline: float) -> None:
+        while True:
+            word = self.mmio.read32(REG_STATUS)
+            if word & STATUS_SUBMIT_REJECTED:
+                self.mmio.write32(REG_CONTROL, CONTROL_CLEAR_SUBMIT_REJECTED)
+                raise TransportProtocolError(
+                    "FPGA loader bridge rejected an MMIO command submission"
+                )
+            if word & STATUS_BRIDGE_READY:
+                return
+            if word & STATUS_LOADER_ERROR and command.command is not Command.BEGIN:
+                code, _failed, _rejected = self._read_error()
+                raise TransportProtocolError(self._error_message(command.stage, code))
+            if self._monotonic() >= deadline:
+                raise TransportTimeout(f"{command.stage} command readiness timed out")
+            self._pause(deadline)
+
+    @staticmethod
+    def _manifest_word(manifest: Manifest) -> int:
+        return (
+            (1 << MANIFEST_VALID_SHIFT)
+            | (int(manifest.chr_is_ram) << MANIFEST_CHR_IS_RAM_SHIFT)
+            | (int(manifest.mirroring) << MANIFEST_MIRRORING_SHIFT)
+            | (manifest.mapper << MANIFEST_MAPPER_SHIFT)
+        )
+
+    def send(self, command: LoaderCommand, *, timeout_s: float) -> None:
+        deadline = self._validate_timeout(timeout_s)
+        self._wait_ready(command, deadline)
+
+        self.mmio.write32(REG_TARGET, int(command.target))
+        self.mmio.write32(REG_ADDRESS, command.address & 0xFFFF)
+        self.mmio.write32(REG_WRITE_DATA, command.data & 0xFF)
+        if command.command is Command.BEGIN:
+            if command.manifest is None:
+                raise TransportProtocolError("BEGIN requires a manifest")
+            self.mmio.write32(REG_MANIFEST, self._manifest_word(command.manifest))
+            self.mmio.write32(REG_MANIFEST_PRG_BYTES, command.manifest.prg_bytes)
+            self.mmio.write32(REG_MANIFEST_CHR_BYTES, command.manifest.chr_bytes)
+
+        before = self.mmio.read32(REG_COMPLETED_COUNT)
+        self.mmio.write32(REG_COMMAND, int(command.command))
+        while True:
+            status_word = self.mmio.read32(REG_STATUS)
+            if status_word & STATUS_SUBMIT_REJECTED:
+                self.mmio.write32(REG_CONTROL, CONTROL_CLEAR_SUBMIT_REJECTED)
+                raise TransportProtocolError(
+                    f"FPGA loader bridge rejected {command.stage} submission"
+                )
+            completed = self.mmio.read32(REG_COMPLETED_COUNT)
+            if completed != before and not (status_word & STATUS_COMMAND_PENDING):
+                break
+            if self._monotonic() >= deadline:
+                raise TransportTimeout(f"{command.stage} command acceptance timed out")
+            self._pause(deadline)
+
+        code, failed, rejected = self._read_error()
+        if rejected:
+            self.mmio.write32(REG_CONTROL, CONTROL_CLEAR_SUBMIT_REJECTED)
+            raise TransportProtocolError(
+                f"FPGA loader bridge rejected {command.stage} submission"
+            )
+        if failed:
+            raise TransportProtocolError(self._error_message(command.stage, code))
+
+    def read_status(self) -> RuntimeStatus:
+        word = self.mmio.read32(REG_STATUS)
+        state_value = (word & STATUS_STATE_MASK) >> STATUS_STATE_SHIFT
+        try:
+            state = LoaderState(state_value)
+        except ValueError as error:
+            raise TransportProtocolError(
+                f"FPGA loader bridge returned unknown loader state {state_value}"
+            ) from error
+        code, _failed, rejected = self._read_error()
+        if rejected or word & STATUS_SUBMIT_REJECTED:
+            self.mmio.write32(REG_CONTROL, CONTROL_CLEAR_SUBMIT_REJECTED)
+            raise TransportProtocolError(
+                "FPGA loader bridge reports a rejected MMIO submission"
+            )
+        return RuntimeStatus(
+            state=state,
+            error_code=code,
+            image_valid=bool(word & STATUS_IMAGE_VALID),
+            runtime_active=bool(word & STATUS_RUNTIME_ACTIVE),
+            activation_in_progress=bool(word & STATUS_ACTIVATION_IN_PROGRESS),
+            nes_hold_reset=bool(word & STATUS_NES_HELD_RESET),
+        )
+
+    def _wait(
+        self,
+        predicate: Callable[[RuntimeStatus], bool],
+        timeout_s: float,
+        stage: str,
+    ) -> RuntimeStatus:
+        deadline = self._validate_timeout(timeout_s)
+        while True:
+            status = self.read_status()
+            if status.state is LoaderState.ERROR:
+                raise TransportProtocolError(
+                    f"FPGA reported {stage} error: "
+                    f"{status.error_code.name.lower().replace('_', ' ')} "
+                    f"({status.error_code.name}, error {int(status.error_code)})"
+                )
+            if predicate(status):
+                return status
+            if self._monotonic() >= deadline:
+                raise TransportTimeout(f"{stage} timed out")
+            self._pause(deadline)
+
+    def wait_for_image_valid(self, *, timeout_s: float) -> RuntimeStatus:
+        return self._wait(
+            lambda status: status.image_valid,
+            timeout_s,
+            "image validation",
+        )
+
+    def wait_for_active(self, *, timeout_s: float) -> RuntimeStatus:
+        return self._wait(
+            lambda status: (
+                status.runtime_active
+                and not status.activation_in_progress
+                and not status.nes_hold_reset
+            ),
+            timeout_s,
+            "activation",
+        )
 
 
 DelayFunction = Callable[[int, LoaderCommand], int]

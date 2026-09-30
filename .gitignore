@@ -18,6 +18,10 @@ output_files/
 *.qws
 *.qsf.bak
 *_pin_model_dump.txt
+quartus/nes_hps_loader_system.sopcinfo
+quartus/hps_sdram_p0_all_pins.txt
+quartus/hps_sdram_p0_summary.csv
+quartus/hps_isw_handoff/
 
 # Verilator generated files
 obj_dir/

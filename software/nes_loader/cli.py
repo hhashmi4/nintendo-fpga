@@ -14,7 +14,13 @@ from .loader import (
     RuntimeLoaderTimeouts,
     execute_load_plan,
 )
-from .transport import MockRuntimeLoaderTransport
+from .mmio import DevMemMmio
+from .mmio_registers import MMIO_PHYSICAL_BASE, MMIO_SPAN_BYTES
+from .transport import (
+    MmioRuntimeLoaderTransport,
+    MockRuntimeLoaderTransport,
+    TransportError,
+)
 
 
 def _yes_no(value: bool) -> str:
@@ -48,7 +54,7 @@ def _inspection_lines(path: Path, inspection: ImageInspection) -> list[str]:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nes-loader",
-        description="Inspect or dry-run a Mapper-0 iNES runtime load",
+        description="Inspect or load a Mapper-0 iNES image at runtime",
     )
     subparsers = parser.add_subparsers(dest="action", required=True)
     inspect_parser = subparsers.add_parser("inspect", help="inspect iNES metadata")
@@ -64,6 +70,11 @@ def _parser() -> argparse.ArgumentParser:
     load_parser.add_argument("--command-timeout", type=float, default=1.0)
     load_parser.add_argument("--validation-timeout", type=float, default=1.0)
     load_parser.add_argument("--activation-timeout", type=float, default=1.0)
+    load_parser.add_argument(
+        "--dev-mem",
+        default="/dev/mem",
+        help="physical-memory device used by the HPS MMIO backend",
+    )
     return parser
 
 
@@ -80,29 +91,38 @@ def run(
             print("\n".join(_inspection_lines(args.file, inspection)), file=stdout)
             return 0 if inspection.supported else 2
 
-        if not args.dry_run:
-            print(
-                "nes-loader: no physical HPS/FPGA transport exists in Phase 4F-E; "
-                "use --dry-run",
-                file=stderr,
-            )
-            return 2
-
         image = load_runtime_image(args.file)
         plan = LoadPlan.from_image(image)
-        transport = MockRuntimeLoaderTransport(
-            validation_delay_polls=2,
-            activation_delay_polls=4,
-        )
-        result = execute_load_plan(
-            plan,
-            transport,
-            timeouts=RuntimeLoaderTimeouts(
-                command_s=args.command_timeout,
-                image_validation_s=args.validation_timeout,
-                activation_s=args.activation_timeout,
-            ),
-        )
+        if args.dry_run:
+            transport = MockRuntimeLoaderTransport(
+                validation_delay_polls=2,
+                activation_delay_polls=4,
+            )
+            result = execute_load_plan(
+                plan,
+                transport,
+                timeouts=RuntimeLoaderTimeouts(
+                    command_s=args.command_timeout,
+                    image_validation_s=args.validation_timeout,
+                    activation_s=args.activation_timeout,
+                ),
+            )
+        else:
+            with DevMemMmio(
+                MMIO_PHYSICAL_BASE,
+                MMIO_SPAN_BYTES,
+                device=args.dev_mem,
+            ) as raw_mmio:
+                transport = MmioRuntimeLoaderTransport(raw_mmio)
+                result = execute_load_plan(
+                    plan,
+                    transport,
+                    timeouts=RuntimeLoaderTimeouts(
+                        command_s=args.command_timeout,
+                        image_validation_s=args.validation_timeout,
+                        activation_s=args.activation_timeout,
+                    ),
+                )
         print("Parsed image: OK", file=stdout)
         print(f"Mapper {result.manifest.mapper}: supported", file=stdout)
         print("Manifest: valid", file=stdout)
@@ -110,8 +130,13 @@ def run(
         print(f"CHR transfer: {result.chr_bytes_written} bytes", file=stdout)
         print("Image validation: OK", file=stdout)
         print("Activation: OK", file=stdout)
-        print("Dry run completed successfully", file=stdout)
+        print(
+            "Dry run completed successfully"
+            if args.dry_run
+            else "Runtime load completed successfully",
+            file=stdout,
+        )
         return 0
-    except (OSError, INESError, RuntimeLoadError, ValueError) as error:
+    except (OSError, INESError, RuntimeLoadError, TransportError, ValueError) as error:
         print(f"nes-loader: {args.file}: {error}", file=stderr)
         return 2

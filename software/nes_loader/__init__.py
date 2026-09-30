@@ -20,11 +20,14 @@ from .loader import (
     RuntimeLoaderTimeouts,
     execute_load_plan,
 )
+from .mmio import DevMemMmio, FakeMmio, RawMmio
 from .protocol import Manifest, Mirroring
 from .transport import (
+    MmioRuntimeLoaderTransport,
     MockRuntimeLoaderTransport,
     RuntimeLoaderTransport,
     TransportError,
+    TransportIdentityError,
     TransportTimeout,
 )
 
@@ -33,17 +36,22 @@ __all__ = [
     "INES_HEADER_SIZE",
     "PRG_BANK_SIZE",
     "INESFormatError",
+    "DevMemMmio",
+    "FakeMmio",
     "LoadPlan",
     "LoadResult",
     "Manifest",
     "Mirroring",
+    "MmioRuntimeLoaderTransport",
     "MockRuntimeLoaderTransport",
     "ParsedINES",
     "RuntimeImage",
     "RuntimeLoadError",
     "RuntimeLoaderTimeouts",
     "RuntimeLoaderTransport",
+    "RawMmio",
     "TransportError",
+    "TransportIdentityError",
     "TransportTimeout",
     "UnsupportedINESImage",
     "execute_load_plan",

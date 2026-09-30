@@ -20,6 +20,7 @@ if ! cmp -s "$PLAYABLE_ROM" "$REGENERATED_ROM"; then
 fi
 python3 "$ROOT_DIR/scripts/prepare_phase4db_cartridge.py" \
     "$PLAYABLE_ROM" "$PLAYABLE_PREFIX"
+"$ROOT_DIR/scripts/generate_hps_loader_system.sh"
 cd "$PROJECT_DIR"
 quartus_sh --flow compile "$PROJECT_NAME"
 

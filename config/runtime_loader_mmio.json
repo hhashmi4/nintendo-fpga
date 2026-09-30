@@ -1,0 +1,62 @@
+{
+  "hps_lightweight_window_base": "0xff200000",
+  "slave_offset": "0x00000000",
+  "span_bytes": 64,
+  "magic": "0x4e45534c",
+  "version_major": 1,
+  "version_minor": 0,
+  "capabilities": {
+    "MANIFEST": 0,
+    "PRG_WRITE": 1,
+    "CHR_WRITE": 2,
+    "ATOMIC_ACTIVATE": 3,
+    "COHERENT_STATUS_CDC": 4
+  },
+  "registers": {
+    "MAGIC": "0x00",
+    "VERSION": "0x04",
+    "CAPABILITIES": "0x08",
+    "STATUS": "0x0c",
+    "ERROR": "0x10",
+    "COMMAND": "0x14",
+    "TARGET": "0x18",
+    "ADDRESS": "0x1c",
+    "WRITE_DATA": "0x20",
+    "MANIFEST": "0x24",
+    "MANIFEST_PRG_BYTES": "0x28",
+    "MANIFEST_CHR_BYTES": "0x2c",
+    "COMPLETED_COUNT": "0x30",
+    "CONTROL": "0x34"
+  },
+  "status_bits": {
+    "BRIDGE_READY": 0,
+    "COMMAND_PENDING": 1,
+    "LOADER_BUSY": 2,
+    "LOADER_READY": 3,
+    "IMAGE_VALID": 4,
+    "RUNTIME_ACTIVE": 5,
+    "NES_HELD_RESET": 6,
+    "LOADER_ERROR": 7,
+    "ACTIVATION_IN_PROGRESS": 8,
+    "SUBMIT_REJECTED": 9
+  },
+  "status_state_shift": 16,
+  "status_state_width": 2,
+  "error_code_shift": 0,
+  "error_code_width": 4,
+  "error_submit_rejected_bit": 8,
+  "error_response_failed_bit": 16,
+  "error_state_shift": 17,
+  "error_state_width": 2,
+  "manifest_fields": {
+    "VALID_SHIFT": 0,
+    "CHR_IS_RAM_SHIFT": 1,
+    "MIRRORING_SHIFT": 2,
+    "MIRRORING_WIDTH": 2,
+    "MAPPER_SHIFT": 8,
+    "MAPPER_WIDTH": 8
+  },
+  "control_bits": {
+    "CLEAR_SUBMIT_REJECTED": 0
+  }
+}

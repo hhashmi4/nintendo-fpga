@@ -38,11 +38,67 @@ module de1_soc_nes_vga_top #(
     output logic       VGA_CLK,
     output logic       VGA_BLANK_N,
     output logic       VGA_SYNC_N
+`ifdef ALTERA_SYNTHESIS
+    ,
+    output wire [14:0] HPS_DDR3_ADDR,
+    output wire [2:0]  HPS_DDR3_BA,
+    output wire        HPS_DDR3_CAS_N,
+    output wire        HPS_DDR3_CK_N,
+    output wire        HPS_DDR3_CK_P,
+    output wire        HPS_DDR3_CKE,
+    output wire        HPS_DDR3_CS_N,
+    output wire [3:0]  HPS_DDR3_DM,
+    inout  wire [31:0] HPS_DDR3_DQ,
+    inout  wire [3:0]  HPS_DDR3_DQS_N,
+    inout  wire [3:0]  HPS_DDR3_DQS_P,
+    output wire        HPS_DDR3_ODT,
+    output wire        HPS_DDR3_RAS_N,
+    output wire        HPS_DDR3_RESET_N,
+    input  wire        HPS_DDR3_RZQ,
+    output wire        HPS_DDR3_WE_N,
+    output wire        HPS_ENET_GTX_CLK,
+    inout  wire        HPS_ENET_INT_N,
+    output wire        HPS_ENET_MDC,
+    inout  wire        HPS_ENET_MDIO,
+    input  wire        HPS_ENET_RX_CLK,
+    input  wire [3:0]  HPS_ENET_RX_DATA,
+    input  wire        HPS_ENET_RX_DV,
+    output wire [3:0]  HPS_ENET_TX_DATA,
+    output wire        HPS_ENET_TX_EN,
+    inout  wire [3:0]  HPS_FLASH_DATA,
+    output wire        HPS_FLASH_DCLK,
+    output wire        HPS_FLASH_NCSO,
+    inout  wire        HPS_GSENSOR_INT,
+    inout  wire        HPS_I2C_CONTROL,
+    inout  wire        HPS_I2C1_SCLK,
+    inout  wire        HPS_I2C1_SDAT,
+    inout  wire        HPS_I2C2_SCLK,
+    inout  wire        HPS_I2C2_SDAT,
+    inout  wire        HPS_KEY_N,
+    inout  wire        HPS_LED,
+    inout  wire        HPS_LTC_GPIO,
+    output wire        HPS_SD_CLK,
+    inout  wire        HPS_SD_CMD,
+    inout  wire [3:0]  HPS_SD_DATA,
+    output wire        HPS_SPIM_CLK,
+    input  wire        HPS_SPIM_MISO,
+    output wire        HPS_SPIM_MOSI,
+    output wire        HPS_SPIM_SS,
+    input  wire        HPS_UART_RX,
+    output wire        HPS_UART_TX,
+    input  wire        HPS_USB_CLKOUT,
+    inout  wire [7:0]  HPS_USB_DATA,
+    input  wire        HPS_USB_DIR,
+    input  wire        HPS_USB_NXT,
+    output wire        HPS_USB_STP,
+    inout  wire        HPS_CONV_USB_N
+`endif
 );
     logic pixel_clk;
     logic pll_locked;
     logic reset_request_n;
     logic system_reset;
+    logic runtime_loader_reset;
     logic nes_functional_reset;
     logic video_reset;
     logic test_pattern;
@@ -79,9 +135,46 @@ module de1_soc_nes_vga_top #(
     logic cartridge_debug_chr_read;
     logic cartridge_debug_chr_write;
 
-    // Phase 4F-D logical loader hooks. A future Phase 4F-F bridge will drive
-    // these registers across its CDC boundary. They intentionally have no
-    // physical board mapping in this phase.
+    logic hps_mmio_clk;
+    logic hps_mmio_reset_raw;
+    logic hps_mmio_reset;
+    logic [5:0] hps_mmio_address;
+    logic hps_mmio_read;
+    logic hps_mmio_write;
+    logic [31:0] hps_mmio_writedata;
+    logic [3:0] hps_mmio_byteenable;
+    logic hps_mmio_waitrequest;
+    logic [31:0] hps_mmio_readdata;
+    logic hps_mmio_readdatavalid;
+    logic runtime_source_submit;
+    nes_runtime_loader_pkg::loader_command_t runtime_source_command;
+    nes_runtime_loader_pkg::loader_target_t runtime_source_target;
+    logic [15:0] runtime_source_address;
+    logic [7:0] runtime_source_data;
+    logic runtime_source_manifest_valid;
+    logic [7:0] runtime_source_manifest_mapper;
+    logic [15:0] runtime_source_manifest_prg_bytes;
+    logic [15:0] runtime_source_manifest_chr_bytes;
+    logic runtime_source_manifest_chr_is_ram;
+    logic [1:0] runtime_source_manifest_mirroring;
+    logic runtime_source_ready;
+    logic runtime_source_busy;
+    logic runtime_source_done;
+    nes_runtime_loader_pkg::loader_state_t runtime_source_response_state;
+    logic runtime_source_response_error;
+    nes_runtime_loader_pkg::loader_error_t
+        runtime_source_response_error_code;
+    nes_runtime_loader_pkg::loader_state_t runtime_source_status_state;
+    logic runtime_source_status_busy;
+    logic runtime_source_status_ready;
+    logic runtime_source_status_image_valid;
+    logic runtime_source_status_runtime_active;
+    logic runtime_source_status_nes_hold_reset;
+    logic runtime_source_status_error;
+    logic runtime_source_status_activation_in_progress;
+
+    // Phase 4F-F drives the established logical loader hooks through an
+    // exactly-once bundled-data CDC mailbox.
     (* preserve, noprune *) logic runtime_command_valid;
     (* preserve, noprune *) nes_runtime_loader_pkg::loader_command_t
         runtime_command;
@@ -328,42 +421,224 @@ module de1_soc_nes_vga_top #(
         .reset(video_reset)
     );
 
+`ifdef ALTERA_SYNTHESIS
+    // Platform Designer converts the Cyclone V lightweight HPS AXI master to
+    // a narrow Avalon-MM master. Its HPS-generated clock is intentionally
+    // independent of the 50 MHz loader domain below.
+    nes_hps_loader_system hps_loader_system (
+        .clk_clk(CLOCK_50),
+        .hps_ddr3_mem_a(HPS_DDR3_ADDR),
+        .hps_ddr3_mem_ba(HPS_DDR3_BA),
+        .hps_ddr3_mem_ck(HPS_DDR3_CK_P),
+        .hps_ddr3_mem_ck_n(HPS_DDR3_CK_N),
+        .hps_ddr3_mem_cke(HPS_DDR3_CKE),
+        .hps_ddr3_mem_cs_n(HPS_DDR3_CS_N),
+        .hps_ddr3_mem_ras_n(HPS_DDR3_RAS_N),
+        .hps_ddr3_mem_cas_n(HPS_DDR3_CAS_N),
+        .hps_ddr3_mem_we_n(HPS_DDR3_WE_N),
+        .hps_ddr3_mem_reset_n(HPS_DDR3_RESET_N),
+        .hps_ddr3_mem_dq(HPS_DDR3_DQ),
+        .hps_ddr3_mem_dqs(HPS_DDR3_DQS_P),
+        .hps_ddr3_mem_dqs_n(HPS_DDR3_DQS_N),
+        .hps_ddr3_mem_odt(HPS_DDR3_ODT),
+        .hps_ddr3_mem_dm(HPS_DDR3_DM),
+        .hps_ddr3_oct_rzqin(HPS_DDR3_RZQ),
+        .hps_io_hps_io_emac1_inst_TX_CLK(HPS_ENET_GTX_CLK),
+        .hps_io_hps_io_emac1_inst_TXD0(HPS_ENET_TX_DATA[0]),
+        .hps_io_hps_io_emac1_inst_TXD1(HPS_ENET_TX_DATA[1]),
+        .hps_io_hps_io_emac1_inst_TXD2(HPS_ENET_TX_DATA[2]),
+        .hps_io_hps_io_emac1_inst_TXD3(HPS_ENET_TX_DATA[3]),
+        .hps_io_hps_io_emac1_inst_RXD0(HPS_ENET_RX_DATA[0]),
+        .hps_io_hps_io_emac1_inst_MDIO(HPS_ENET_MDIO),
+        .hps_io_hps_io_emac1_inst_MDC(HPS_ENET_MDC),
+        .hps_io_hps_io_emac1_inst_RX_CTL(HPS_ENET_RX_DV),
+        .hps_io_hps_io_emac1_inst_TX_CTL(HPS_ENET_TX_EN),
+        .hps_io_hps_io_emac1_inst_RX_CLK(HPS_ENET_RX_CLK),
+        .hps_io_hps_io_emac1_inst_RXD1(HPS_ENET_RX_DATA[1]),
+        .hps_io_hps_io_emac1_inst_RXD2(HPS_ENET_RX_DATA[2]),
+        .hps_io_hps_io_emac1_inst_RXD3(HPS_ENET_RX_DATA[3]),
+        .hps_io_hps_io_qspi_inst_IO0(HPS_FLASH_DATA[0]),
+        .hps_io_hps_io_qspi_inst_IO1(HPS_FLASH_DATA[1]),
+        .hps_io_hps_io_qspi_inst_IO2(HPS_FLASH_DATA[2]),
+        .hps_io_hps_io_qspi_inst_IO3(HPS_FLASH_DATA[3]),
+        .hps_io_hps_io_qspi_inst_SS0(HPS_FLASH_NCSO),
+        .hps_io_hps_io_qspi_inst_CLK(HPS_FLASH_DCLK),
+        .hps_io_hps_io_sdio_inst_CMD(HPS_SD_CMD),
+        .hps_io_hps_io_sdio_inst_D0(HPS_SD_DATA[0]),
+        .hps_io_hps_io_sdio_inst_D1(HPS_SD_DATA[1]),
+        .hps_io_hps_io_sdio_inst_CLK(HPS_SD_CLK),
+        .hps_io_hps_io_sdio_inst_D2(HPS_SD_DATA[2]),
+        .hps_io_hps_io_sdio_inst_D3(HPS_SD_DATA[3]),
+        .hps_io_hps_io_usb1_inst_D0(HPS_USB_DATA[0]),
+        .hps_io_hps_io_usb1_inst_D1(HPS_USB_DATA[1]),
+        .hps_io_hps_io_usb1_inst_D2(HPS_USB_DATA[2]),
+        .hps_io_hps_io_usb1_inst_D3(HPS_USB_DATA[3]),
+        .hps_io_hps_io_usb1_inst_D4(HPS_USB_DATA[4]),
+        .hps_io_hps_io_usb1_inst_D5(HPS_USB_DATA[5]),
+        .hps_io_hps_io_usb1_inst_D6(HPS_USB_DATA[6]),
+        .hps_io_hps_io_usb1_inst_D7(HPS_USB_DATA[7]),
+        .hps_io_hps_io_usb1_inst_CLK(HPS_USB_CLKOUT),
+        .hps_io_hps_io_usb1_inst_STP(HPS_USB_STP),
+        .hps_io_hps_io_usb1_inst_DIR(HPS_USB_DIR),
+        .hps_io_hps_io_usb1_inst_NXT(HPS_USB_NXT),
+        .hps_io_hps_io_spim1_inst_CLK(HPS_SPIM_CLK),
+        .hps_io_hps_io_spim1_inst_MOSI(HPS_SPIM_MOSI),
+        .hps_io_hps_io_spim1_inst_MISO(HPS_SPIM_MISO),
+        .hps_io_hps_io_spim1_inst_SS0(HPS_SPIM_SS),
+        .hps_io_hps_io_uart0_inst_RX(HPS_UART_RX),
+        .hps_io_hps_io_uart0_inst_TX(HPS_UART_TX),
+        .hps_io_hps_io_i2c0_inst_SDA(HPS_I2C1_SDAT),
+        .hps_io_hps_io_i2c0_inst_SCL(HPS_I2C1_SCLK),
+        .hps_io_hps_io_i2c1_inst_SDA(HPS_I2C2_SDAT),
+        .hps_io_hps_io_i2c1_inst_SCL(HPS_I2C2_SCLK),
+        .hps_io_hps_io_gpio_inst_GPIO09(HPS_CONV_USB_N),
+        .hps_io_hps_io_gpio_inst_GPIO35(HPS_ENET_INT_N),
+        .hps_io_hps_io_gpio_inst_GPIO40(HPS_LTC_GPIO),
+        .hps_io_hps_io_gpio_inst_GPIO48(HPS_I2C_CONTROL),
+        .hps_io_hps_io_gpio_inst_GPIO53(HPS_LED),
+        .hps_io_hps_io_gpio_inst_GPIO54(HPS_KEY_N),
+        .hps_io_hps_io_gpio_inst_GPIO61(HPS_GSENSOR_INT),
+        .hps_user0_clock_clk(hps_mmio_clk),
+        .hps_user0_reset_reset(hps_mmio_reset_raw),
+        .loader_mmio_waitrequest(hps_mmio_waitrequest),
+        .loader_mmio_readdata(hps_mmio_readdata),
+        .loader_mmio_readdatavalid(hps_mmio_readdatavalid),
+        .loader_mmio_burstcount(),
+        .loader_mmio_writedata(hps_mmio_writedata),
+        .loader_mmio_address(hps_mmio_address),
+        .loader_mmio_write(hps_mmio_write),
+        .loader_mmio_read(hps_mmio_read),
+        .loader_mmio_byteenable(hps_mmio_byteenable),
+        .loader_mmio_debugaccess(),
+        .reset_reset_n(KEY0)
+    );
+`else
+    // Ordinary top-level simulations do not need an HPS behavioral model.
+    // The dedicated MMIO/CDC testbench drives the same register block.
+    assign hps_mmio_clk = CLOCK_50;
+    assign hps_mmio_reset_raw = system_reset;
+    assign hps_mmio_address = 6'h00;
+    assign hps_mmio_read = 1'b0;
+    assign hps_mmio_write = 1'b0;
+    assign hps_mmio_writedata = 32'h00000000;
+    assign hps_mmio_byteenable = 4'b1111;
+`endif
+
+    reset_sync hps_mmio_reset_generator (
+        .clk(hps_mmio_clk),
+        .async_reset_n(reset_request_n && !hps_mmio_reset_raw),
+        .reset(hps_mmio_reset)
+    );
+
+    // An HPS-side bridge reset also resets the destination mailbox and loader;
+    // this common reset assertion prevents either toggle endpoint retaining a
+    // stale request epoch. Each domain releases reset synchronously.
+    reset_sync runtime_loader_reset_generator (
+        .clk(CLOCK_50),
+        .async_reset_n(reset_request_n && !hps_mmio_reset_raw),
+        .reset(runtime_loader_reset)
+    );
+
     // system_reset is synchronously deasserted by reset_sync. The runtime
     // hold is generated in this same 50 MHz domain, so the complete NES sees
     // deterministic synchronous reset release after active metadata settles.
-    assign nes_functional_reset = system_reset || runtime_nes_hold_reset;
+    assign nes_functional_reset = system_reset || runtime_loader_reset ||
+                                  runtime_nes_hold_reset;
 
-    always_ff @(posedge CLOCK_50) begin
-        if (system_reset) begin
-            runtime_command_valid <= 1'b0;
-            runtime_command <= nes_runtime_loader_pkg::LOADER_COMMAND_BEGIN;
-            runtime_command_target <=
-                nes_runtime_loader_pkg::LOADER_TARGET_NONE;
-            runtime_command_address <= 16'h0000;
-            runtime_command_data <= 8'h00;
-            runtime_manifest_valid <= 1'b0;
-            runtime_manifest_mapper <= 8'd0;
-            runtime_manifest_prg_bytes <=
-                nes_runtime_loader_pkg::LOADER_PRG_NROM128_BYTES;
-            runtime_manifest_chr_bytes <=
-                nes_runtime_loader_pkg::LOADER_CHR_ROM_BYTES;
-            runtime_manifest_chr_is_ram <= 1'b0;
-            runtime_manifest_mirroring <=
-                nes_runtime_loader_pkg::LOADER_MIRROR_HORIZONTAL;
-        end else begin
-            runtime_command_valid <= runtime_command_valid;
-            runtime_command <= runtime_command;
-            runtime_command_target <= runtime_command_target;
-            runtime_command_address <= runtime_command_address;
-            runtime_command_data <= runtime_command_data;
-            runtime_manifest_valid <= runtime_manifest_valid;
-            runtime_manifest_mapper <= runtime_manifest_mapper;
-            runtime_manifest_prg_bytes <= runtime_manifest_prg_bytes;
-            runtime_manifest_chr_bytes <= runtime_manifest_chr_bytes;
-            runtime_manifest_chr_is_ram <= runtime_manifest_chr_is_ram;
-            runtime_manifest_mirroring <= runtime_manifest_mirroring;
-        end
-    end
+    nes_runtime_loader_mmio runtime_loader_mmio (
+        .clk(hps_mmio_clk),
+        .reset(hps_mmio_reset),
+        .avs_address(hps_mmio_address),
+        .avs_read(hps_mmio_read),
+        .avs_write(hps_mmio_write),
+        .avs_writedata(hps_mmio_writedata),
+        .avs_byteenable(hps_mmio_byteenable),
+        .avs_waitrequest(hps_mmio_waitrequest),
+        .avs_readdata(hps_mmio_readdata),
+        .avs_readdatavalid(hps_mmio_readdatavalid),
+        .command_submit(runtime_source_submit),
+        .command(runtime_source_command),
+        .command_target(runtime_source_target),
+        .command_address(runtime_source_address),
+        .command_data(runtime_source_data),
+        .manifest_valid(runtime_source_manifest_valid),
+        .manifest_mapper(runtime_source_manifest_mapper),
+        .manifest_prg_bytes(runtime_source_manifest_prg_bytes),
+        .manifest_chr_bytes(runtime_source_manifest_chr_bytes),
+        .manifest_chr_is_ram(runtime_source_manifest_chr_is_ram),
+        .manifest_mirroring(runtime_source_manifest_mirroring),
+        .command_channel_ready(runtime_source_ready),
+        .command_channel_busy(runtime_source_busy),
+        .command_done(runtime_source_done),
+        .command_response_state(runtime_source_response_state),
+        .command_response_error(runtime_source_response_error),
+        .command_response_error_code(runtime_source_response_error_code),
+        .status_loader_state(runtime_source_status_state),
+        .status_loader_busy(runtime_source_status_busy),
+        .status_loader_ready(runtime_source_status_ready),
+        .status_image_valid(runtime_source_status_image_valid),
+        .status_runtime_active(runtime_source_status_runtime_active),
+        .status_nes_hold_reset(runtime_source_status_nes_hold_reset),
+        .status_loader_error(runtime_source_status_error),
+        .status_activation_in_progress(
+            runtime_source_status_activation_in_progress)
+    );
+
+    nes_runtime_loader_cdc runtime_loader_mailbox (
+        .source_clk(hps_mmio_clk),
+        .source_reset(hps_mmio_reset),
+        .source_valid(runtime_source_submit),
+        .source_command(runtime_source_command),
+        .source_target(runtime_source_target),
+        .source_address(runtime_source_address),
+        .source_data(runtime_source_data),
+        .source_manifest_valid(runtime_source_manifest_valid),
+        .source_manifest_mapper(runtime_source_manifest_mapper),
+        .source_manifest_prg_bytes(runtime_source_manifest_prg_bytes),
+        .source_manifest_chr_bytes(runtime_source_manifest_chr_bytes),
+        .source_manifest_chr_is_ram(runtime_source_manifest_chr_is_ram),
+        .source_manifest_mirroring(runtime_source_manifest_mirroring),
+        .source_ready(runtime_source_ready),
+        .source_busy(runtime_source_busy),
+        .source_done(runtime_source_done),
+        .source_response_state(runtime_source_response_state),
+        .source_response_error(runtime_source_response_error),
+        .source_response_error_code(runtime_source_response_error_code),
+        .source_status_state(runtime_source_status_state),
+        .source_status_busy(runtime_source_status_busy),
+        .source_status_ready(runtime_source_status_ready),
+        .source_status_image_valid(runtime_source_status_image_valid),
+        .source_status_runtime_active(runtime_source_status_runtime_active),
+        .source_status_nes_hold_reset(runtime_source_status_nes_hold_reset),
+        .source_status_error(runtime_source_status_error),
+        .source_status_error_code(),
+        .source_status_activation_in_progress(
+            runtime_source_status_activation_in_progress),
+        .destination_clk(CLOCK_50),
+        .destination_reset(runtime_loader_reset),
+        .destination_valid(runtime_command_valid),
+        .destination_command(runtime_command),
+        .destination_target(runtime_command_target),
+        .destination_address(runtime_command_address),
+        .destination_data(runtime_command_data),
+        .destination_manifest_valid(runtime_manifest_valid),
+        .destination_manifest_mapper(runtime_manifest_mapper),
+        .destination_manifest_prg_bytes(runtime_manifest_prg_bytes),
+        .destination_manifest_chr_bytes(runtime_manifest_chr_bytes),
+        .destination_manifest_chr_is_ram(runtime_manifest_chr_is_ram),
+        .destination_manifest_mirroring(runtime_manifest_mirroring),
+        .destination_command_ready(runtime_command_ready),
+        .destination_command_accepted(runtime_command_accepted),
+        .destination_status_state(runtime_loader_state),
+        .destination_status_busy(runtime_loader_busy),
+        .destination_status_image_valid(runtime_staged_image_valid),
+        .destination_status_runtime_active(runtime_cartridge_active),
+        .destination_status_nes_hold_reset(runtime_nes_hold_reset),
+        .destination_status_error(runtime_loader_error),
+        .destination_status_error_code(runtime_loader_error_code),
+        .destination_status_activation_in_progress(
+            runtime_activation_in_progress)
+    );
 
     // No Phase 4D-B board control is repurposed. This retained self-holding
     // video-domain register makes the complete Developer Mode datapath real
@@ -581,7 +856,7 @@ module de1_soc_nes_vga_top #(
         .LEGACY_CHR_INIT_FILE (CHR_INIT_FILE)
     ) cartridge (
         .clk(CLOCK_50),
-        .reset(system_reset),
+        .reset(runtime_loader_reset),
         .command_valid(runtime_command_valid),
         .command(runtime_command),
         .command_target(runtime_command_target),

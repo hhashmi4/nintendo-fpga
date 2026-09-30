@@ -40,6 +40,9 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_pixel_mixer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/ppu/ppu_sprite_core.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/nes_core.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_mmio_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_mmio.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_cdc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_mapper0.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_cartridge.sv
@@ -59,6 +62,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_command_cdc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/de1_soc_nes_vga_top.sv
+set_global_assignment -name QIP_FILE ../build/qsys_nes_hps_loader_system/synthesis/nes_hps_loader_system.qip
 set_global_assignment -name SDC_FILE ../constraints/de1_soc_nes_vga.sdc
 set_global_assignment -name VERILOG_MACRO "ALTERA_SYNTHESIS=1"
 
@@ -193,5 +197,10 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX2[*]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX3[*]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX4[*]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX5[*]
+
+# HPS DDR3 and hard-peripheral pins are kept in a separate board assignment
+# file so the FPGA-side VGA/control pinout stays readable.
+source de1_soc_hps_pins.qsf
+source de1_soc_hps_ddr3.qsf
 
 set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
