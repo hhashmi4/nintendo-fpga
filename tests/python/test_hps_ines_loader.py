@@ -6,6 +6,7 @@ import re
 
 import pytest
 
+import software.nes_loader.cli as loader_cli
 from software.nes_loader.cli import run
 from software.nes_loader.ines import (
     CHRType,
@@ -233,7 +234,7 @@ def test_inspect_cli_reports_supported_and_unsupported(tmp_path: Path):
     assert "Reason:        Mapper 2 is not supported" in report
 
 
-def test_load_cli_dry_run_and_physical_transport_guard(tmp_path: Path):
+def test_load_cli_dry_run_and_real_mmio_error(tmp_path: Path):
     path = tmp_path / "owned.nes"
     path.write_bytes(make_ines(chr_banks=0))
     stdout = StringIO()
@@ -245,8 +246,37 @@ def test_load_cli_dry_run_and_physical_transport_guard(tmp_path: Path):
     assert "Activation: OK" in report
 
     stderr = StringIO()
-    assert run(["load", str(path)], stdout=StringIO(), stderr=stderr) == 2
-    assert "no physical HPS/FPGA transport" in stderr.getvalue()
+    missing_device = tmp_path / "missing-dev-mem"
+    assert (
+        run(
+            ["load", str(path), "--dev-mem", str(missing_device)],
+            stdout=StringIO(),
+            stderr=stderr,
+        )
+        == 2
+    )
+    assert str(missing_device) in stderr.getvalue()
+
+
+def test_load_cli_reports_incompatible_fpga_without_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    path = tmp_path / "owned.nes"
+    path.write_bytes(make_ines(chr_banks=0))
+    device = tmp_path / "fake-dev-mem"
+    device.write_bytes(bytes(loader_cli.MMIO_SPAN_BYTES))
+    monkeypatch.setattr(loader_cli, "MMIO_PHYSICAL_BASE", 0)
+
+    stderr = StringIO()
+    assert (
+        run(
+            ["load", str(path), "--dev-mem", str(device)],
+            stdout=StringIO(),
+            stderr=stderr,
+        )
+        == 2
+    )
+    assert "FPGA loader bridge magic mismatch" in stderr.getvalue()
 
 
 def test_load_runtime_image_rejects_before_transport_boundary(tmp_path: Path):

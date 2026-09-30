@@ -66,7 +66,11 @@ and natural CPU boot through the runtime reset vector. Phase 4F-E adds
 dependency-light Linux/HPS software for strict classic-iNES
 parsing, Mapper-0 runtime-image validation, exact manifest/load-plan creation,
 bounded transport orchestration, and a contract-enforcing mock/dry-run CLI.
-The physical Cyclone V HPS bridge and microSD loading remain future work.
+Phase 4F-F adds the real Cyclone V lightweight HPS-to-FPGA bridge, a versioned
+32-bit MMIO contract, coherent exactly-once command/status CDC, a `/dev/mem`
+Linux transport, reproducible Platform Designer integration, and production
+HPS/NES/VGA synthesis and timing closure. Physical board validation and
+microSD loading remain future work.
 
 ## Phase 1 foundation
 
@@ -660,6 +664,36 @@ Architecture, the exact RTL-derived software contract, format policy,
 timeouts, mock behavior, and verification are documented in
 [`docs/phase4f-e-linux-hps-ines-loader.md`](docs/phase4f-e-linux-hps-ines-loader.md).
 
+## Phase 4F-F — Cyclone V HPS ↔ FPGA runtime-loader bridge
+
+- Cyclone V lightweight HPS-to-FPGA AXI path converted to a 32-bit Avalon-MM
+  loader aperture by a source-controlled Platform Designer system
+- Generated address-map validation: HPS lightweight window plus the actual
+  assigned slave offset, shared with RTL and Python through one JSON contract
+- Versioned magic/version/capability registers, explicit manifest fields,
+  typed status/errors, a one-entry command bank, and completion counter
+- Held-bundle request/acknowledge CDC between the HPS user clock and 50 MHz
+  loader domain, with three-stage toggle synchronizers and coherent return
+  status snapshots
+- Production `MmioRuntimeLoaderTransport`, page-correct `/dev/mem` mapping,
+  bounded polling, endpoint compatibility checks, and useful typed errors
+- Faithful fake-MMIO software co-verification and a self-checking asynchronous
+  RTL test with backpressure, reset recovery, and a complete 16 KiB transfer
+- Integrated HPS + NES/VGA Quartus build with successful fit, assembly, fully
+  constrained TimeQuest analysis, and non-negative slack in every corner
+
+Run a real HPS load with the target image's required `/dev/mem` permissions:
+
+```bash
+python3 scripts/nes_loader.py load game.nes
+```
+
+No physical HPS↔FPGA communication is claimed in this phase. Board bootloader/
+preloader integration and on-board validation remain Phase 4F-I. Architecture,
+the exact register map, CDC/reset reasoning, address derivation, software
+backend, build procedure, verification, and physical limits are documented in
+[`docs/phase4f-f-hps-fpga-bridge.md`](docs/phase4f-f-hps-fpga-bridge.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -705,16 +739,19 @@ steps, frame completion overruns, paused framebuffer/health checks, mixed playab
 debugger long run, playable integration checks, the Phase 4F-A runtime-loader
 protocol/model/backpressure test, and the Phase 4F-B runtime storage/Mapper-0
 model and integration test, plus the Phase 4F-C manifest/coverage model and
-end-to-end image-validation/readback test, and the Phase 4F-D atomic activation,
-runtime reset-vector boot, replacement, DMA/NMI, and CHR integration test, PPU
+end-to-end image-validation/readback test, the Phase 4F-D atomic activation,
+runtime reset-vector boot, replacement, DMA/NMI, and CHR integration test, and
+the Phase 4F-F asynchronous MMIO/CDC/backpressure/reset/full-transfer test, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
 and Phase 3K timing, framebuffer, CDC, full-frame, and integrated NES/VGA
 programs.
-The Python stage also exercises the Phase 4F-E iNES parser, runtime-image and
+The Python stage also exercises the Phase 4F-E/F iNES parser, runtime-image and
 manifest mapping, lazy load plan, mock transport, backpressure/timeouts,
-failure behavior, and inspect/dry-run CLI.
+failure behavior, production MMIO transport semantics, endpoint compatibility,
+typed FPGA errors, register-model co-verification, `/dev/mem` mapping behavior,
+and inspect/dry-run CLI.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
@@ -731,6 +768,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_runtime_cartridge_phase4fb.fst`,
 `nes_runtime_image_phase4fc.fst`,
 `nes_runtime_activation_phase4fd.fst`,
+`nes_runtime_loader_mmio_phase4ff.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -832,9 +870,10 @@ Run the combined Phase 3J CPU+PPU NES-core synthesis and timing proof:
 ./scripts/build_nes_phase3j_quartus.sh
 ```
 
-Build the current Phase 4E-E debugger-enabled playable-ROM DE1-SoC NES/VGA
-image and run its strict ROM regeneration/import, fitter, assembler, timing,
-and RBF generation checks:
+Build the Phase 4F-F HPS-bridge/debugger/playable-ROM DE1-SoC NES/VGA image.
+The script regenerates and validates the Platform Designer address map, then
+runs strict ROM import, synthesis, fitter, assembler, fully constrained timing,
+SOF, and RBF checks:
 
 ```bash
 ./scripts/build_de1_soc_nes_vga_quartus.sh

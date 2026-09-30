@@ -180,6 +180,17 @@ verilator --lint-only --Wall \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader.sv
 
+verilator --lint-only --Wall -Wno-UNUSEDPARAM \
+    --top-module nes_runtime_loader_mmio \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader_mmio_pkg.sv \
+    rtl/loader/nes_runtime_loader_mmio.sv
+
+verilator --lint-only --Wall -Wno-UNUSEDPARAM \
+    --top-module nes_runtime_loader_cdc \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader_cdc.sv
+
 verilator --lint-only --Wall \
     --top-module nes_runtime_cartridge \
     rtl/loader/nes_runtime_loader_pkg.sv \
@@ -278,6 +289,9 @@ PHASE3K_RTL_FILES=(
     rtl/platform/nes_timing_gen.sv
     "${NES_RTL_FILES[@]}"
     rtl/loader/nes_runtime_loader_pkg.sv
+    rtl/loader/nes_runtime_loader_mmio_pkg.sv
+    rtl/loader/nes_runtime_loader_mmio.sv
+    rtl/loader/nes_runtime_loader_cdc.sv
     rtl/loader/nes_runtime_loader.sv
     "${CARTRIDGE_RTL_FILES[@]}"
     rtl/cartridge/nes_runtime_cartridge_storage.sv

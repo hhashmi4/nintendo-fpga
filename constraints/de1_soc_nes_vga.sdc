@@ -14,6 +14,88 @@ set_clock_groups -asynchronous \
     -group [get_clocks {CLOCK_50}] \
     -group $vga_domain_clocks
 
+# Platform Designer constrains the HPS-generated loader/MMIO clock at its hard
+# HPS source pin. It is asynchronous to both board oscillators. HPS-to-loader
+# crossings are constrained individually below so their bundled payloads keep
+# a finite routing bound instead of being hidden by a blanket false path.
+set hps_loader_clocks [get_clocks {*h2f_user0_clk}]
+if {[get_collection_size $hps_loader_clocks] != 1} {
+    post_message -type error "Phase 4F-F HPS loader clock was not discovered"
+}
+set_clock_groups -asynchronous \
+    -group $hps_loader_clocks \
+    -group $vga_domain_clocks
+
+# The HPS peripheral pins terminate in Cyclone V hard-HPS I/O rather than FPGA
+# fabric. Platform Designer emits these false paths for its generated wrapper
+# port names; repeat the intent for the board-level names used by this top.
+# HPS DDR3 is deliberately excluded because its generated UniPHY constraints
+# provide full external-interface timing analysis.
+create_clock -name HPS_USB_ULPI_CLK -period 16.667 \
+    [get_ports {HPS_USB_CLKOUT}]
+create_clock -name HPS_I2C1_SCL -period 2500.000 \
+    [get_ports {HPS_I2C1_SCLK}]
+create_clock -name HPS_I2C2_SCL -period 2500.000 \
+    [get_ports {HPS_I2C2_SCLK}]
+set hps_hard_peripheral_ports [get_ports {
+    HPS_ENET_* HPS_FLASH_* HPS_SD_* HPS_USB_* HPS_SPIM_* HPS_UART_*
+    HPS_I2C* HPS_GSENSOR_INT HPS_KEY_N HPS_LED HPS_LTC_GPIO
+}]
+set_false_path -from $hps_hard_peripheral_ports
+set_false_path -to $hps_hard_peripheral_ports
+
+# Request/acknowledge toggles use explicit three-flop synchronizers. The
+# payload banks are held until the corresponding synchronized toggle is
+# acknowledged. A 20 ns datapath bound ensures every bundled data bit settles
+# before a toggle can traverse the three receiving-domain stages.
+set loader_cdc_first_stage_registers [get_registers {
+    *runtime_loader_mailbox|request_sync[0]
+    *runtime_loader_mailbox|acknowledge_sync[0]
+    *runtime_loader_mailbox|status_request_sync[0]
+    *runtime_loader_mailbox|status_acknowledge_sync[0]
+}]
+set_false_path -to $loader_cdc_first_stage_registers
+
+set loader_cdc_command_bank [get_registers {
+    *runtime_loader_mailbox|command_bank*
+    *runtime_loader_mailbox|target_bank*
+    *runtime_loader_mailbox|address_bank*
+    *runtime_loader_mailbox|data_bank*
+    *runtime_loader_mailbox|manifest_valid_bank*
+    *runtime_loader_mailbox|manifest_mapper_bank*
+    *runtime_loader_mailbox|manifest_prg_bytes_bank*
+    *runtime_loader_mailbox|manifest_chr_bytes_bank*
+    *runtime_loader_mailbox|manifest_chr_is_ram_bank*
+    *runtime_loader_mailbox|manifest_mirroring_bank*
+}]
+set loader_cdc_destination_payload [get_registers {
+    *runtime_loader_mailbox|destination_command*
+    *runtime_loader_mailbox|destination_target*
+    *runtime_loader_mailbox|destination_address*
+    *runtime_loader_mailbox|destination_data*
+    *runtime_loader_mailbox|destination_manifest_valid*
+    *runtime_loader_mailbox|destination_manifest_mapper*
+    *runtime_loader_mailbox|destination_manifest_prg_bytes*
+    *runtime_loader_mailbox|destination_manifest_chr_bytes*
+    *runtime_loader_mailbox|destination_manifest_chr_is_ram*
+    *runtime_loader_mailbox|destination_manifest_mirroring*
+}]
+set_max_delay 20.000 \
+    -from $loader_cdc_command_bank -to $loader_cdc_destination_payload
+
+set loader_cdc_return_bank [get_registers {
+    *runtime_loader_mailbox|response_bank*
+    *runtime_loader_mailbox|status_bank*
+}]
+set loader_cdc_source_capture [get_registers {
+    *runtime_loader_mailbox|source_response_state*
+    *runtime_loader_mailbox|source_response_error*
+    *runtime_loader_mailbox|source_response_error_code*
+    *runtime_loader_mailbox|source_status_bank*
+}]
+set_max_delay 20.000 \
+    -from $loader_cdc_return_bank -to $loader_cdc_source_capture
+
 # KEY0 asserts reset asynchronously; every slide switch enters a two-flop
 # synchronizer before its value is used in the corresponding clock domain.
 set_false_path -from [get_ports {KEY0 SW0 SW1 SW2 SW3 SW4 SW5 SW6 SW7 SW8 SW9}]
