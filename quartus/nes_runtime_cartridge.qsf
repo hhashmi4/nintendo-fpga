@@ -56,6 +56,15 @@ set_instance_assignment -name VIRTUAL_PIN ON -to image_prg_bytes[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to image_chr_bytes[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to image_chr_is_ram
 set_instance_assignment -name VIRTUAL_PIN ON -to image_mirroring[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to activation_accepted
+set_instance_assignment -name VIRTUAL_PIN ON -to activation_in_progress
+set_instance_assignment -name VIRTUAL_PIN ON -to activation_error
+set_instance_assignment -name VIRTUAL_PIN ON -to runtime_active
+set_instance_assignment -name VIRTUAL_PIN ON -to active_mapper[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to active_prg_bytes[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to active_chr_bytes[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to active_chr_is_ram
+set_instance_assignment -name VIRTUAL_PIN ON -to active_mirroring[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to debug_prg_address[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to debug_prg_data[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to debug_chr_address[*]

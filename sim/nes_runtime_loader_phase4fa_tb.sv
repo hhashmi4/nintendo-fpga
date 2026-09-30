@@ -36,6 +36,7 @@ module nes_runtime_loader_phase4fa_tb;
     logic [15:0] image_chr_bytes;
     logic image_chr_is_ram;
     logic [1:0] image_mirroring;
+    logic activation_accepted;
     /* verilator lint_on UNUSEDSIGNAL */
 
     loader_target_t observed_target [0:255];

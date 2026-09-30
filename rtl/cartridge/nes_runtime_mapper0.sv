@@ -1,8 +1,8 @@
 `timescale 1ns/1ps
 
 // Runtime-configurable Mapper 0 address translation around the Phase 4F-B
-// writable payload store. Configuration is supplied directly for now; a
-// later manifest/activation phase will validate and latch it atomically.
+// writable payload store. The Phase 4F-D cartridge wrapper supplies the
+// atomically latched active configuration.
 module nes_runtime_mapper0 (
     input  logic                                      clk,
     input  logic                                      reset,

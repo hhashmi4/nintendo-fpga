@@ -60,9 +60,10 @@ writable 32 KiB PRG/8 KiB CHR endpoint, runtime-selectable NROM-128/NROM-256
 translation, preserved CHR-ROM/RAM behavior, and deterministic reset/collision
 semantics. Phase 4F-C adds an explicit Mapper-0 image manifest, strict
 per-target sequential coverage, deterministic incomplete/ordering errors, and
-a staged `image_valid` result. Atomic activation/reset integration, the
-physical Cyclone V HPS bridge, Linux software, and microSD loading remain
-future work.
+a staged `image_valid` result. Phase 4F-D adds explicit atomic activation,
+production legacy/runtime cartridge selection, a controlled whole-NES reset,
+and natural CPU boot through the runtime reset vector. The physical Cyclone V
+HPS bridge, Linux software, and microSD loading remain future work.
 
 ## Phase 1 foundation
 
@@ -604,6 +605,29 @@ target; PRG and CHR streams may interleave. Architecture, correctness proof,
 error/recovery contract, verification, and synthesis results are documented in
 [`docs/phase4f-c-runtime-image-validation.md`](docs/phase4f-c-runtime-image-validation.md).
 
+## Phase 4F-D — Atomic runtime cartridge activation
+
+- Explicit canonical `ACTIVATE` command; a completed image remains staged and
+  held until software requests activation
+- Atomic latching of runtime selection, PRG size, CHR-ROM/RAM mode, mapper,
+  and nametable mirroring metadata
+- Single 32 KiB PRG + 8 KiB CHR store reused safely while the complete NES is
+  held; no resource-expensive payload double buffer
+- Production legacy/runtime cartridge mux preserves the build-time playable
+  ROM whenever no runtime session has begun
+- Four-cycle controlled functional reset covers CPU, PPU, scheduler, system
+  bus, DMA, controllers, debugger, framebuffer write side, and debug capture
+- Natural `$FFFC/$FFFD` reset-vector fetch and instruction execution verified
+  for both mirrored NROM-128 and direct-mapped NROM-256
+- Runtime CHR-ROM reads/write protection, zero-payload CHR-RAM writes,
+  repeated activation, replacement loading, DMA/NMI reset, and failure safety
+- Independent activation-policy model plus a focused NES-core RTL integration
+  proof; the normal legacy/playable/debugger regression remains unchanged
+
+Architecture, exact command/reset semantics, verification, and synthesis
+results are documented in
+[`docs/phase4f-d-runtime-image-activation.md`](docs/phase4f-d-runtime-image-activation.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -649,7 +673,8 @@ steps, frame completion overruns, paused framebuffer/health checks, mixed playab
 debugger long run, playable integration checks, the Phase 4F-A runtime-loader
 protocol/model/backpressure test, and the Phase 4F-B runtime storage/Mapper-0
 model and integration test, plus the Phase 4F-C manifest/coverage model and
-end-to-end image-validation/readback test, PPU
+end-to-end image-validation/readback test, and the Phase 4F-D atomic activation,
+runtime reset-vector boot, replacement, DMA/NMI, and CHR integration test, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -670,6 +695,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_debug_pages.fst`, `nes_runtime_loader_phase4fa.fst`,
 `nes_runtime_cartridge_phase4fb.fst`,
 `nes_runtime_image_phase4fc.fst`,
+`nes_runtime_activation_phase4fd.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -700,7 +726,7 @@ changing the board top or cartridge storage:
 ./scripts/build_runtime_loader_quartus.sh
 ```
 
-Run the standalone Phase 4F-C runtime-cartridge manifest/storage fit,
+Run the standalone Phase 4F-D runtime-cartridge validation/activation fit,
 M10K-inference, and timing proof:
 
 ```bash

@@ -43,6 +43,7 @@ module de1_soc_nes_vga_top #(
     logic pll_locked;
     logic reset_request_n;
     logic system_reset;
+    logic nes_functional_reset;
     logic video_reset;
     logic test_pattern;
     logic freeze_capture;
@@ -77,6 +78,36 @@ module de1_soc_nes_vga_top #(
     logic cartridge_debug_prg_ram_write;
     logic cartridge_debug_chr_read;
     logic cartridge_debug_chr_write;
+
+    // Phase 4F-D logical loader hooks. A future Phase 4F-F bridge will drive
+    // these registers across its CDC boundary. They intentionally have no
+    // physical board mapping in this phase.
+    (* preserve, noprune *) logic runtime_command_valid;
+    (* preserve, noprune *) nes_runtime_loader_pkg::loader_command_t
+        runtime_command;
+    (* preserve, noprune *) nes_runtime_loader_pkg::loader_target_t
+        runtime_command_target;
+    (* preserve, noprune *) logic [15:0] runtime_command_address;
+    (* preserve, noprune *) logic [7:0] runtime_command_data;
+    logic runtime_command_ready;
+    logic runtime_command_accepted;
+    (* preserve, noprune *) logic runtime_manifest_valid;
+    (* preserve, noprune *) logic [7:0] runtime_manifest_mapper;
+    (* preserve, noprune *) logic [15:0] runtime_manifest_prg_bytes;
+    (* preserve, noprune *) logic [15:0] runtime_manifest_chr_bytes;
+    (* preserve, noprune *) logic runtime_manifest_chr_is_ram;
+    (* preserve, noprune *) logic [1:0] runtime_manifest_mirroring;
+    nes_runtime_loader_pkg::loader_state_t runtime_loader_state;
+    logic runtime_loader_busy;
+    logic runtime_loader_completed;
+    logic runtime_loader_error;
+    nes_runtime_loader_pkg::loader_error_t runtime_loader_error_code;
+    logic runtime_staged_image_valid;
+    logic runtime_activation_accepted;
+    logic runtime_activation_in_progress;
+    logic runtime_activation_error;
+    logic runtime_cartridge_active;
+    logic runtime_nes_hold_reset;
     logic pixel_valid;
     logic [7:0] pixel_x;
     logic [7:0] pixel_y;
@@ -244,7 +275,7 @@ module de1_soc_nes_vga_top #(
         .destination_result(debugger_response_result)
     );
     nes_debugger debugger (
-        .clk(CLOCK_50), .reset(system_reset),
+        .clk(CLOCK_50), .reset(nes_functional_reset),
         .command_valid(debugger_command_valid), .command(debugger_command),
         .command_sequence(debugger_command_sequence),
         .command_done(debugger_command_done), .response_state(debugger_response_state),
@@ -260,7 +291,7 @@ module de1_soc_nes_vga_top #(
     // Retry status/pause captures through a busy mailbox. A paused heartbeat
     // keeps CDC health observable without advancing any NES event counter.
     always_ff @(posedge CLOCK_50) begin
-        if (system_reset) begin
+        if (nes_functional_reset) begin
             debug_capture_pending <= 1'b0;
             debug_pause_heartbeat <= '0;
         end else begin
@@ -296,6 +327,43 @@ module de1_soc_nes_vga_top #(
         .async_reset_n(reset_request_n),
         .reset(video_reset)
     );
+
+    // system_reset is synchronously deasserted by reset_sync. The runtime
+    // hold is generated in this same 50 MHz domain, so the complete NES sees
+    // deterministic synchronous reset release after active metadata settles.
+    assign nes_functional_reset = system_reset || runtime_nes_hold_reset;
+
+    always_ff @(posedge CLOCK_50) begin
+        if (system_reset) begin
+            runtime_command_valid <= 1'b0;
+            runtime_command <= nes_runtime_loader_pkg::LOADER_COMMAND_BEGIN;
+            runtime_command_target <=
+                nes_runtime_loader_pkg::LOADER_TARGET_NONE;
+            runtime_command_address <= 16'h0000;
+            runtime_command_data <= 8'h00;
+            runtime_manifest_valid <= 1'b0;
+            runtime_manifest_mapper <= 8'd0;
+            runtime_manifest_prg_bytes <=
+                nes_runtime_loader_pkg::LOADER_PRG_NROM128_BYTES;
+            runtime_manifest_chr_bytes <=
+                nes_runtime_loader_pkg::LOADER_CHR_ROM_BYTES;
+            runtime_manifest_chr_is_ram <= 1'b0;
+            runtime_manifest_mirroring <=
+                nes_runtime_loader_pkg::LOADER_MIRROR_HORIZONTAL;
+        end else begin
+            runtime_command_valid <= runtime_command_valid;
+            runtime_command <= runtime_command;
+            runtime_command_target <= runtime_command_target;
+            runtime_command_address <= runtime_command_address;
+            runtime_command_data <= runtime_command_data;
+            runtime_manifest_valid <= runtime_manifest_valid;
+            runtime_manifest_mapper <= runtime_manifest_mapper;
+            runtime_manifest_prg_bytes <= runtime_manifest_prg_bytes;
+            runtime_manifest_chr_bytes <= runtime_manifest_chr_bytes;
+            runtime_manifest_chr_is_ram <= runtime_manifest_chr_is_ram;
+            runtime_manifest_mirroring <= runtime_manifest_mirroring;
+        end
+    end
 
     // No Phase 4D-B board control is repurposed. This retained self-holding
     // video-domain register makes the complete Developer Mode datapath real
@@ -382,7 +450,7 @@ module de1_soc_nes_vga_top #(
     /* verilator lint_off PINMISSING */
     nes_core nes (
         .clk(CLOCK_50),
-        .reset(system_reset),
+        .reset(nes_functional_reset),
         .nes_enable(nes_ppu_ce && debugger_authorized),
         .irq(1'b0),
         .mirroring_mode(cartridge_mirroring_mode),
@@ -481,7 +549,7 @@ module de1_soc_nes_vga_top #(
 
     nes_controller controllers (
         .clk(CLOCK_50),
-        .reset(system_reset),
+        .reset(nes_functional_reset),
         .controller1_buttons(controller1_buttons),
         .controller2_buttons(8'h00),
         .cpu_port(controller_port),
@@ -503,17 +571,30 @@ module de1_soc_nes_vga_top #(
         .debug_latch_event(controller_debug_latch)
     );
 
-    nes_cartridge #(
-        .MAPPER_NUMBER (0),
-        .PRG_ROM_BYTES (16384),
-        .CHR_IS_RAM    (1'b0),
-        .PRG_RAM_ENABLE(1'b0),
-        .MIRRORING_MODE(2'd1),
-        .PRG_INIT_FILE (PRG_INIT_FILE),
-        .CHR_INIT_FILE (CHR_INIT_FILE)
+    nes_cartridge_runtime_mux #(
+        .LEGACY_MAPPER_NUMBER (0),
+        .LEGACY_PRG_ROM_BYTES (16384),
+        .LEGACY_CHR_IS_RAM    (1'b0),
+        .LEGACY_PRG_RAM_ENABLE(1'b0),
+        .LEGACY_MIRRORING_MODE(2'd1),
+        .LEGACY_PRG_INIT_FILE (PRG_INIT_FILE),
+        .LEGACY_CHR_INIT_FILE (CHR_INIT_FILE)
     ) cartridge (
         .clk(CLOCK_50),
         .reset(system_reset),
+        .command_valid(runtime_command_valid),
+        .command(runtime_command),
+        .command_target(runtime_command_target),
+        .command_address(runtime_command_address),
+        .command_data(runtime_command_data),
+        .command_ready(runtime_command_ready),
+        .command_accepted(runtime_command_accepted),
+        .manifest_valid(runtime_manifest_valid),
+        .manifest_mapper(runtime_manifest_mapper),
+        .manifest_prg_bytes(runtime_manifest_prg_bytes),
+        .manifest_chr_bytes(runtime_manifest_chr_bytes),
+        .manifest_chr_is_ram(runtime_manifest_chr_is_ram),
+        .manifest_mirroring(runtime_manifest_mirroring),
         .cpu_address(cart_cpu_address),
         .cpu_read(cart_cpu_read),
         .cpu_write(cart_cpu_write),
@@ -529,6 +610,17 @@ module de1_soc_nes_vga_top #(
         .nrom_256(cartridge_nrom_256),
         .chr_is_ram(cartridge_chr_is_ram),
         .mirroring_mode(cartridge_mirroring_mode),
+        .loader_state(runtime_loader_state),
+        .loader_busy(runtime_loader_busy),
+        .loader_completed(runtime_loader_completed),
+        .loader_error(runtime_loader_error),
+        .loader_error_code(runtime_loader_error_code),
+        .staged_image_valid(runtime_staged_image_valid),
+        .activation_accepted(runtime_activation_accepted),
+        .activation_in_progress(runtime_activation_in_progress),
+        .activation_error(runtime_activation_error),
+        .runtime_active(runtime_cartridge_active),
+        .nes_hold_reset(runtime_nes_hold_reset),
         .debug_prg_address(cartridge_debug_prg_address),
         .debug_prg_data(cartridge_debug_prg_data),
         .debug_chr_address(cartridge_debug_chr_address),
@@ -543,7 +635,7 @@ module de1_soc_nes_vga_top #(
 
     nes_framebuffer framebuffer (
         .write_clk(CLOCK_50),
-        .write_reset(system_reset),
+        .write_reset(nes_functional_reset),
         .write_frame_start(ppu_frame_start),
         .write_valid(pixel_valid),
         .write_x(pixel_x),
@@ -694,7 +786,7 @@ module de1_soc_nes_vga_top #(
 
     nes_debug_snapshot debug_snapshot (
         .source_clk(CLOCK_50),
-        .source_reset(system_reset),
+        .source_reset(nes_functional_reset),
         .source_frame_capture(ppu_frame_start),
         .manual_capture(debug_capture_pending && !debug_source_busy),
         .observations(debug_observations),
@@ -828,6 +920,17 @@ module de1_soc_nes_vga_top #(
                            cartridge_debug_prg_ram_write ||
                            cartridge_debug_chr_read ||
                            cartridge_debug_chr_write ||
+                           runtime_command_ready ||
+                           runtime_command_accepted ||
+                           ^runtime_loader_state || runtime_loader_busy ||
+                           runtime_loader_completed || runtime_loader_error ||
+                           ^runtime_loader_error_code ||
+                           runtime_staged_image_valid ||
+                           runtime_activation_accepted ||
+                           runtime_activation_in_progress ||
+                           runtime_activation_error ||
+                           runtime_cartridge_active ||
+                           runtime_nes_hold_reset ||
                            ^captured_frames || controller_debug_strobe ||
                            ^controller_debug_live2 ||
                            ^controller_debug_shift1 ||

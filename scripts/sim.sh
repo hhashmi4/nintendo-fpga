@@ -37,6 +37,7 @@ mkdir -p \
     build/verilator/nes_runtime_loader_phase4fa \
     build/verilator/nes_runtime_cartridge_phase4fb \
     build/verilator/nes_runtime_image_phase4fc \
+    build/verilator/nes_runtime_activation_phase4fd \
     build/verilator/nes_debug_snapshot \
     build/verilator/nes_debug_renderer \
     build/verilator/nes_developer_side_panel \
@@ -124,6 +125,7 @@ NES_RUNTIME_LOADER_PHASE4FA_REFERENCE="build/sim/runtime_loader_reference.txt"
 NES_RUNTIME_CARTRIDGE_PHASE4FB_WAVEFORM="build/sim/nes_runtime_cartridge_phase4fb.fst"
 NES_RUNTIME_CARTRIDGE_PHASE4FB_REFERENCE="build/sim/runtime_cartridge_reference.txt"
 NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM="build/sim/nes_runtime_image_phase4fc.fst"
+NES_RUNTIME_ACTIVATION_PHASE4FD_WAVEFORM="build/sim/nes_runtime_activation_phase4fd.fst"
 NES_DEBUG_SNAPSHOT_WAVEFORM="build/sim/nes_debug_snapshot.fst"
 NES_DEBUG_RENDERER_WAVEFORM="build/sim/nes_debug_renderer.fst"
 NES_DEBUG_RENDERER_FONT_REFERENCE="build/sim/debug_font_reference.txt"
@@ -218,6 +220,7 @@ rm -f \
     "$NES_RUNTIME_CARTRIDGE_PHASE4FB_WAVEFORM" \
     "$NES_RUNTIME_CARTRIDGE_PHASE4FB_REFERENCE" \
     "$NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM" \
+    "$NES_RUNTIME_ACTIVATION_PHASE4FD_WAVEFORM" \
     "$NES_DEBUG_SNAPSHOT_WAVEFORM" \
     "$NES_DEBUG_RENDERER_WAVEFORM" \
     "$NES_DEBUG_RENDERER_FONT_REFERENCE" \
@@ -832,6 +835,29 @@ fi
 
 verilator --binary --timing --trace-fst --Wall \
     --assert \
+    --Mdir build/verilator/nes_runtime_activation_phase4fd \
+    --top-module nes_runtime_activation_phase4fd_tb \
+    -o nes_runtime_activation_phase4fd_tb \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader.sv \
+    rtl/cartridge/nes_mapper0.sv \
+    rtl/cartridge/nes_cartridge.sv \
+    rtl/cartridge/nes_runtime_cartridge_storage.sv \
+    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_cartridge.sv \
+    rtl/cartridge/nes_cartridge_runtime_mux.sv \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    sim/nes_runtime_activation_phase4fd_tb.sv
+
+build/verilator/nes_runtime_activation_phase4fd/nes_runtime_activation_phase4fd_tb
+
+if [[ ! -s "$NES_RUNTIME_ACTIVATION_PHASE4FD_WAVEFORM" ]]; then
+    echo "ERROR: Phase 4F-D runtime-activation waveform is missing" >&2
+    exit 1
+fi
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
     --Mdir build/verilator/nes_phase4c_controller \
     --top-module nes_phase4c_controller_tb \
     -o nes_phase4c_controller_tb \
@@ -1371,8 +1397,14 @@ PHASE4EC_TOP_RTL_FILES=(
     "${NES_PHASE3J_RTL_FILES[@]}"
     rtl/controller/controller_input_sync.sv
     rtl/controller/nes_controller.sv
+    rtl/loader/nes_runtime_loader_pkg.sv
+    rtl/loader/nes_runtime_loader.sv
     rtl/cartridge/nes_mapper0.sv
     rtl/cartridge/nes_cartridge.sv
+    rtl/cartridge/nes_runtime_cartridge_storage.sv
+    rtl/cartridge/nes_runtime_mapper0.sv
+    rtl/cartridge/nes_runtime_cartridge.sv
+    rtl/cartridge/nes_cartridge_runtime_mux.sv
     rtl/diagnostic/hex7seg.sv
     "${VIDEO_PHASE3K_RTL_FILES[@]}"
     rtl/video/nes_developer_compositor.sv
@@ -1433,6 +1465,7 @@ echo "NES playable Phase 4D-B boot trace: $ROOT_DIR/$NES_PHASE4DB_BOOT_TRACE"
 echo "NES runtime loader Phase 4F-A waveform: $ROOT_DIR/$NES_RUNTIME_LOADER_PHASE4FA_WAVEFORM"
 echo "NES runtime cartridge Phase 4F-B waveform: $ROOT_DIR/$NES_RUNTIME_CARTRIDGE_PHASE4FB_WAVEFORM"
 echo "NES runtime image Phase 4F-C waveform: $ROOT_DIR/$NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM"
+echo "NES runtime activation Phase 4F-D waveform: $ROOT_DIR/$NES_RUNTIME_ACTIVATION_PHASE4FD_WAVEFORM"
 echo "NES debug snapshot Phase 4E-A waveform: $ROOT_DIR/$NES_DEBUG_SNAPSHOT_WAVEFORM"
 echo "NES debug renderer Phase 4E-B waveform: $ROOT_DIR/$NES_DEBUG_RENDERER_WAVEFORM"
 echo "NES debug renderer Phase 4E-B frame: $ROOT_DIR/$NES_DEBUG_RENDERER_FRAME"

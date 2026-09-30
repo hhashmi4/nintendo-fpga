@@ -50,7 +50,11 @@ module nes_runtime_loader #(
     output logic [15:0]                               image_prg_bytes,
     output logic [15:0]                               image_chr_bytes,
     output logic                                      image_chr_is_ram,
-    output logic [1:0]                                image_mirroring
+    output logic [1:0]                                image_mirroring,
+
+    // One-cycle logical request accepted only for a complete staged image.
+    // The cartridge activation/reset controller consumes this pulse.
+    output logic                                      activation_accepted
 );
     import nes_runtime_loader_pkg::*;
 
@@ -67,6 +71,7 @@ module nes_runtime_loader #(
     logic manifest_mirroring_valid;
     logic manifest_prg_valid;
     logic manifest_chr_valid;
+    logic activation_payload_valid;
     loader_error_t begin_manifest_error;
 
     logic session_manifest_valid;
@@ -97,6 +102,10 @@ module nes_runtime_loader #(
         begin_payload_valid = command_target == LOADER_TARGET_NONE &&
                               command_address == 16'h0000 &&
                               command_data == 8'h00;
+        activation_payload_valid =
+            command_target == LOADER_TARGET_NONE &&
+            command_address == 16'h0000 &&
+            command_data == 8'h00;
         manifest_mirroring_valid =
             manifest_mirroring == LOADER_MIRROR_VERTICAL ||
             manifest_mirroring == LOADER_MIRROR_HORIZONTAL;
@@ -195,6 +204,11 @@ module nes_runtime_loader #(
     assign image_chr_is_ram = !reset && image_chr_is_ram_register;
     assign image_mirroring = reset ? LOADER_MIRROR_VERTICAL :
                                      image_mirroring_register;
+    assign activation_accepted = IMAGE_VALIDATION_ENABLE &&
+                                 command_accepted &&
+                                 command == LOADER_COMMAND_ACTIVATE &&
+                                 state_register == LOADER_STATE_READY &&
+                                 activation_payload_valid;
 
     always_ff @(posedge clk) begin
         if (reset) begin
@@ -327,6 +341,25 @@ module nes_runtime_loader #(
                         end
                     end
 
+                    LOADER_COMMAND_ACTIVATE: begin
+                        if (!IMAGE_VALIDATION_ENABLE) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <= LOADER_ERROR_BAD_COMMAND;
+                        end else if (state_register != LOADER_STATE_READY ||
+                                     !activation_payload_valid) begin
+                            state_register <= LOADER_STATE_ERROR;
+                            error_register <=
+                                LOADER_ERROR_ACTIVATE_INVALID;
+                        end else begin
+                            // Selection, active metadata, and reset sequencing
+                            // are owned by nes_runtime_cartridge. Keeping READY
+                            // preserves the staged-valid status and makes a
+                            // repeated ACTIVATE a deterministic reboot.
+                            state_register <= LOADER_STATE_READY;
+                            error_register <= LOADER_ERROR_NONE;
+                        end
+                    end
+
                     default: begin
                         state_register <= LOADER_STATE_ERROR;
                         error_register <= LOADER_ERROR_BAD_COMMAND;
@@ -371,6 +404,10 @@ module nes_runtime_loader #(
             end
         end
         assert (image_valid == (IMAGE_VALIDATION_ENABLE && completed));
+        if (activation_accepted) begin
+            assert (image_valid);
+            assert (activation_payload_valid);
+        end
         if (busy || error || state == LOADER_STATE_IDLE)
             assert (nes_hold_reset);
         if (reset) begin

@@ -113,6 +113,7 @@ module nes_core (
     import nes_system_pkg::*;
 
     logic cpu_cycle_parity;
+    logic dma_engine_active;
     logic dma_source_read_request;
     logic [10:0] shared_ram_read_address;
     logic [7:0] cpu_ram_read_data;
@@ -149,6 +150,10 @@ module nes_core (
     assign cpu_read_enable = !reset && cpu_bus_valid && !cpu_write_enable;
 
     assign dma_trigger = bus_dma_write;
+    // The DMA engine is synchronously reset. Mask its externally visible
+    // active flag while reset is asserted so the combinational arbiter moves
+    // to NES_BUS_MASTER_NONE immediately at a runtime-activation boundary.
+    assign dma_active = !reset && dma_engine_active;
 
     nes_cpu_ram internal_cpu_ram (
         .clk          (clk),
@@ -215,7 +220,7 @@ module nes_core (
         .source_read_event  (dma_read_event),
         .oam_write_data     (dma_data),
         .oam_write_strobe   (dma_write_event),
-        .active             (dma_active),
+        .active             (dma_engine_active),
         .cpu_stall          (dma_cpu_stall),
         .phase              (dma_phase),
         .source_page        (dma_page),

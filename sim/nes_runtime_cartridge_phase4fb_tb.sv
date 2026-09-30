@@ -49,6 +49,15 @@ module nes_runtime_cartridge_phase4fb_tb;
     logic [15:0] image_chr_bytes;
     logic image_chr_is_ram;
     logic [1:0] image_mirroring;
+    logic activation_accepted;
+    logic activation_in_progress;
+    logic activation_error;
+    logic runtime_active;
+    logic [7:0] active_mapper;
+    logic [15:0] active_prg_bytes;
+    logic [15:0] active_chr_bytes;
+    logic active_chr_is_ram;
+    logic [1:0] active_mirroring;
     /* verilator lint_on UNUSEDSIGNAL */
 
     logic [14:0] debug_prg_address;
@@ -69,7 +78,8 @@ module nes_runtime_cartridge_phase4fb_tb;
     integer vector_ppu_writes = 0;
 
     nes_runtime_cartridge #(
-        .IMAGE_VALIDATION_ENABLE(1'b0)
+        .IMAGE_VALIDATION_ENABLE(1'b0),
+        .ACTIVATION_ENABLE      (1'b0)
     ) dut (.*);
 
     always #5 clk <= ~clk;
