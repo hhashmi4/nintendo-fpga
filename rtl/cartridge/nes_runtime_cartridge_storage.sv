@@ -120,8 +120,8 @@ module nes_runtime_cartridge_storage (
     // masks read outputs to zero, and retains already accepted bytes. This
     // keeps the arrays inferable as block RAM. Same-address reads are
     // explicitly write-first. A loader CHR write takes priority over a PPU
-    // CHR-RAM write because the inferred memory has one write port; Phase
-    // 4F-D will hold the NES while loading.
+    // CHR-RAM write because the inferred memory has one write port; the
+    // Phase 4F-D activation controller holds the NES while loading.
     // Keep each memory's read and write ports in the canonical synchronous
     // simple-dual-port form. The bypass registers define write-first behavior
     // without depending on the device's native mixed-port collision mode.

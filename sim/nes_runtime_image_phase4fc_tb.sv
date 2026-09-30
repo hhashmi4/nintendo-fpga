@@ -53,6 +53,15 @@ module nes_runtime_image_phase4fc_tb;
     logic [15:0] image_chr_bytes;
     logic image_chr_is_ram;
     logic [1:0] image_mirroring;
+    logic activation_accepted;
+    logic activation_in_progress;
+    logic activation_error;
+    logic runtime_active;
+    logic [7:0] active_mapper;
+    logic [15:0] active_prg_bytes;
+    logic [15:0] active_chr_bytes;
+    logic active_chr_is_ram;
+    logic [1:0] active_mirroring;
 
     logic [14:0] debug_prg_address;
     logic [7:0] debug_prg_data;
@@ -97,11 +106,14 @@ module nes_runtime_image_phase4fc_tb;
     logic [15:0] bp_image_chr_bytes;
     logic bp_image_chr_is_ram;
     logic [1:0] bp_image_mirroring;
+    logic bp_activation_accepted;
     /* verilator lint_on UNUSEDSIGNAL */
 
     always #5 clk <= !clk;
 
-    nes_runtime_cartridge dut (.*);
+    nes_runtime_cartridge #(
+        .ACTIVATION_ENABLE(1'b0)
+    ) dut (.*);
 
     nes_runtime_loader backpressure_dut (
         .clk                  (clk),
@@ -135,7 +147,8 @@ module nes_runtime_image_phase4fc_tb;
         .image_prg_bytes      (bp_image_prg_bytes),
         .image_chr_bytes      (bp_image_chr_bytes),
         .image_chr_is_ram     (bp_image_chr_is_ram),
-        .image_mirroring      (bp_image_mirroring)
+        .image_mirroring      (bp_image_mirroring),
+        .activation_accepted  (bp_activation_accepted)
     );
 
     always_ff @(posedge clk) begin

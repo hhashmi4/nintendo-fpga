@@ -189,6 +189,16 @@ verilator --lint-only --Wall \
     rtl/cartridge/nes_runtime_cartridge.sv
 
 verilator --lint-only --Wall \
+    --top-module nes_cartridge_runtime_mux \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader.sv \
+    "${CARTRIDGE_RTL_FILES[@]}" \
+    rtl/cartridge/nes_runtime_cartridge_storage.sv \
+    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_cartridge.sv \
+    rtl/cartridge/nes_cartridge_runtime_mux.sv
+
+verilator --lint-only --Wall \
     --top-module nes_debug_snapshot \
     rtl/debug/nes_debug_snapshot_pkg.sv \
     rtl/debug/nes_debug_snapshot.sv
@@ -267,7 +277,13 @@ PHASE3K_RTL_FILES=(
     rtl/platform/level_sync.sv
     rtl/platform/nes_timing_gen.sv
     "${NES_RTL_FILES[@]}"
+    rtl/loader/nes_runtime_loader_pkg.sv
+    rtl/loader/nes_runtime_loader.sv
     "${CARTRIDGE_RTL_FILES[@]}"
+    rtl/cartridge/nes_runtime_cartridge_storage.sv
+    rtl/cartridge/nes_runtime_mapper0.sv
+    rtl/cartridge/nes_runtime_cartridge.sv
+    rtl/cartridge/nes_cartridge_runtime_mux.sv
     "${CONTROLLER_RTL_FILES[@]}"
     rtl/diagnostic/hex7seg.sv
     rtl/video/vga_timing.sv

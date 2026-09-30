@@ -18,6 +18,12 @@ package nes_runtime_loader_pkg;
         LOADER_COMMAND_RESERVED = 2'd3
     } loader_command_t;
 
+    // Phase 4F-D assigns the formerly reserved encoding to explicit image
+    // activation. The RESERVED spelling remains as a compatibility alias for
+    // the Phase 4F-A validation-disabled protocol tests.
+    localparam loader_command_t LOADER_COMMAND_ACTIVATE =
+        LOADER_COMMAND_RESERVED;
+
     typedef enum logic [1:0] {
         LOADER_TARGET_NONE     = 2'd0,
         LOADER_TARGET_PRG      = 2'd1,
@@ -46,6 +52,7 @@ package nes_runtime_loader_pkg;
         LOADER_ERROR_UNSUPPORTED_CHR    = 4'd10,
         LOADER_ERROR_UNEXPECTED_ADDRESS = 4'd11,
         LOADER_ERROR_PRG_INCOMPLETE     = 4'd12,
-        LOADER_ERROR_CHR_INCOMPLETE     = 4'd13
+        LOADER_ERROR_CHR_INCOMPLETE     = 4'd13,
+        LOADER_ERROR_ACTIVATE_INVALID   = 4'd14
     } loader_error_t;
 endpackage
