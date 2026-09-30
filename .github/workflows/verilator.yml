@@ -47,5 +47,5 @@ jobs:
           echo "$version"
           [[ "$version" == "Verilator 5.032 "* ]]
 
-      - name: Run Python, lint, and Phase 1-4F-C RTL simulation tests
+      - name: Run Python, lint, and Phase 1-4F-E verification
         run: scripts/test.sh
