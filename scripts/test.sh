@@ -10,7 +10,7 @@ if ! python3 -m pytest --version >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "[1/4] Python reference tests"
+echo "[1/4] Python reference and Phase 4F-E loader tests"
 python3 -m pytest
 
 echo "[2/4] Verilator RTL lint"

@@ -62,8 +62,11 @@ semantics. Phase 4F-C adds an explicit Mapper-0 image manifest, strict
 per-target sequential coverage, deterministic incomplete/ordering errors, and
 a staged `image_valid` result. Phase 4F-D adds explicit atomic activation,
 production legacy/runtime cartridge selection, a controlled whole-NES reset,
-and natural CPU boot through the runtime reset vector. The physical Cyclone V
-HPS bridge, Linux software, and microSD loading remain future work.
+and natural CPU boot through the runtime reset vector. Phase 4F-E adds
+dependency-light Linux/HPS software for strict classic-iNES
+parsing, Mapper-0 runtime-image validation, exact manifest/load-plan creation,
+bounded transport orchestration, and a contract-enforcing mock/dry-run CLI.
+The physical Cyclone V HPS bridge and microSD loading remain future work.
 
 ## Phase 1 foundation
 
@@ -628,6 +631,35 @@ Architecture, exact command/reset semantics, verification, and synthesis
 results are documented in
 [`docs/phase4f-d-runtime-image-activation.md`](docs/phase4f-d-runtime-image-activation.md).
 
+## Phase 4F-E — Linux/HPS iNES loader software
+
+- Strict classic-iNES parsing with exact payload boundaries and explicit
+  rejection of NES 2.0, trainers, four-screen, battery saves, console variants,
+  unsupported mappers/bank counts, truncation, and trailing bytes
+- Validated `RuntimeImage` boundary for NROM-128/NROM-256 with 8 KiB CHR-ROM
+  or zero-payload CHR-RAM and horizontal/vertical mirroring
+- Centralized command, target, manifest, state, error, size, and mirroring
+  encodings checked against the RTL package
+- Lazy deterministic load plan: `BEGIN`, sequential physical PRG, sequential
+  CHR-ROM when present, `COMMIT`, wait-valid, `ACTIVATE`, wait-active
+- Physical-transport-neutral interface with bounded command, validation, and
+  activation waits; no MMIO addresses or fake FPGA communication
+- Contract-enforcing deterministic mock with command recording, configurable
+  backpressure/status delays, failure injection, and timeout coverage
+- `inspect` and complete `load --dry-run` CLI workflows plus four generated,
+  original synthetic iNES fixtures and 40 focused tests
+
+Run the loader from the repository root:
+
+```bash
+python3 scripts/nes_loader.py inspect game.nes
+python3 scripts/nes_loader.py load game.nes --dry-run
+```
+
+Architecture, the exact RTL-derived software contract, format policy,
+timeouts, mock behavior, and verification are documented in
+[`docs/phase4f-e-linux-hps-ines-loader.md`](docs/phase4f-e-linux-hps-ines-loader.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -680,6 +712,9 @@ address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
 and Phase 3K timing, framebuffer, CDC, full-frame, and integrated NES/VGA
 programs.
+The Python stage also exercises the Phase 4F-E iNES parser, runtime-image and
+manifest mapping, lazy load plan, mock transport, backpressure/timeouts,
+failure behavior, and inspect/dry-run CLI.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
