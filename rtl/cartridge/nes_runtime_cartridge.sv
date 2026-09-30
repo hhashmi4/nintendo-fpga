@@ -1,10 +1,12 @@
 `timescale 1ns/1ps
 
-// Phase 4F-A + Phase 4F-B composition. This remains independent of the CPU
-// bus master and of any eventual HPS bridge/CDC implementation. nes_hold_reset
-// is exported but is not connected to the production NES reset path until
-// the later atomic-activation phase.
-module nes_runtime_cartridge (
+// Phase 4F-A/B/C composition. This remains independent of the CPU bus master
+// and of any eventual HPS bridge/CDC implementation. nes_hold_reset is
+// exported but is not connected to the production NES reset path until the
+// later atomic-activation phase.
+module nes_runtime_cartridge #(
+    parameter bit IMAGE_VALIDATION_ENABLE = 1'b1
+) (
     input  logic                                      clk,
     input  logic                                      reset,
 
@@ -16,6 +18,13 @@ module nes_runtime_cartridge (
     input  logic [7:0]                                command_data,
     output logic                                      command_ready,
     output logic                                      command_accepted,
+
+    input  logic                                      manifest_valid,
+    input  logic [7:0]                                manifest_mapper,
+    input  logic [15:0]                               manifest_prg_bytes,
+    input  logic [15:0]                               manifest_chr_bytes,
+    input  logic                                      manifest_chr_is_ram,
+    input  logic [1:0]                                manifest_mirroring,
 
     input  logic                                      nrom_256,
     input  logic                                      chr_is_ram,
@@ -38,6 +47,12 @@ module nes_runtime_cartridge (
     output logic                                      loader_error,
     output nes_runtime_loader_pkg::loader_error_t     loader_error_code,
     output logic                                      nes_hold_reset,
+    output logic                                      image_valid,
+    output logic [7:0]                                image_mapper,
+    output logic [15:0]                               image_prg_bytes,
+    output logic [15:0]                               image_chr_bytes,
+    output logic                                      image_chr_is_ram,
+    output logic [1:0]                                image_mirroring,
 
     output logic [14:0]                               debug_prg_address,
     output logic [7:0]                                debug_prg_data,
@@ -56,7 +71,9 @@ module nes_runtime_cartridge (
     logic [7:0] storage_write_data;
     logic storage_write_ready;
 
-    nes_runtime_loader loader (
+    nes_runtime_loader #(
+        .IMAGE_VALIDATION_ENABLE(IMAGE_VALIDATION_ENABLE)
+    ) loader (
         .clk                  (clk),
         .reset                (reset),
         .command_valid        (command_valid),
@@ -66,6 +83,12 @@ module nes_runtime_cartridge (
         .command_data         (command_data),
         .command_ready        (command_ready),
         .command_accepted     (command_accepted),
+        .manifest_valid       (manifest_valid),
+        .manifest_mapper      (manifest_mapper),
+        .manifest_prg_bytes   (manifest_prg_bytes),
+        .manifest_chr_bytes   (manifest_chr_bytes),
+        .manifest_chr_is_ram  (manifest_chr_is_ram),
+        .manifest_mirroring   (manifest_mirroring),
         .storage_write_valid  (storage_write_valid),
         .storage_write_target (storage_write_target),
         .storage_write_address(storage_write_address),
@@ -76,7 +99,13 @@ module nes_runtime_cartridge (
         .completed            (loader_completed),
         .error                (loader_error),
         .error_code           (loader_error_code),
-        .nes_hold_reset       (nes_hold_reset)
+        .nes_hold_reset       (nes_hold_reset),
+        .image_valid          (image_valid),
+        .image_mapper         (image_mapper),
+        .image_prg_bytes      (image_prg_bytes),
+        .image_chr_bytes      (image_chr_bytes),
+        .image_chr_is_ram     (image_chr_is_ram),
+        .image_mirroring      (image_mirroring)
     );
 
     nes_runtime_mapper0 mapper (

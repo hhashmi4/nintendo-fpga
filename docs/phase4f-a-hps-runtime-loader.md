@@ -14,8 +14,8 @@ microSD access, a menu, APU/audio, or another mapper. It does not claim that a
 `.nes` file can be loaded or that physical HPS communication works.
 
 The pre-existing cartridge read path and board image are unchanged. The
-runtime loader is deliberately isolated until Phase 4F-B provides a real
-storage endpoint and the associated reset-tree integration.
+runtime loader is deliberately isolated: Phase 4F-B provides its storage
+endpoint, while Phase 4F-D owns activation and reset-tree integration.
 
 ## Repository and baseline
 
@@ -69,7 +69,7 @@ nes_runtime_loader                   (Phase 4F-A)
                          CPU bus       PPU CHR port
 
 nes_runtime_loader.nes_hold_reset ---> functional NES reset integration
-                                      (Phase 4F-B)
+                                      (Phase 4F-D)
 ```
 
 The loader never drives CPU address, data, read/write, DMA, PPU register, or
@@ -161,7 +161,9 @@ buffering and clock-domain choices separate from protocol correctness.
 
 ## Error semantics
 
-The error output has a typed three-bit reason:
+Phase 4F-A assigned the first seven values of the typed error output. The
+field was originally three bits and was widened to four bits by Phase 4F-C;
+these established encodings remain unchanged:
 
 | Error | Cause |
 | --- | --- |
@@ -195,16 +197,18 @@ asserts hold on the accepting clock edge before any new write can be accepted.
 
 Phase 4F-A intentionally leaves this output unconnected in the production
 top. Consequently the existing synthesized playable ROM behaves exactly as it
-did before this phase. Phase 4F-B must connect it to a functional NES reset or
-equivalent execution hold at the same time that runtime storage becomes
-visible. Leaving it disconnected after adding runtime-writable storage would
-violate the safety contract.
+did before this phase. Phase 4F-B subsequently added storage only behind the
+standalone runtime composition. Phase 4F-D must connect a functional NES reset
+or equivalent execution hold when runtime storage can become active. Making
+that storage active while leaving the hold disconnected would violate the
+safety contract.
 
 COMMIT is the upstream producer's statement that its image transfer is
 complete. Phase 4F-A rejects an empty transfer but cannot prove whole-image
 coverage because image length, iNES metadata, staging storage, and atomic
-activation are outside this subphase. Phase 4F-B must add those storage and
-coverage rules before presenting runtime-loaded data to the NES.
+activation are outside this subphase. Phase 4F-B must add the storage, and
+Phase 4F-C must add coverage rules, before presenting runtime-loaded data to
+the NES.
 
 ## Clock-domain assumptions
 
@@ -267,7 +271,7 @@ constrained with nonnegative reported slack (minimum reported slack 0.142 ns).
 The fitted board design uses 4,897 ALMs (15%), 4,528 registers, 230 RAM blocks
 (58%), zero DSP blocks, and one PLL. This is a production-path non-regression
 check; the isolated Phase 4F-A controller is deliberately absent from that
-board image until the Phase 4F-B storage/reset integration exists.
+board image until the Phase 4F-D activation/reset integration exists.
 
 No physical DE1-SoC, HPS bridge, Linux process, JTAG session, or microSD card is
 required or claimed for Phase 4F-A.
@@ -288,6 +292,8 @@ Phase 4F-B subsequently added runtime-writable Mapper 0 PRG/CHR storage behind
 the validated write interface while retaining the existing build-time ROM
 path. Its architecture and verification are documented in
 [`phase4f-b-runtime-cartridge-storage.md`](phase4f-b-runtime-cartridge-storage.md).
-Complete-transfer validation is Phase 4F-C; atomic activation and functional
-NES reset/hold integration are Phase 4F-D. The physical Cyclone V HPS bridge
+Phase 4F-C subsequently added complete-transfer validation, documented in
+[`phase4f-c-runtime-image-validation.md`](phase4f-c-runtime-image-validation.md).
+Atomic activation and functional NES reset/hold integration are Phase 4F-D.
+The physical Cyclone V HPS bridge
 and its CDC/register adapter remain later Phase 4F work.

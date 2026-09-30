@@ -58,7 +58,9 @@ PRG/CHR byte writes, explicit ready/valid backpressure, deterministic error
 states, and a fail-safe NES hold/reset request. Phase 4F-B adds a runtime-
 writable 32 KiB PRG/8 KiB CHR endpoint, runtime-selectable NROM-128/NROM-256
 translation, preserved CHR-ROM/RAM behavior, and deterministic reset/collision
-semantics. Complete-image validation, atomic activation/reset integration, the
+semantics. Phase 4F-C adds an explicit Mapper-0 image manifest, strict
+per-target sequential coverage, deterministic incomplete/ordering errors, and
+a staged `image_valid` result. Atomic activation/reset integration, the
 physical Cyclone V HPS bridge, Linux software, and microSD loading remain
 future work.
 
@@ -554,7 +556,7 @@ verification, and the Phase 4F-A HPS interface recommendation are documented in
 - Latched, classified errors with recovery through reset or a fresh `BEGIN`
 - Fail-safe NES hold/reset request asserted in IDLE, LOADING, and ERROR
 - Isolated integration boundary leaves the existing cartridge and board image
-  unchanged until Phase 4F-B adds runtime-writable storage
+  unchanged; Phase 4F-B subsequently added standalone runtime storage
 - Independent Python model, fixed-seed randomized vectors, directed RTL tests,
   Verilator assertions, and standalone Cyclone V synthesis check
 
@@ -577,9 +579,30 @@ are documented in
 - Existing build-time playable cartridge and production board path unchanged
 
 Runtime cartridge byte storage and Mapper-0 reads are implemented and verified.
-Image completeness and activation are intentionally deferred. Architecture,
+Image activation is intentionally deferred. Architecture,
 collision/reset contracts, verification, and synthesis results are documented
 in [`docs/phase4f-b-runtime-cartridge-storage.md`](docs/phase4f-b-runtime-cartridge-storage.md).
+
+## Phase 4F-C — Runtime image validation
+
+- Explicit `BEGIN` manifest for mapper, exact PRG/CHR sizes, CHR-ROM/RAM, and
+  horizontal/vertical mirroring
+- Supported Mapper-0 configurations: 16 KiB or 32 KiB PRG, with either an
+  8 KiB CHR-ROM payload or CHR-RAM with no ROM payload
+- Strict sequential coverage tracked independently for PRG and CHR, allowing
+  target interleaving without any coverage RAM
+- Deterministic rejection of malformed manifests, unsupported configurations,
+  duplicate/gapped/reversed writes, range violations, and early commits
+- `image_valid` status separated from cartridge activation and NES reset release
+- Reset and every fresh `BEGIN` invalidate stale coverage and staged validity
+- Independent Python oracle, 40 unit tests, and a 123,016-check RTL integration
+  proof through loader, storage, Mapper 0, and CPU/PPU readback
+- Standalone Cyclone V proof preserves exactly 40 M10Ks and closes 50 MHz timing
+
+The future HPS/Linux loader must emit sequential byte addresses within each
+target; PRG and CHR streams may interleave. Architecture, correctness proof,
+error/recovery contract, verification, and synthesis results are documented in
+[`docs/phase4f-c-runtime-image-validation.md`](docs/phase4f-c-runtime-image-validation.md).
 
 ## Development environment
 
@@ -625,7 +648,8 @@ pixel-perfect comparisons, Phase 4E-E command CDC, deterministic instruction/DMA
 steps, frame completion overruns, paused framebuffer/health checks, mixed playable
 debugger long run, playable integration checks, the Phase 4F-A runtime-loader
 protocol/model/backpressure test, and the Phase 4F-B runtime storage/Mapper-0
-model and integration test, PPU
+model and integration test, plus the Phase 4F-C manifest/coverage model and
+end-to-end image-validation/readback test, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
@@ -645,6 +669,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_debug_renderer.fst`, `nes_developer_side_panel.fst`,
 `nes_debug_pages.fst`, `nes_runtime_loader_phase4fa.fst`,
 `nes_runtime_cartridge_phase4fb.fst`,
+`nes_runtime_image_phase4fc.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -675,8 +700,8 @@ changing the board top or cartridge storage:
 ./scripts/build_runtime_loader_quartus.sh
 ```
 
-Run the standalone Phase 4F-B runtime-cartridge fit, M10K-inference, and timing
-proof:
+Run the standalone Phase 4F-C runtime-cartridge manifest/storage fit,
+M10K-inference, and timing proof:
 
 ```bash
 ./scripts/build_runtime_cartridge_quartus.sh
@@ -790,7 +815,7 @@ before use.
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — standalone OAM DMA bus master
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
-- `rtl/loader` — FPGA-side runtime-loader protocol and control foundation
+- `rtl/loader` — runtime-loader protocol, manifest, and transfer validation
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
 - `rtl/apu`, `rtl/memory` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches
