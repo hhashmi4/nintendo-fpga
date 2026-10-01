@@ -4,6 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+SIM_PROFILE="${1:-full}"
+if [[ "$SIM_PROFILE" != "full" && "$SIM_PROFILE" != "--fast" ]]; then
+    echo "Usage: $0 [--fast]" >&2
+    exit 2
+fi
+
 mkdir -p \
     build/sim \
     build/verilator/platform \
@@ -342,6 +348,11 @@ build/verilator/nes_runtime_image_phase4fc/nes_runtime_image_phase4fc_tb
 if [[ ! -s "$NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM" ]]; then
     echo "ERROR: Phase 4F-C runtime-image waveform is missing" >&2
     exit 1
+fi
+
+if [[ "$SIM_PROFILE" == "--fast" ]]; then
+    echo "FAST RTL smoke passed: platform and Phase 4F-A/B/C runtime loading"
+    exit 0
 fi
 
 python3 scripts/generate_nes_phase4a_vectors.py "$NES_PHASE4A_BUS_REFERENCE"

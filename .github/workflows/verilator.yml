@@ -4,12 +4,80 @@ on:
   push:
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      verification_level:
+        description: Verification level
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - fast
+
+concurrency:
+  group: fpga-verification-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verification:
     runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      VERILATOR_VERSION: "5.032"
+      VERILATOR_REVISION: 8ff77e9d47351b0a59114929880687839a51840b
+      VERILATOR_PREFIX: /home/runner/.local/verilator/5.032
 
     steps:
+      - name: Select verification level
+        id: verification_level
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          HEAD_COMMITTER: ${{ github.event.head_commit.committer.username }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+          REQUESTED_LEVEL: ${{ inputs.verification_level }}
+        run: |
+          level=fast
+          reason="feature branch push"
+
+          case "$EVENT_NAME" in
+            pull_request)
+              level=full
+              reason="pull request to main"
+              ;;
+            workflow_dispatch)
+              level="$REQUESTED_LEVEL"
+              reason="manual $REQUESTED_LEVEL request"
+              ;;
+            push)
+              if [[ "$GIT_REF" == refs/tags/* || "$GIT_REF" == refs/heads/release/* ]]; then
+                level=full
+                reason="release ref"
+              elif [[ "$GIT_REF" == refs/heads/main ]]; then
+                if [[ "$HEAD_COMMITTER" == web-flow && "$HEAD_MESSAGE" == "Merge pull request #"* ]]; then
+                  reason="GitHub PR merge already covered by the full PR gate"
+                else
+                  level=full
+                  reason="direct or nonstandard main update"
+                fi
+              fi
+              ;;
+            *)
+              echo "Unsupported event: $EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+          echo "Verification level: $level ($reason)"
+          {
+            echo "### FPGA verification"
+            echo
+            echo "- Level: **$level**"
+            echo "- Reason: $reason"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -23,10 +91,15 @@ jobs:
       - name: Install Python verification dependencies
         run: python -m pip install -r requirements-dev.txt
 
-      - name: Install Verilator 5.032
-        env:
-          # Immutable source commit for the upstream v5.032 release.
-          VERILATOR_REVISION: 8ff77e9d47351b0a59114929880687839a51840b
+      - name: Restore pinned Verilator cache
+        id: verilator-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VERILATOR_PREFIX }}
+          key: verilator-${{ runner.os }}-${{ runner.arch }}-${{ env.VERILATOR_VERSION }}-${{ env.VERILATOR_REVISION }}
+
+      - name: Build Verilator 5.032
+        if: steps.verilator-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential autoconf bison flex help2man libfl-dev zlib1g-dev perl git
@@ -36,10 +109,12 @@ jobs:
           git fetch --depth 1 origin "$VERILATOR_REVISION"
           git checkout --detach FETCH_HEAD
           autoconf
-          ./configure --prefix="$RUNNER_TEMP/verilator-5.032"
+          ./configure --prefix="$VERILATOR_PREFIX"
           make -j2
           make install
-          echo "$RUNNER_TEMP/verilator-5.032/bin" >> "$GITHUB_PATH"
+
+      - name: Add Verilator to PATH
+        run: echo "$VERILATOR_PREFIX/bin" >> "$GITHUB_PATH"
 
       - name: Show Verilator version
         run: |
@@ -47,5 +122,10 @@ jobs:
           echo "$version"
           [[ "$version" == "Verilator 5.032 "* ]]
 
-      - name: Run Python, lint, and Phase 1-4F-E verification
+      - name: FAST verification — Python, full lint, and focused RTL smoke
+        if: steps.verification_level.outputs.level == 'fast'
+        run: scripts/test_fast.sh
+
+      - name: FULL verification — complete Python, lint, RTL, and integration regression
+        if: steps.verification_level.outputs.level == 'full'
         run: scripts/test.sh

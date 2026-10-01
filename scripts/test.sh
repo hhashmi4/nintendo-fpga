@@ -10,7 +10,7 @@ if ! python3 -m pytest --version >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "[1/4] Python reference and Phase 4F-E/F/G loader/MMIO/E2E tests"
+echo "[1/4] Python reference and Phase 4F-E/F/G/H loader/MMIO/E2E/library tests"
 python3 scripts/generate_runtime_loader_mmio_defs.py --check
 python3 -m pytest
 

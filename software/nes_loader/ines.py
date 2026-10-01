@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import os
 from pathlib import Path
+import stat
 
 from .protocol import (
     CHR_ROM_BYTES,
@@ -168,10 +170,14 @@ def parse_ines_header(data: bytes) -> INESHeader:
     )
 
 
-def parse_ines(data: bytes) -> ParsedINES:
-    """Parse exact classic-iNES boundaries without deciding FPGA support."""
+def ines_container_size(header: INESHeader) -> int:
+    """Return the exact container size declared by a classic iNES header."""
 
-    header = parse_ines_header(data)
+    trainer_size = TRAINER_SIZE if header.trainer else 0
+    return INES_HEADER_SIZE + trainer_size + header.prg_bytes + header.chr_bytes
+
+
+def _validate_classic_header(header: INESHeader) -> None:
     if header.nes2:
         raise UnsupportedINESImage("NES 2.0 images are not supported")
     if header.flags7 & 0x0C:
@@ -179,34 +185,10 @@ def parse_ines(data: bytes) -> ParsedINES:
     if any(header.raw[12:16]):
         raise INESFormatError("reserved iNES 1.0 header bytes 12-15 must be zero")
 
-    trainer_size = TRAINER_SIZE if header.trainer else 0
-    expected_size = (
-        INES_HEADER_SIZE + trainer_size + header.prg_bytes + header.chr_bytes
-    )
-    if len(data) < expected_size:
-        raise INESFormatError(
-            f"file is truncated at {len(data)} bytes; header requires "
-            f"{expected_size} bytes"
-        )
-    if len(data) > expected_size:
-        raise INESFormatError(
-            f"file has {len(data) - expected_size} unexpected trailing bytes; "
-            f"header requires exactly {expected_size} bytes"
-        )
 
-    offset = INES_HEADER_SIZE
-    trainer_bytes = data[offset : offset + trainer_size]
-    offset += trainer_size
-    prg_bytes = data[offset : offset + header.prg_bytes]
-    offset += header.prg_bytes
-    chr_bytes = data[offset : offset + header.chr_bytes]
-    return ParsedINES(header, trainer_bytes, prg_bytes, chr_bytes)
+def _validate_runtime_header(header: INESHeader) -> tuple[CHRType, Mirroring]:
+    """Validate support using header metadata without touching ROM payloads."""
 
-
-def validate_runtime_image(parsed: ParsedINES) -> RuntimeImage:
-    """Convert a parsed container into the exact Mapper-0 runtime subset."""
-
-    header = parsed.header
     if header.console_variant:
         raise UnsupportedINESImage("VS System and PlayChoice-10 images are unsupported")
     if header.mapper != MAPPER_0:
@@ -235,6 +217,42 @@ def validate_runtime_image(parsed: ParsedINES) -> RuntimeImage:
     mirroring = (
         Mirroring.VERTICAL if header.vertical_mirroring else Mirroring.HORIZONTAL
     )
+    return chr_type, mirroring
+
+
+def parse_ines(data: bytes) -> ParsedINES:
+    """Parse exact classic-iNES boundaries without deciding FPGA support."""
+
+    header = parse_ines_header(data)
+    _validate_classic_header(header)
+
+    trainer_size = TRAINER_SIZE if header.trainer else 0
+    expected_size = ines_container_size(header)
+    if len(data) < expected_size:
+        raise INESFormatError(
+            f"file is truncated at {len(data)} bytes; header requires "
+            f"{expected_size} bytes"
+        )
+    if len(data) > expected_size:
+        raise INESFormatError(
+            f"file has {len(data) - expected_size} unexpected trailing bytes; "
+            f"header requires exactly {expected_size} bytes"
+        )
+
+    offset = INES_HEADER_SIZE
+    trainer_bytes = data[offset : offset + trainer_size]
+    offset += trainer_size
+    prg_bytes = data[offset : offset + header.prg_bytes]
+    offset += header.prg_bytes
+    chr_bytes = data[offset : offset + header.chr_bytes]
+    return ParsedINES(header, trainer_bytes, prg_bytes, chr_bytes)
+
+
+def validate_runtime_image(parsed: ParsedINES) -> RuntimeImage:
+    """Convert a parsed container into the exact Mapper-0 runtime subset."""
+
+    header = parsed.header
+    chr_type, mirroring = _validate_runtime_header(header)
     image = RuntimeImage(
         mapper=header.mapper,
         mirroring=mirroring,
@@ -265,5 +283,59 @@ def inspect_ines(data: bytes) -> ImageInspection:
     return ImageInspection(header, parsed, image, True, None)
 
 
-def load_runtime_image(path: str | Path) -> RuntimeImage:
-    return validate_runtime_image(parse_ines(Path(path).read_bytes()))
+def inspect_ines_metadata(header_data: bytes, file_size: int) -> ImageInspection:
+    """Inspect one header and file size without reading the ROM payload.
+
+    This is the library-scanning counterpart to :func:`inspect_ines`. It uses
+    the same parser and support policy, but leaves payload-bearing fields empty.
+    """
+
+    header = parse_ines_header(header_data)
+    if header.nes2:
+        return ImageInspection(header, None, None, False, "NES 2.0 is not supported")
+    _validate_classic_header(header)
+    expected_size = ines_container_size(header)
+    if file_size < expected_size:
+        raise INESFormatError(
+            f"file is truncated at {file_size} bytes; header requires "
+            f"{expected_size} bytes"
+        )
+    if file_size > expected_size:
+        raise INESFormatError(
+            f"file has {file_size - expected_size} unexpected trailing bytes; "
+            f"header requires exactly {expected_size} bytes"
+        )
+    try:
+        _validate_runtime_header(header)
+    except UnsupportedINESImage as error:
+        return ImageInspection(header, None, None, False, str(error))
+    return ImageInspection(header, None, None, True, None)
+
+
+def inspect_ines_file(path: str | Path) -> ImageInspection:
+    """Read only the header of a regular iNES file for library display."""
+
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, "rb") as stream:
+        metadata = os.fstat(stream.fileno())
+        if not stat.S_ISREG(metadata.st_mode):
+            raise INESFormatError("library entry is not a regular file")
+        header_data = stream.read(INES_HEADER_SIZE)
+    return inspect_ines_metadata(header_data, metadata.st_size)
+
+
+def load_runtime_image(
+    path: str | Path, *, follow_symlinks: bool = True
+) -> RuntimeImage:
+    if follow_symlinks:
+        data = Path(path).read_bytes()
+    else:
+        flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | os.O_NOFOLLOW
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise INESFormatError("library entry is not a regular file")
+            data = stream.read()
+    return validate_runtime_image(parse_ines(data))
