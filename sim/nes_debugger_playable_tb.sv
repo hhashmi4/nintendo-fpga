@@ -51,7 +51,10 @@ module nes_debugger_playable_tb;
     logic have_cpu_state = 1'b0;
     integer source_frames=0, fetches=0, commands=0, acknowledgements=0;
     integer dma_reads=0, dma_writes=0, irq_entries=0;
+    integer apu_cpu_slots=0, apu_dma_advances=0;
     logic previous_fetch=0, previous_deferred=0;
+    logic previous_apu_slot=0, previous_dma_active=0;
+    logic [15:0] previous_apu_cycle=0;
     integer deferred_frames=0;
     always @(posedge clock_50) begin
         if (!dut.system_reset) begin
@@ -66,11 +69,21 @@ module nes_debugger_playable_tb;
             end
             if(dut.dma_read_event) dma_reads<=dma_reads+1;
             if(dut.dma_write_event) dma_writes<=dma_writes+1;
+            if(dut.nes_core_cpu_cycle_slot) apu_cpu_slots<=apu_cpu_slots+1;
+            if(previous_dma_active && previous_apu_slot &&
+               dut.apu.frame_sequence_cycle!=previous_apu_cycle)
+                apu_dma_advances<=apu_dma_advances+1;
             if(dut.debugger_status.state==DBG_PAUSED) begin
-                assert(!dut.nes_core_cpu_enable && !dut.nes_core_ppu_enable && !dut.dma_debug_active);
+                assert(!dut.nes_core_cpu_enable && !dut.nes_core_cpu_cycle_slot &&
+                       !dut.nes_core_ppu_enable && !dut.dma_debug_active);
+                assert(!dut.apu_quarter_frame_tick &&
+                       !dut.apu_half_frame_tick);
                 assert(dut.cpu_debug_execution_state==CPU_STATE_FETCH);
             end
             assert(!dut.write_range_error && !dut.write_sequence_error);
+            previous_apu_slot<=dut.nes_core_cpu_cycle_slot;
+            previous_dma_active<=dut.dma_debug_active;
+            previous_apu_cycle<=dut.apu.frame_sequence_cycle;
         end
     end
     always @(posedge dut.pixel_clk) begin
@@ -106,20 +119,34 @@ module nes_debugger_playable_tb;
         assert(dut.debug_snapshot.source_snapshot.ppu.scanline==dut.ppu_debug_scanline);
     endtask
     task automatic instruction_step;
-        integer f;
+        integer f, a;
+        logic [20:0] apu_state;
         logic [15:0] count;
-        f=fetches; count=dut.debugger_status.instruction_steps;
+        f=fetches; a=apu_cpu_slots;
+        apu_state={dut.apu.frame_sequence_cycle, dut.apu.cpu_cycle_odd,
+                   dut.apu.frame_reset_pending, dut.apu.frame_reset_delay};
+        count=dut.debugger_status.instruction_steps;
         send_command(DBG_STEP_I); await_pause();
         assert(fetches==f+1);
+        assert(apu_cpu_slots>a);
+        assert({dut.apu.frame_sequence_cycle, dut.apu.cpu_cycle_odd,
+                dut.apu.frame_reset_pending, dut.apu.frame_reset_delay}!=apu_state);
         assert(dut.debugger_status.instruction_steps==count+16'd1);
         assert(dut.debug_snapshot.source_snapshot.debugger.instruction_steps==count+16'd1);
     endtask
     task automatic frame_step;
-        integer f;
+        integer f, a;
+        logic [20:0] apu_state;
         logic [15:0] count;
-        f=source_frames; count=dut.debugger_status.frame_steps;
+        f=source_frames; a=apu_cpu_slots;
+        apu_state={dut.apu.frame_sequence_cycle, dut.apu.cpu_cycle_odd,
+                   dut.apu.frame_reset_pending, dut.apu.frame_reset_delay};
+        count=dut.debugger_status.frame_steps;
         send_command(DBG_STEP_F); await_pause();
         assert(source_frames==f+1);
+        assert(apu_cpu_slots>a);
+        assert({dut.apu.frame_sequence_cycle, dut.apu.cpu_cycle_odd,
+                dut.apu.frame_reset_pending, dut.apu.frame_reset_delay}!=apu_state);
         assert(dut.debugger_status.frame_steps==count+16'd1);
         assert(dma_reads==dma_completions*256 && dma_writes==dma_completions*256);
         assert(dut.debugger_status.frame_overrun<4000);
@@ -338,6 +365,7 @@ module nes_debugger_playable_tb;
         integer displayed_x, old_displayed_x;
         logic [15:0] frozen_pc;
         logic [17:0] frozen_ppu;
+        logic [20:0] frozen_apu;
         logic [1:0] frozen_bank;
         $dumpfile("build/sim/nes_debugger_playable.fst");
         $dumpvars(0,dut.debugger,dut.debugger_mailbox);
@@ -351,6 +379,8 @@ module nes_debugger_playable_tb;
         run_frames(5);
         send_command(DBG_PAUSE); await_pause();
         frozen_pc=dut.cpu_debug_pc; frozen_ppu={dut.ppu_debug_scanline,dut.ppu_debug_dot};
+        frozen_apu={dut.apu.frame_sequence_cycle, dut.apu.cpu_cycle_odd,
+                    dut.apu.frame_reset_pending, dut.apu.frame_reset_delay};
         baseline_frames=source_frames; baseline_polls=controller_polls;
         baseline_dmas=dma_completions; baseline_nmi=nmi_events;
         // Ten whole VGA frames while NES is paused: page selection, coherent
@@ -359,6 +389,9 @@ module nes_debugger_playable_tb;
             request_virtual_next_page();
             assert(dut.cpu_debug_pc==frozen_pc);
             assert({dut.ppu_debug_scanline,dut.ppu_debug_dot}==frozen_ppu);
+            assert({dut.apu.frame_sequence_cycle, dut.apu.cpu_cycle_odd,
+                    dut.apu.frame_reset_pending,
+                    dut.apu.frame_reset_delay}==frozen_apu);
             assert(source_frames==baseline_frames && controller_polls==baseline_polls);
             assert(dma_completions==baseline_dmas && nmi_events==baseline_nmi);
             assert(!dut.debug_snapshot_stale);
@@ -430,6 +463,7 @@ module nes_debugger_playable_tb;
         assert(acknowledgements==commands);
         assert(nmi_events==irq_entries || nmi_events==irq_entries+1);
         assert(dma_reads==dma_completions*256 && dma_writes==dma_completions*256);
+        assert(apu_dma_advances>dma_completions*500);
         assert(!dut.debug_snapshot_stale && !dut.write_sequence_error && !dut.write_range_error);
         $display("PASS: playable debugger mixed long run frames=%0d commands=%0d acknowledgements=%0d I=%0d F=%0d NMI=%0d entries=%0d DMA=%0d polls=%0d pages=%0d snapshots=%0d deferred_frames=%0d",source_frames,commands,acknowledgements,dut.debugger_status.instruction_steps,dut.debugger_status.frame_steps,nmi_events,irq_entries,dma_completions,controller_polls,page_changes,snapshot_updates,deferred_frames);
         // Shared KEY0 reset restores RUNNING, sequence/counters zero, no token.

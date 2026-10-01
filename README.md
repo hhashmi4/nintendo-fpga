@@ -30,8 +30,8 @@ and future APU/controller/cartridge boundaries while preserving the verified
 CPU, PPU, and DMA behavior. Phase 4B adds strict host-side iNES import, a
 replaceable cartridge shell, Mapper 0/NROM-128 and NROM-256 PRG mapping,
 CHR ROM/RAM, cartridge-selected nametable mirroring, and a real cartridge
-reset-vector boot path. APU, advanced mappers, physical cartridge loading,
-and audio remain future work. Phase 4C adds two authentic NES serial
+reset-vector boot path. Advanced mappers, physical cartridge loading, and
+audio output remain future work. Phase 4C adds two authentic NES serial
 controller ports, an abstract synchronized input boundary, DE1-SoC Controller
 1 switch mapping, exhaustive protocol verification, and a cartridge program
 that polls both ports into CPU RAM. Phase 4D-A extracts the verified OAM DMA
@@ -74,7 +74,11 @@ runtime boot path in simulation. Phase 4F-H adds a configurable, safe,
 deterministic microSD-style game library with header-only discovery,
 supported/unsupported/invalid classification, stable selection, and direct
 reuse of the existing loader. Physical board and removable-media validation
-remain future work.
+remain future work. Phase 5A adds the NTSC APU timing and register foundation:
+exact CPU-slot frame sequencing, `$4015` status/control and read side effects,
+parity-delayed `$4017` control, frame IRQ state, channel extension interfaces,
+and independent Python/RTL model comparison. Audible channels, mixing, CPU IRQ
+consumption, DMC DMA, and codec output remain later Phase 5 work.
 
 ## Phase 1 foundation
 
@@ -751,6 +755,26 @@ Architecture, discovery/security policy, CLI behavior, and verification are
 documented in
 [`docs/phase4f-h-microsd-game-library.md`](docs/phase4f-h-microsd-game-library.md).
 
+## Phase 5A — APU foundation
+
+- Single-clock APU state driven by the complete NES CPU-time slot stream
+- Debugger pause freezes APU time; stepping resumes deterministically; OAM DMA
+  continues to advance it while the CPU core is stalled
+- Exactly-once `$4000-$4013` future-channel write events
+- `$4015` channel-enable state, real active-status separation, frame-IRQ
+  reporting/read-clear, and explicit future DMC status/clear boundaries
+- Exact NTSC 4-step/5-step quarter- and half-frame event positions
+- Immediate IRQ inhibit plus parity-dependent three/four-cycle `$4017` apply
+- Production bus integration preserving `$4014`, `$4016`, and direction-split
+  `$4017` controller/APU behavior
+- Independent Python oracle, directed unit tests, and 142,214-cycle randomized
+  RTL state/output comparison
+- No channel waveform, mixer, DMC DMA, codec, or audible output in this phase
+
+Architecture, timing sources and assumptions, register semantics, future APU
+boundaries, and verification are documented in
+[`docs/apu-phase5a-foundation.md`](docs/apu-phase5a-foundation.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -789,7 +813,8 @@ suite for pull requests to `main`; the event policy, fail-safe `main` behavior,
 caching, concurrency, and timeout are documented in
 [`docs/ci-verification.md`](docs/ci-verification.md).
 
-This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
+This runs pytest, synthesizable RTL lint, the Phase 5A APU oracle/RTL comparison,
+and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
 4D-A standalone/arbiter/integrated DMA and NMI tests, Phase 4D-B playable-ROM
@@ -837,6 +862,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_runtime_activation_phase4fd.fst`,
 `nes_runtime_loader_mmio_phase4ff.fst`,
 `nes_runtime_boot_phase4fg.fst`,
+`nes_apu_phase5a.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
@@ -982,10 +1008,11 @@ before use.
 - `rtl/cartridge` — build-time and runtime Mapper 0/NROM cartridge storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — standalone OAM DMA bus master
+- `rtl/apu` — APU register, frame-sequencer, status, and timing foundation
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
 - `rtl/loader` — runtime-loader protocol, manifest, and transfer validation
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
-- `rtl/apu`, `rtl/memory` — reserved for later phases
+- `rtl/memory` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches
 - `verification` and `tests/python` — Python reference infrastructure/tests
 - `constraints` — SDC timing constraints

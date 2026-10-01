@@ -104,6 +104,17 @@ SYSTEM_BUS_RTL_FILES=(
     rtl/system/nes_cpu_bus.sv
 )
 
+APU_RTL_FILES=(
+    rtl/apu/nes_apu_pkg.sv
+    rtl/apu/nes_apu.sv
+)
+
+# Several package constants intentionally reserve stable names and bit
+# positions for later Phase 5 channel modules.
+verilator --lint-only --Wall -Wno-UNUSEDPARAM \
+    --top-module nes_apu \
+    "${APU_RTL_FILES[@]}"
+
 verilator --lint-only --Wall \
     --top-module nes_cpu_bus \
     "${SYSTEM_BUS_RTL_FILES[@]}"
@@ -277,6 +288,7 @@ verilator --lint-only --Wall -Wno-fatal \
     "${CPU_BOARD_DIAG_RTL_FILES[@]}"
 
 PHASE3K_RTL_FILES=(
+    "${APU_RTL_FILES[@]}"
     rtl/debug/nes_debug_snapshot_pkg.sv
     rtl/debug/nes_debug_snapshot.sv
     rtl/debug/nes_debug_page_select.sv

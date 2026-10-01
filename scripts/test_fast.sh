@@ -17,5 +17,5 @@ python3 -m pytest
 echo "[FAST 2/3] Complete Verilator RTL lint"
 scripts/lint.sh
 
-echo "[FAST 3/3] Focused platform and runtime-loader RTL smoke"
+echo "[FAST 3/3] Focused platform, Phase 5A APU, and runtime-loader RTL smoke"
 scripts/sim.sh --fast
