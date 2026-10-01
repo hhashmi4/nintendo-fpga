@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-// Phase 4E-D physical top. The NES stays in the 50 MHz fabric domain and is
+// Phase 5A physical top. The NES stays in the 50 MHz fabric domain and is
 // advanced by an NTSC-rate clock enable; the VGA reader uses a PLL-derived
 // 25.2 MHz clock and crosses only through nes_framebuffer's handoff protocol.
 module de1_soc_nes_vga_top #(
@@ -209,6 +209,15 @@ module de1_soc_nes_vga_top #(
     logic ppu_frame_start;
     logic nes_core_ppu_enable;
     logic nes_core_cpu_cycle_slot;
+    logic [15:0] apu_cpu_address;
+    logic apu_cpu_read;
+    logic apu_cpu_write;
+    logic [7:0] apu_cpu_write_data;
+    logic [7:0] apu_cpu_read_data;
+    logic apu_irq;
+    logic apu_quarter_frame_tick;
+    logic apu_half_frame_tick;
+    nes_apu_pkg::nes_apu_channel_mask_t apu_channel_enable;
     logic dma_complete_event;
     logic dma_start_event;
     logic dma_read_event;
@@ -734,11 +743,11 @@ module de1_soc_nes_vga_top #(
         .cart_cpu_write(cart_cpu_write),
         .cart_cpu_write_data(cart_cpu_write_data),
         .cart_cpu_read_data(cart_cpu_read_data),
-        .apu_cpu_address(),
-        .apu_cpu_read(),
-        .apu_cpu_write(),
-        .apu_cpu_write_data(),
-        .apu_cpu_read_data(8'h00),
+        .apu_cpu_address(apu_cpu_address),
+        .apu_cpu_read(apu_cpu_read),
+        .apu_cpu_write(apu_cpu_write),
+        .apu_cpu_write_data(apu_cpu_write_data),
+        .apu_cpu_read_data(apu_cpu_read_data),
         .controller_port(controller_port),
         .controller_cpu_read(controller_cpu_read),
         .controller_cpu_write(controller_cpu_write),
@@ -820,6 +829,42 @@ module de1_soc_nes_vga_top #(
         .pixel_source(ppu_debug_pixel_source)
     );
     /* verilator lint_on PINMISSING */
+    /* verilator lint_on PINCONNECTEMPTY */
+
+    // Phase 5A advances in the complete CPU-time slot stream. In particular,
+    // OAM DMA stops the CPU core but not the APU, while debugger pause stops
+    // the scheduler and therefore the APU as well. CPU IRQ consumption is a
+    // deliberate Phase 5I integration point; apu_irq is verified here at the
+    // APU boundary and frame IRQ remains CPU-visible through $4015.
+    /* verilator lint_off PINCONNECTEMPTY */
+    nes_apu apu (
+        .clk(CLOCK_50),
+        .reset(nes_functional_reset),
+        .cpu_cycle_enable(nes_core_cpu_cycle_slot),
+        .cpu_read(apu_cpu_read),
+        .cpu_write(apu_cpu_write),
+        .cpu_address(apu_cpu_address),
+        .cpu_write_data(apu_cpu_write_data),
+        .cpu_read_data(apu_cpu_read_data),
+        .channel_active('0),
+        .dmc_irq_flag(1'b0),
+        .channel_enable(apu_channel_enable),
+        .channel_write(),
+        .channel_write_register(),
+        .channel_write_data(),
+        .dmc_irq_clear(),
+        .quarter_frame_tick(apu_quarter_frame_tick),
+        .half_frame_tick(apu_half_frame_tick),
+        .irq(apu_irq),
+        .frame_mode(),
+        .frame_irq_inhibit(),
+        .frame_irq_flag(),
+        .frame_sequence_cycle(),
+        .cpu_cycle_odd(),
+        .frame_reset_pending(),
+        .frame_reset_delay(),
+        .frame_tick_block()
+    );
     /* verilator lint_on PINCONNECTEMPTY */
 
     nes_controller controllers (
@@ -1189,6 +1234,8 @@ module de1_soc_nes_vga_top #(
                            ^cartridge_debug_prg_data ||
                            ^cartridge_debug_chr_address ||
                            ^cartridge_debug_chr_data ||
+                           apu_irq || apu_quarter_frame_tick ||
+                           apu_half_frame_tick || ^apu_channel_enable ||
                            cartridge_debug_prg_read ||
                            cartridge_debug_prg_write ||
                            cartridge_debug_prg_ram_read ||
