@@ -61,3 +61,32 @@ def write_valid_runtime_images(output_dir: str | Path) -> list[Path]:
         path.write_bytes(payload)
         paths.append(path)
     return paths
+
+
+def game_library_files() -> dict[str, bytes]:
+    """Return a mixed, original library fixture with no third-party ROM data."""
+
+    supported = make_ines()
+    chrram = make_ines(prg_banks=2, chr_banks=0, flags6=0x01)
+    return {
+        "Alpha Test.nes": supported,
+        "Beta CHR-RAM.NES": chrram,
+        "Duplicate.nes": supported,
+        "Duplicate.NES": chrram,
+        "Unicode 星.nEs": supported,
+        "Unsupported Mapper 2.nes": make_ines(flags6=0x20),
+        "Corrupt Header.nes": b"NOT-AN-INES-FILE",
+        "Truncated Payload.nes": supported[:-7],
+        "notes.txt": b"generated library fixture; not a ROM\n",
+    }
+
+
+def write_game_library(output_dir: str | Path) -> dict[str, Path]:
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    paths: dict[str, Path] = {}
+    for name, payload in game_library_files().items():
+        path = destination / name
+        path.write_bytes(payload)
+        paths[name] = path
+    return paths

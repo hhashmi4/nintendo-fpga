@@ -69,8 +69,12 @@ bounded transport orchestration, and a contract-enforcing mock/dry-run CLI.
 Phase 4F-F adds the real Cyclone V lightweight HPS-to-FPGA bridge, a versioned
 32-bit MMIO contract, coherent exactly-once command/status CDC, a `/dev/mem`
 Linux transport, reproducible Platform Designer integration, and production
-HPS/NES/VGA synthesis and timing closure. Physical board validation and
-microSD loading remain future work.
+HPS/NES/VGA synthesis and timing closure. Phase 4F-G proves the complete
+runtime boot path in simulation. Phase 4F-H adds a configurable, safe,
+deterministic microSD-style game library with header-only discovery,
+supported/unsupported/invalid classification, stable selection, and direct
+reuse of the existing loader. Physical board and removable-media validation
+remain future work.
 
 ## Phase 1 foundation
 
@@ -711,10 +715,41 @@ backend, build procedure, verification, and physical limits are documented in
   failure proving that activation is never issued
 
 This is an end-to-end software/RTL simulation proof, not physical DE1-SoC
-HPS↔FPGA validation. Physical validation remains Phase 4F-I; microSD/game
-library work remains Phase 4F-H. Architecture, trace format, exact acceptance
-results, and failure behavior are documented in
+HPS↔FPGA validation. Physical validation remains Phase 4F-I. Architecture,
+trace format, exact acceptance results, and failure behavior are documented in
 [`docs/phase4f-g-runtime-boot-e2e.md`](docs/phase4f-g-runtime-boot-e2e.md).
+
+## Phase 4F-H — microSD game library and selection
+
+- Configurable `--library PATH` or `NES_LIBRARY_ROOT`; no fixed Linux mount
+  point and a clear distinction between missing media and an empty library
+- Non-recursive, case-insensitive `.nes` discovery with deterministic Unicode
+  sorting and stable exact relative-filename IDs
+- Header-only metadata scan through the existing iNES parser, exposing mapper,
+  PRG/CHR type and size, mirroring, support state, and useful failure reasons
+- Unsupported and corrupt games stay visible but cannot reach the load plan or
+  transport
+- Symlinks and non-regular files rejected; traversal, nested/absolute paths,
+  media removal, changed files, read errors, spaces, Unicode, long names, and
+  duplicate display names handled explicitly
+- `list`, `info`, and `load-library` CLI commands; `load-library --dry-run`
+  reuses the complete Phase 4F-E load plan and mock transport
+- Original generated mixed-library fixtures and a 256-game header-scan test;
+  no commercial ROM data and no writes to removable media
+
+Generate fixtures and exercise the operator workflow:
+
+```bash
+python3 scripts/generate_game_library_fixtures.py build/game-library
+python3 scripts/nes_loader.py list --library build/game-library
+python3 scripts/nes_loader.py info "Alpha Test.nes" --library build/game-library
+python3 scripts/nes_loader.py load-library "Alpha Test.nes" \
+  --library build/game-library --dry-run
+```
+
+Architecture, discovery/security policy, CLI behavior, and verification are
+documented in
+[`docs/phase4f-h-microsd-game-library.md`](docs/phase4f-h-microsd-game-library.md).
 
 ## Development environment
 
@@ -748,6 +783,12 @@ Run the normal suite from the repository root:
 ./scripts/test.sh
 ```
 
+The complete suite remains the local pre-push and pull-request gate. GitHub
+Actions uses `./scripts/test_fast.sh` for feature-branch pushes and the complete
+suite for pull requests to `main`; the event policy, fail-safe `main` behavior,
+caching, concurrency, and timeout are documented in
+[`docs/ci-verification.md`](docs/ci-verification.md).
+
 This runs pytest, synthesizable RTL lint, and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -771,12 +812,13 @@ address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
 and Phase 3K timing, framebuffer, CDC, full-frame, and integrated NES/VGA
 programs.
-The Python stage also exercises the Phase 4F-E/F/G iNES parser, runtime-image and
+The Python stage also exercises the Phase 4F-E/F/G/H iNES parser, runtime-image and
 manifest mapping, lazy load plan, mock transport, backpressure/timeouts,
 failure behavior, production MMIO transport semantics, endpoint compatibility,
 typed FPGA errors, register-model co-verification, `/dev/mem` mapping behavior,
-inspect/dry-run CLI, malformed-before-MMIO rejection, and transport-failure
-activation suppression.
+inspect/dry-run CLI, malformed-before-MMIO rejection, transport-failure
+activation suppression, and safe deterministic removable-media game-library
+discovery, classification, selection, and loading.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
