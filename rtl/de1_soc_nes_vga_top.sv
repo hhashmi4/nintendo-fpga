@@ -217,6 +217,7 @@ module de1_soc_nes_vga_top #(
     logic apu_irq;
     logic apu_quarter_frame_tick;
     logic apu_half_frame_tick;
+    logic [3:0] apu_pulse1_output;
     nes_apu_pkg::nes_apu_channel_mask_t apu_channel_enable;
     logic dma_complete_event;
     logic dma_start_event;
@@ -831,7 +832,7 @@ module de1_soc_nes_vga_top #(
     /* verilator lint_on PINMISSING */
     /* verilator lint_on PINCONNECTEMPTY */
 
-    // Phase 5A advances in the complete CPU-time slot stream. In particular,
+    // The APU advances in the complete CPU-time slot stream. In particular,
     // OAM DMA stops the CPU core but not the APU, while debugger pause stops
     // the scheduler and therefore the APU as well. CPU IRQ consumption is a
     // deliberate Phase 5I integration point; apu_irq is verified here at the
@@ -856,6 +857,7 @@ module de1_soc_nes_vga_top #(
         .quarter_frame_tick(apu_quarter_frame_tick),
         .half_frame_tick(apu_half_frame_tick),
         .irq(apu_irq),
+        .pulse1_output(apu_pulse1_output),
         .frame_mode(),
         .frame_irq_inhibit(),
         .frame_irq_flag(),
@@ -1236,6 +1238,7 @@ module de1_soc_nes_vga_top #(
                            ^cartridge_debug_chr_data ||
                            apu_irq || apu_quarter_frame_tick ||
                            apu_half_frame_tick || ^apu_channel_enable ||
+                           ^apu_pulse1_output ||
                            cartridge_debug_prg_read ||
                            cartridge_debug_prg_write ||
                            cartridge_debug_prg_ram_read ||

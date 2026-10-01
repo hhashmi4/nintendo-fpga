@@ -1,4 +1,4 @@
-"""Independent cycle model for the Phase 5A NTSC NES APU foundation."""
+"""Independent cycle model for the NTSC NES APU foundation and Pulse 1."""
 
 from dataclasses import dataclass
 
@@ -16,6 +16,244 @@ FOUR_STEP_HALF = 29829
 FOUR_STEP_END = 29830
 FIVE_STEP_HALF = 37281
 FIVE_STEP_END = 37282
+
+LENGTH_TABLE = (
+    10, 254, 20, 2, 40, 4, 80, 6,
+    160, 8, 60, 10, 14, 12, 26, 14,
+    12, 16, 24, 18, 48, 20, 96, 22,
+    192, 24, 72, 26, 16, 28, 32, 30,
+)
+
+# Position zero is selected by a $4003 write. The hardware sequencer counts
+# downward, selecting position seven on its first timer expiration.
+PULSE_DUTY_TABLE = (
+    (0, 0, 0, 0, 0, 0, 0, 1),
+    (0, 0, 0, 0, 0, 0, 1, 1),
+    (0, 0, 0, 0, 1, 1, 1, 1),
+    (1, 1, 1, 1, 1, 1, 0, 0),
+)
+
+
+def pulse_sequence_cpu_cycles(timer_period: int) -> int:
+    """Return CPU cycles in one complete eight-step pulse waveform."""
+
+    if not 0 <= timer_period <= 0x7FF:
+        raise ValueError("timer_period must be 11 bits")
+    return 16 * (timer_period + 1)
+
+
+def pulse_frequency_hz(timer_period: int, cpu_hz: float = 1_789_773.0) -> float:
+    """Human-readable NTSC frequency; no floating point is used by RTL."""
+
+    return cpu_hz / pulse_sequence_cpu_cycles(timer_period)
+
+
+@dataclass(frozen=True)
+class PulseInputs:
+    reset: bool = False
+    cpu_cycle_enable: bool = False
+    timer_tick: bool = False
+    enable: bool = False
+    write: bool = False
+    write_register: int = 0
+    write_data: int = 0
+    quarter_frame_tick: bool = False
+    half_frame_tick: bool = False
+
+
+@dataclass(frozen=True)
+class PulseOutputs:
+    active: bool
+    raw_output: int
+    sweep_target: int
+    sweep_mute: bool
+
+
+@dataclass(frozen=True)
+class PulseState:
+    duty: int
+    duty_position: int
+    timer_period: int
+    timer_counter: int
+    length_counter: int
+    length_halt: bool
+    constant_volume: bool
+    envelope_period: int
+    envelope_start: bool
+    envelope_divider: int
+    envelope_decay: int
+    sweep_enabled: bool
+    sweep_period: int
+    sweep_negate: bool
+    sweep_shift: int
+    sweep_reload: bool
+    sweep_divider: int
+
+
+class Pulse1Model:
+    """Behavioral specification of one 2A03 Pulse 1 channel."""
+
+    def __init__(self) -> None:
+        self.reset_state()
+
+    def reset_state(self) -> None:
+        self.duty = 0
+        self.duty_position = 0
+        self.timer_period = 0
+        self.timer_counter = 0
+        self.length_counter = 0
+        self.length_halt = False
+        self.constant_volume = False
+        self.envelope_period = 0
+        self.envelope_start = False
+        self.envelope_divider = 0
+        self.envelope_decay = 0
+        self.sweep_enabled = False
+        self.sweep_period = 0
+        self.sweep_negate = False
+        self.sweep_shift = 0
+        self.sweep_reload = False
+        self.sweep_divider = 0
+
+    def state(self) -> PulseState:
+        return PulseState(
+            duty=self.duty,
+            duty_position=self.duty_position,
+            timer_period=self.timer_period,
+            timer_counter=self.timer_counter,
+            length_counter=self.length_counter,
+            length_halt=self.length_halt,
+            constant_volume=self.constant_volume,
+            envelope_period=self.envelope_period,
+            envelope_start=self.envelope_start,
+            envelope_divider=self.envelope_divider,
+            envelope_decay=self.envelope_decay,
+            sweep_enabled=self.sweep_enabled,
+            sweep_period=self.sweep_period,
+            sweep_negate=self.sweep_negate,
+            sweep_shift=self.sweep_shift,
+            sweep_reload=self.sweep_reload,
+            sweep_divider=self.sweep_divider,
+        )
+
+    @staticmethod
+    def _validate(inputs: PulseInputs) -> None:
+        if not 0 <= inputs.write_register <= 3:
+            raise ValueError("write_register must be 2 bits")
+        if not 0 <= inputs.write_data <= 0xFF:
+            raise ValueError("write_data must be 8 bits")
+        if inputs.half_frame_tick and not inputs.quarter_frame_tick:
+            raise ValueError("half-frame ticks must include quarter-frame ticks")
+        if inputs.timer_tick and not inputs.cpu_cycle_enable:
+            raise ValueError("timer_tick requires cpu_cycle_enable")
+
+    def sweep_target(self) -> int:
+        change = self.timer_period >> self.sweep_shift
+        if self.sweep_negate:
+            return (self.timer_period - change - 1) & 0xFFF
+        return self.timer_period + change
+
+    def sweep_mute(self) -> bool:
+        return self.timer_period < 8 or (
+            not self.sweep_negate and self.sweep_target() > 0x7FF
+        )
+
+    def evaluate(self, enable: bool) -> PulseOutputs:
+        active = self.length_counter != 0
+        duty_bit = PULSE_DUTY_TABLE[self.duty][self.duty_position]
+        volume = (
+            self.envelope_period if self.constant_volume else self.envelope_decay
+        )
+        output = volume if enable and active and duty_bit and not self.sweep_mute() else 0
+        return PulseOutputs(
+            active=active,
+            raw_output=output,
+            sweep_target=self.sweep_target(),
+            sweep_mute=self.sweep_mute(),
+        )
+
+    def clock(self, inputs: PulseInputs) -> tuple[PulseOutputs, PulseState]:
+        """Evaluate pre-edge output, then apply one fabric-clock edge."""
+
+        self._validate(inputs)
+        outputs = self.evaluate(inputs.enable)
+        if inputs.reset:
+            self.reset_state()
+            return outputs, self.state()
+        if not inputs.cpu_cycle_enable:
+            return outputs, self.state()
+
+        old = self.state()
+        old_target = outputs.sweep_target
+
+        if inputs.timer_tick:
+            if old.timer_counter == 0:
+                self.timer_counter = old.timer_period
+                self.duty_position = (old.duty_position - 1) & 0x07
+            else:
+                self.timer_counter = old.timer_counter - 1
+
+        if inputs.quarter_frame_tick:
+            if old.envelope_start:
+                self.envelope_start = False
+                self.envelope_decay = 15
+                self.envelope_divider = old.envelope_period
+            elif old.envelope_divider == 0:
+                self.envelope_divider = old.envelope_period
+                if old.envelope_decay != 0:
+                    self.envelope_decay = old.envelope_decay - 1
+                elif old.length_halt:
+                    self.envelope_decay = 15
+            else:
+                self.envelope_divider = old.envelope_divider - 1
+
+        if inputs.half_frame_tick:
+            if old.length_counter != 0 and not old.length_halt:
+                self.length_counter = old.length_counter - 1
+
+            if old.sweep_divider == 0:
+                if (
+                    old.sweep_enabled
+                    and old.sweep_shift != 0
+                    and old.timer_period >= 8
+                    and old_target <= 0x7FF
+                ):
+                    self.timer_period = old_target
+                self.sweep_divider = old.sweep_period
+            else:
+                self.sweep_divider = old.sweep_divider - 1
+
+            if old.sweep_reload:
+                self.sweep_divider = old.sweep_period
+                self.sweep_reload = False
+
+        if inputs.write:
+            if inputs.write_register == 0:
+                self.duty = (inputs.write_data >> 6) & 0x03
+                self.length_halt = bool(inputs.write_data & 0x20)
+                self.constant_volume = bool(inputs.write_data & 0x10)
+                self.envelope_period = inputs.write_data & 0x0F
+            elif inputs.write_register == 1:
+                self.sweep_enabled = bool(inputs.write_data & 0x80)
+                self.sweep_period = (inputs.write_data >> 4) & 0x07
+                self.sweep_negate = bool(inputs.write_data & 0x08)
+                self.sweep_shift = inputs.write_data & 0x07
+                self.sweep_reload = True
+            elif inputs.write_register == 2:
+                self.timer_period = (self.timer_period & 0x700) | inputs.write_data
+            else:
+                self.timer_period = (
+                    (self.timer_period & 0x0FF) | ((inputs.write_data & 0x07) << 8)
+                )
+                self.duty_position = 0
+                self.envelope_start = True
+                if inputs.enable:
+                    self.length_counter = LENGTH_TABLE[inputs.write_data >> 3]
+
+        if not inputs.enable:
+            self.length_counter = 0
+
+        return outputs, self.state()
 
 
 @dataclass(frozen=True)
@@ -40,6 +278,7 @@ class ApuInputs:
 class ApuOutputs:
     cpu_read_data: int
     irq: bool
+    pulse1_output: int
     quarter_frame_tick: bool
     half_frame_tick: bool
     channel_write: bool
@@ -65,9 +304,11 @@ class ApuFoundationModel:
     """Executable specification of register and frame-counter behavior."""
 
     def __init__(self) -> None:
+        self.pulse1 = Pulse1Model()
         self.reset_state()
 
     def reset_state(self) -> None:
+        self.pulse1.reset_state()
         self.channel_enable = 0
         self.mode_5_step = False
         self.irq_inhibit = False
@@ -168,13 +409,21 @@ class ApuFoundationModel:
 
         read_data = 0
         if status_read:
-            read_data = inputs.channel_active & 0x1F
+            pulse1_active = int(self.pulse1.evaluate(bool(self.channel_enable & 1)).active)
+            read_data = (inputs.channel_active & 0x1E) | pulse1_active
             read_data |= int(self.frame_irq_flag or irq_set) << 6
             read_data |= int(inputs.dmc_irq_flag) << 7
+
+        effective_pulse1_enable = (
+            bool(inputs.cpu_write_data & 0x01)
+            if status_write
+            else bool(self.channel_enable & 0x01)
+        )
 
         return ApuOutputs(
             cpu_read_data=read_data,
             irq=not inputs.reset and (self.frame_irq_flag or irq_set),
+            pulse1_output=self.pulse1.evaluate(effective_pulse1_enable).raw_output,
             quarter_frame_tick=quarter,
             half_frame_tick=half,
             channel_write=channel_write,
@@ -187,6 +436,35 @@ class ApuFoundationModel:
         """Evaluate one cycle, apply its edge, and return outputs and new state."""
 
         outputs = self.evaluate(inputs)
+        status_write = (
+            not inputs.reset
+            and inputs.cpu_cycle_enable
+            and inputs.cpu_write
+            and inputs.cpu_address == APU_STATUS
+        )
+        effective_pulse1_enable = (
+            bool(inputs.cpu_write_data & 0x01)
+            if status_write
+            else bool(self.channel_enable & 0x01)
+        )
+        self.pulse1.clock(
+            PulseInputs(
+                reset=inputs.reset,
+                cpu_cycle_enable=inputs.cpu_cycle_enable,
+                timer_tick=(
+                    inputs.cpu_cycle_enable and not self.cpu_cycle_odd
+                ),
+                enable=effective_pulse1_enable,
+                write=(
+                    outputs.channel_write
+                    and outputs.channel_write_register <= 0x03
+                ),
+                write_register=outputs.channel_write_register & 0x03,
+                write_data=outputs.channel_write_data,
+                quarter_frame_tick=outputs.quarter_frame_tick,
+                half_frame_tick=outputs.half_frame_tick,
+            )
+        )
         if inputs.reset:
             self.reset_state()
             return outputs, self.state()

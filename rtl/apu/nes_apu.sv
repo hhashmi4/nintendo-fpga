@@ -1,8 +1,9 @@
 `timescale 1ns/1ps
 
-// Phase 5A NES APU foundation. All state is in the fabric clock domain and
-// advances only on cpu_cycle_enable. The enable is the complete NES CPU-time
-// slot stream, including OAM-DMA stalls; accepted bus strobes remain CPU-only.
+// NES APU foundation plus the Phase 5B Pulse 1 channel. All state is in the
+// fabric clock domain and advances only on cpu_cycle_enable. The enable is the
+// complete NES CPU-time slot stream, including OAM-DMA stalls; accepted bus
+// strobes remain CPU-only.
 module nes_apu (
     input  logic        clk,
     input  logic        reset,
@@ -14,9 +15,11 @@ module nes_apu (
     input  logic [7:0]  cpu_write_data,
     output logic [7:0]  cpu_read_data,
 
-    // Future channel implementations own the active/length and DMC IRQ
-    // states. Enable and active are intentionally distinct.
+    // Bits 4:1 remain external placeholders for later channels. Pulse 1 owns
+    // bit 0 internally from Phase 5B onward. Enable and active are distinct.
+    /* verilator lint_off UNUSEDSIGNAL */
     input  nes_apu_pkg::nes_apu_channel_mask_t channel_active,
+    /* verilator lint_on UNUSEDSIGNAL */
     input  logic        dmc_irq_flag,
     output nes_apu_pkg::nes_apu_channel_mask_t channel_enable,
 
@@ -29,6 +32,7 @@ module nes_apu (
     output logic        quarter_frame_tick,
     output logic        half_frame_tick,
     output logic        irq,
+    output logic [3:0]  pulse1_output,
 
     // Architectural/debug state used by verification and future snapshots.
     output nes_apu_pkg::nes_apu_frame_mode_t frame_mode,
@@ -57,6 +61,10 @@ module nes_apu (
     logic delayed_five_step_tick;
     logic frame_irq_set_event;
     logic effective_irq_inhibit;
+    logic pulse1_active;
+    logic pulse1_enable;
+    logic pulse1_timer_tick;
+    nes_apu_channel_mask_t effective_channel_active;
 
     assign accepted_read = !reset && cpu_cycle_enable && cpu_read;
     assign accepted_write = !reset && cpu_cycle_enable && cpu_write;
@@ -74,6 +82,15 @@ module nes_apu (
     assign channel_write_data = cpu_write_data;
     // A future DMC consumes this pulse to clear its own IRQ latch.
     assign dmc_irq_clear = status_write;
+
+    // A $4015 write affects Pulse 1 on its accepted CPU edge rather than one
+    // slot later. The stored mask remains the externally visible enable state.
+    assign pulse1_enable = status_write ? cpu_write_data[0] :
+                           channel_enable[APU_STATUS_PULSE1_BIT];
+    assign pulse1_timer_tick = cpu_cycle_enable && !cpu_cycle_odd;
+    assign effective_channel_active = {
+        channel_active[4:1], pulse1_active
+    };
 
     assign next_frame_cycle = frame_sequence_cycle + 16'd1;
     // A newer write supersedes a pending value on the same CPU cycle.
@@ -143,7 +160,7 @@ module nes_apu (
     always_comb begin
         cpu_read_data = 8'h00;
         if (status_read) begin
-            cpu_read_data[4:0] = channel_active;
+            cpu_read_data[4:0] = effective_channel_active;
             cpu_read_data[5] = 1'b0; // project-wide open-bus simplification
             cpu_read_data[APU_STATUS_FRAME_IRQ_BIT] =
                 frame_irq_flag || frame_irq_set_event;
@@ -154,6 +171,44 @@ module nes_apu (
     // Phase 5A exposes only the implemented frame IRQ at this boundary. The
     // future DMC phase will OR its owned IRQ latch into this expression.
     assign irq = !reset && (frame_irq_flag || frame_irq_set_event);
+
+    /* verilator lint_off PINCONNECTEMPTY */
+    nes_apu_pulse #(
+        .CHANNEL_ONE(1'b1)
+    ) pulse1 (
+        .clk(clk),
+        .reset(reset),
+        .cpu_cycle_enable(cpu_cycle_enable),
+        .timer_tick(pulse1_timer_tick),
+        .enable(pulse1_enable),
+        .write(channel_write && channel_write_register[4:2] == 3'd0),
+        .write_register(channel_write_register[1:0]),
+        .write_data(channel_write_data),
+        .quarter_frame_tick(quarter_frame_tick),
+        .half_frame_tick(half_frame_tick),
+        .active(pulse1_active),
+        .raw_output(pulse1_output),
+        .duty(),
+        .duty_position(),
+        .timer_period(),
+        .timer_counter(),
+        .length_counter(),
+        .length_halt(),
+        .constant_volume(),
+        .envelope_period(),
+        .envelope_start(),
+        .envelope_divider(),
+        .envelope_decay(),
+        .sweep_enabled(),
+        .sweep_period(),
+        .sweep_negate(),
+        .sweep_shift(),
+        .sweep_reload(),
+        .sweep_divider(),
+        .sweep_target(),
+        .sweep_mute()
+    );
+    /* verilator lint_on PINCONNECTEMPTY */
 
     always_ff @(posedge clk) begin
         if (reset) begin

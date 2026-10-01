@@ -39,6 +39,7 @@ def write_cycle(
         f"{inputs.cpu_write_data:02x} {inputs.channel_active:02x} "
         f"{int(inputs.dmc_irq_flag):d} "
         f"{outputs.cpu_read_data:02x} {int(outputs.irq):d} "
+        f"{outputs.pulse1_output:01x} "
         f"{int(outputs.quarter_frame_tick):d} "
         f"{int(outputs.half_frame_tick):d} "
         f"{int(outputs.channel_write):d} "

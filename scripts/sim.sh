@@ -58,6 +58,7 @@ mkdir -p \
     build/verilator/nes_vga_phase4db \
     build/verilator/nes_vga_phase4ec \
     build/verilator/nes_apu_phase5a \
+    build/verilator/nes_apu_pulse1_phase5b \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -159,6 +160,8 @@ NES_VGA_PHASE4EC_METADATA="build/sim/phase4ec_playable_snapshot.txt"
 NES_VGA_PHASE4EC_FRAME="build/sim/phase4ec_playable_combined.ppm"
 NES_APU_PHASE5A_WAVEFORM="build/sim/nes_apu_phase5a.fst"
 NES_APU_PHASE5A_REFERENCE="build/sim/nes_apu_phase5a_reference.txt"
+NES_APU_PULSE1_PHASE5B_WAVEFORM="build/sim/nes_apu_pulse1_phase5b.fst"
+NES_APU_PULSE1_PHASE5B_REFERENCE="build/sim/nes_apu_pulse1_phase5b_reference.txt"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -259,6 +262,8 @@ rm -f \
     "$NES_VGA_PHASE4EC_FRAME" \
     "$NES_APU_PHASE5A_WAVEFORM" \
     "$NES_APU_PHASE5A_REFERENCE" \
+    "$NES_APU_PULSE1_PHASE5B_WAVEFORM" \
+    "$NES_APU_PULSE1_PHASE5B_REFERENCE" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -304,6 +309,7 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     --top-module nes_apu_phase5a_tb \
     -o nes_apu_phase5a_tb \
     rtl/apu/nes_apu_pkg.sv \
+    rtl/apu/nes_apu_pulse.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_phase5a_tb.sv
 
@@ -311,6 +317,25 @@ build/verilator/nes_apu_phase5a/nes_apu_phase5a_tb
 
 if [[ ! -s "$NES_APU_PHASE5A_WAVEFORM" ]]; then
     echo "ERROR: Phase 5A APU waveform is missing" >&2
+    exit 1
+fi
+
+python3 scripts/generate_apu_pulse1_phase5b_vectors.py \
+    "$NES_APU_PULSE1_PHASE5B_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
+    --assert \
+    --Mdir build/verilator/nes_apu_pulse1_phase5b \
+    --top-module nes_apu_pulse1_phase5b_tb \
+    -o nes_apu_pulse1_phase5b_tb \
+    rtl/apu/nes_apu_pkg.sv \
+    rtl/apu/nes_apu_pulse.sv \
+    sim/nes_apu_pulse1_phase5b_tb.sv
+
+build/verilator/nes_apu_pulse1_phase5b/nes_apu_pulse1_phase5b_tb
+
+if [[ ! -s "$NES_APU_PULSE1_PHASE5B_WAVEFORM" ]]; then
+    echo "ERROR: Phase 5B Pulse 1 waveform is missing" >&2
     exit 1
 fi
 
@@ -375,7 +400,7 @@ if [[ ! -s "$NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM" ]]; then
 fi
 
 if [[ "$SIM_PROFILE" == "--fast" ]]; then
-    echo "FAST RTL smoke passed: platform, Phase 5A APU, and Phase 4F-A/B/C runtime loading"
+    echo "FAST RTL smoke passed: platform, Phase 5A/5B APU, and Phase 4F-A/B/C runtime loading"
     exit 0
 fi
 
@@ -1489,6 +1514,7 @@ python3 scripts/verify_nes_vga_trace.py "$NES_VGA_PHASE4DB_TRACE"
 
 PHASE4EC_TOP_RTL_FILES=(
     rtl/apu/nes_apu_pkg.sv
+    rtl/apu/nes_apu_pulse.sv
     rtl/apu/nes_apu.sv
     rtl/platform/platform_config_pkg.sv
     rtl/platform/reset_sync.sv
@@ -1591,6 +1617,7 @@ echo "NES/VGA Phase 3K trace: $ROOT_DIR/$NES_VGA_PHASE3K_TRACE"
 echo "NES/VGA playable Phase 4D-B trace: $ROOT_DIR/$NES_VGA_PHASE4DB_TRACE"
 echo "NES/VGA playable Phase 4E-C frame: $ROOT_DIR/$NES_VGA_PHASE4EC_FRAME"
 echo "NES APU Phase 5A waveform: $ROOT_DIR/$NES_APU_PHASE5A_WAVEFORM"
+echo "NES APU Pulse 1 Phase 5B waveform: $ROOT_DIR/$NES_APU_PULSE1_PHASE5B_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

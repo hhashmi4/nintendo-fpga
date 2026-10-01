@@ -77,8 +77,11 @@ reuse of the existing loader. Physical board and removable-media validation
 remain future work. Phase 5A adds the NTSC APU timing and register foundation:
 exact CPU-slot frame sequencing, `$4015` status/control and read side effects,
 parity-delayed `$4017` control, frame IRQ state, channel extension interfaces,
-and independent Python/RTL model comparison. Audible channels, mixing, CPU IRQ
-consumption, DMC DMA, and codec output remain later Phase 5 work.
+and independent Python/RTL model comparison. Phase 5B adds the first sound-
+producing channel: register-accurate Pulse 1 duty/timer, envelope, length and
+sweep units, raw 0..15 output, the channel-one negate quirk, and real `$4015`
+activity. Final mixing, CPU IRQ consumption, DMC DMA, resampling, and codec
+output remain later Phase 5 work.
 
 ## Phase 1 foundation
 
@@ -775,6 +778,21 @@ Architecture, timing sources and assumptions, register semantics, future APU
 boundaries, and verification are documented in
 [`docs/apu-phase5a-foundation.md`](docs/apu-phase5a-foundation.md).
 
+## Phase 5B — APU Pulse 1
+
+- Authentic `$4000-$4003` register semantics and `$4015` enable/active behavior
+- Explicit eight-step implementations of all four NES pulse duty sequences
+- Every-other-CPU-cycle 11-bit timer with the period-below-8 mute rule
+- Quarter-frame envelope and half-frame length/sweep clocks from Phase 5A
+- Shared 32-entry length table and Pulse 1 one's-complement negate quirk
+- Raw four-bit channel amplitude only; no mixer, resampler, or board audio path
+- Independent Python model, directed waveform/math tests, and a 220,195-cycle
+  fixed-seed RTL state/output comparison with FST capture
+
+Architecture, register semantics, timing, verification, synthesis results, and
+limitations are documented in
+[`docs/apu-phase5b-pulse1.md`](docs/apu-phase5b-pulse1.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -813,7 +831,8 @@ suite for pull requests to `main`; the event policy, fail-safe `main` behavior,
 caching, concurrency, and timeout are documented in
 [`docs/ci-verification.md`](docs/ci-verification.md).
 
-This runs pytest, synthesizable RTL lint, the Phase 5A APU oracle/RTL comparison,
+This runs pytest, synthesizable RTL lint, the Phase 5A APU foundation and Phase
+5B Pulse 1 oracle/RTL comparisons,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
