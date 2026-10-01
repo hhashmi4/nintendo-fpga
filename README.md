@@ -694,6 +694,28 @@ the exact register map, CDC/reset reasoning, address derivation, software
 backend, build procedure, verification, and physical limits are documented in
 [`docs/phase4f-f-hps-fpga-bridge.md`](docs/phase4f-f-hps-fpga-bridge.md).
 
+## Phase 4F-G — End-to-end runtime `.nes` boot validation
+
+- Project-owned legal NROM-128/CHR-ROM and NROM-256/CHR-RAM images generated
+  deterministically at test time
+- Real iNES parser, lazy load plan, and production MMIO transport generate the
+  software-visible trace consumed through the real RTL MMIO bank and CDC
+- Asynchronous clocks and a deterministic stall on every delivered command;
+  exact 16,384/8,192 and 32,768/0 PRG/CHR transfer counts
+- Natural `$FFFC/$FFFD` reset-vector fetches, unique CPU RAM signatures, NMI,
+  OAM DMA, controller input, CHR-ROM rendering, and CHR-RAM write/readback
+- Pixel-perfect 61,440-pixel runtime-CHR frame comparison with zero mismatches
+- Same-configuration Game A → failed replacement → Game B sequence proving
+  safe hold behavior, fresh-`BEGIN` recovery, and atomic replacement
+- Malformed image rejection before any MMIO write and injected transport
+  failure proving that activation is never issued
+
+This is an end-to-end software/RTL simulation proof, not physical DE1-SoC
+HPS↔FPGA validation. Physical validation remains Phase 4F-I; microSD/game
+library work remains Phase 4F-H. Architecture, trace format, exact acceptance
+results, and failure behavior are documented in
+[`docs/phase4f-g-runtime-boot-e2e.md`](docs/phase4f-g-runtime-boot-e2e.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -741,17 +763,20 @@ protocol/model/backpressure test, and the Phase 4F-B runtime storage/Mapper-0
 model and integration test, plus the Phase 4F-C manifest/coverage model and
 end-to-end image-validation/readback test, the Phase 4F-D atomic activation,
 runtime reset-vector boot, replacement, DMA/NMI, and CHR integration test, and
-the Phase 4F-F asynchronous MMIO/CDC/backpressure/reset/full-transfer test, PPU
+the Phase 4F-F asynchronous MMIO/CDC/backpressure/reset/full-transfer test,
+and the Phase 4F-G parser-to-MMIO/CDC-to-NES runtime boot, frame, replacement,
+and failure test, PPU
 timing/register/memory/scroll/background/OAM/sprite/mixer, CPU, ALU,
 address-generator, Phase 2D through Phase 2J instruction simulations, and the
 Phase 2K board-program simulation, Phase 3J integrated system/NMI sampling,
 and Phase 3K timing, framebuffer, CDC, full-frame, and integrated NES/VGA
 programs.
-The Python stage also exercises the Phase 4F-E/F iNES parser, runtime-image and
+The Python stage also exercises the Phase 4F-E/F/G iNES parser, runtime-image and
 manifest mapping, lazy load plan, mock transport, backpressure/timeouts,
 failure behavior, production MMIO transport semantics, endpoint compatibility,
 typed FPGA errors, register-model co-verification, `/dev/mem` mapping behavior,
-and inspect/dry-run CLI.
+inspect/dry-run CLI, malformed-before-MMIO rejection, and transport-failure
+activation suppression.
 Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `ppu_timing.fst`, `ppu_phase3b.fst`, `ppu_memory.fst`, `ppu_phase3c.fst`,
 `ppu_scroll.fst`, `ppu_phase3d.fst`, `ppu_background.fst`, `ppu_phase3e.fst`,
@@ -769,6 +794,7 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_runtime_image_phase4fc.fst`,
 `nes_runtime_activation_phase4fd.fst`,
 `nes_runtime_loader_mmio_phase4ff.fst`,
+`nes_runtime_boot_phase4fg.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,
