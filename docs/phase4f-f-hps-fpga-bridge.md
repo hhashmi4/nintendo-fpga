@@ -12,7 +12,9 @@ Platform Designer system, Linux transport, register-level model, asynchronous
 RTL simulation, Quartus fit, and static timing are verified. Physical Linux
 MMIO access, HPS boot software, board reset behavior, and a runtime-loaded game
 on the actual board are **not** verified here; that belongs to Phase 4F-I.
-Phase 4F-G is not implemented.
+Phase 4F-G was intentionally not part of this phase; it was subsequently
+implemented as the end-to-end simulation described in
+[`phase4f-g-runtime-boot-e2e.md`](phase4f-g-runtime-boot-e2e.md).
 
 ## Baseline and environment
 

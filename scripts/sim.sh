@@ -39,6 +39,7 @@ mkdir -p \
     build/verilator/nes_runtime_image_phase4fc \
     build/verilator/nes_runtime_activation_phase4fd \
     build/verilator/nes_runtime_loader_mmio_phase4ff \
+    build/verilator/nes_runtime_boot_phase4fg \
     build/verilator/nes_debug_snapshot \
     build/verilator/nes_debug_renderer \
     build/verilator/nes_developer_side_panel \
@@ -128,6 +129,9 @@ NES_RUNTIME_CARTRIDGE_PHASE4FB_REFERENCE="build/sim/runtime_cartridge_reference.
 NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM="build/sim/nes_runtime_image_phase4fc.fst"
 NES_RUNTIME_ACTIVATION_PHASE4FD_WAVEFORM="build/sim/nes_runtime_activation_phase4fd.fst"
 NES_RUNTIME_LOADER_MMIO_PHASE4FF_WAVEFORM="build/sim/nes_runtime_loader_mmio_phase4ff.fst"
+NES_RUNTIME_BOOT_PHASE4FG_WAVEFORM="build/sim/nes_runtime_boot_phase4fg.fst"
+NES_RUNTIME_BOOT_PHASE4FG_FRAME="build/sim/phase4fg_game_a.hex"
+NES_RUNTIME_BOOT_PHASE4FG_PPM="build/sim/phase4fg_game_a.ppm"
 NES_DEBUG_SNAPSHOT_WAVEFORM="build/sim/nes_debug_snapshot.fst"
 NES_DEBUG_RENDERER_WAVEFORM="build/sim/nes_debug_renderer.fst"
 NES_DEBUG_RENDERER_FONT_REFERENCE="build/sim/debug_font_reference.txt"
@@ -224,6 +228,9 @@ rm -f \
     "$NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM" \
     "$NES_RUNTIME_ACTIVATION_PHASE4FD_WAVEFORM" \
     "$NES_RUNTIME_LOADER_MMIO_PHASE4FF_WAVEFORM" \
+    "$NES_RUNTIME_BOOT_PHASE4FG_WAVEFORM" \
+    "$NES_RUNTIME_BOOT_PHASE4FG_FRAME" \
+    "$NES_RUNTIME_BOOT_PHASE4FG_PPM" \
     "$NES_DEBUG_SNAPSHOT_WAVEFORM" \
     "$NES_DEBUG_RENDERER_WAVEFORM" \
     "$NES_DEBUG_RENDERER_FONT_REFERENCE" \
@@ -879,6 +886,44 @@ if [[ ! -s "$NES_RUNTIME_LOADER_MMIO_PHASE4FF_WAVEFORM" ]]; then
     exit 1
 fi
 
+python3 scripts/generate_phase4fg_runtime_boot.py build/runtime_e2e
+
+verilator --binary --timing --trace-fst --Wall \
+    -Wno-PINCONNECTEMPTY -Wno-PINMISSING -Wno-UNUSEDSIGNAL \
+    -Wno-UNUSEDPARAM -Wno-BLKSEQ \
+    --assert \
+    --Mdir build/verilator/nes_runtime_boot_phase4fg \
+    --top-module nes_runtime_boot_phase4fg_tb \
+    -o nes_runtime_boot_phase4fg_tb \
+    rtl/platform/platform_config_pkg.sv \
+    rtl/platform/nes_timing_gen.sv \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/controller/controller_input_sync.sv \
+    rtl/controller/nes_controller.sv \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader_mmio_pkg.sv \
+    rtl/loader/nes_runtime_loader_mmio.sv \
+    rtl/loader/nes_runtime_loader_cdc.sv \
+    rtl/loader/nes_runtime_loader.sv \
+    rtl/cartridge/nes_mapper0.sv \
+    rtl/cartridge/nes_cartridge.sv \
+    rtl/cartridge/nes_runtime_cartridge_storage.sv \
+    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_cartridge.sv \
+    rtl/cartridge/nes_cartridge_runtime_mux.sv \
+    sim/nes_runtime_boot_phase4fg_tb.sv
+
+build/verilator/nes_runtime_boot_phase4fg/nes_runtime_boot_phase4fg_tb
+
+if [[ ! -s "$NES_RUNTIME_BOOT_PHASE4FG_WAVEFORM" ||
+      ! -s "$NES_RUNTIME_BOOT_PHASE4FG_FRAME" ]]; then
+    echo "ERROR: Phase 4F-G runtime-boot artifacts are missing" >&2
+    exit 1
+fi
+python3 scripts/verify_phase4fg_frame.py \
+    "$NES_RUNTIME_BOOT_PHASE4FG_FRAME" \
+    "$NES_RUNTIME_BOOT_PHASE4FG_PPM"
+
 verilator --binary --timing --trace-fst --Wall \
     --assert \
     --Mdir build/verilator/nes_phase4c_controller \
@@ -1493,6 +1538,8 @@ echo "NES runtime cartridge Phase 4F-B waveform: $ROOT_DIR/$NES_RUNTIME_CARTRIDG
 echo "NES runtime image Phase 4F-C waveform: $ROOT_DIR/$NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM"
 echo "NES runtime activation Phase 4F-D waveform: $ROOT_DIR/$NES_RUNTIME_ACTIVATION_PHASE4FD_WAVEFORM"
 echo "NES runtime loader MMIO Phase 4F-F waveform: $ROOT_DIR/$NES_RUNTIME_LOADER_MMIO_PHASE4FF_WAVEFORM"
+echo "NES runtime boot Phase 4F-G waveform: $ROOT_DIR/$NES_RUNTIME_BOOT_PHASE4FG_WAVEFORM"
+echo "NES runtime boot Phase 4F-G frame: $ROOT_DIR/$NES_RUNTIME_BOOT_PHASE4FG_PPM"
 echo "NES debug snapshot Phase 4E-A waveform: $ROOT_DIR/$NES_DEBUG_SNAPSHOT_WAVEFORM"
 echo "NES debug renderer Phase 4E-B waveform: $ROOT_DIR/$NES_DEBUG_RENDERER_WAVEFORM"
 echo "NES debug renderer Phase 4E-B frame: $ROOT_DIR/$NES_DEBUG_RENDERER_FRAME"
