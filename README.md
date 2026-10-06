@@ -82,9 +82,11 @@ producing channel: register-accurate Pulse 1 duty/timer, envelope, length and
 sweep units, raw 0..15 output, the channel-one negate quirk, and real `$4015`
 activity. Phase 5C reuses that pulse datapath for Pulse 2, integrates
 `$4004-$4007` and `$4015` bit 1, selects the channel-two sweep-negate rule, and
-proves both raw 0..15 outputs simultaneously and independently. Final mixing,
-CPU IRQ consumption, DMC DMA, resampling, and codec output remain later Phase
-5 work.
+proves both raw 0..15 outputs simultaneously and independently. Phase 5D adds
+the every-CPU-cycle Triangle timer, exact 32-step waveform, linear and length
+counters, held-DAC semantics, `$4008/$400A/$400B`, and `$4015` bit 2 while
+preserving both pulse channels. Final mixing, CPU IRQ consumption, Noise, DMC
+DMA, resampling, and codec output remain later Phase 5 work.
 
 ## Phase 1 foundation
 
@@ -814,6 +816,27 @@ Architecture, channel differences, simultaneous operation, verification,
 synthesis results, and limitations are documented in
 [`docs/apu-phase5c-pulse2.md`](docs/apu-phase5c-pulse2.md).
 
+## Phase 5D — APU Triangle
+
+- Authentic `$4008`, `$400A`, and `$400B` behavior with reserved `$4009`
+  ignored and `$4015` bit 2 providing independent enable/active status
+- Exact 32-step 0..15 digital waveform and 11-bit timer clocked on every
+  accepted CPU/APU time slot
+- Quarter-frame linear counter with exact reload-flag/control semantics and
+  shared half-frame length counter whose halt uses the same control flag
+- Sequencer advancement gated by nonzero linear and length counters while the
+  raw DAC code holds its current value; periods 0 and 1 remain digitally active
+- Simultaneous independent Pulse 1, Pulse 2, and Triangle outputs with pause,
+  step, DMA, reset, register-isolation, and all `$4015` combinations verified
+- 108 directed Python cases plus a 314,560-cycle fixed-seed top-level
+  RTL/model comparison with zero mismatches and all 32 positions observed
+- No Noise, DMC, mixer, resampler, sample pipeline, or board audio path in
+  this phase
+
+Architecture, register behavior, counter semantics, waveform verification,
+synthesis results, and limitations are documented in
+[`docs/apu-phase5d-triangle.md`](docs/apu-phase5d-triangle.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -853,7 +876,8 @@ caching, concurrency, and timeout are documented in
 [`docs/ci-verification.md`](docs/ci-verification.md).
 
 This runs pytest, synthesizable RTL lint, the Phase 5A APU foundation, Phase 5B
-Pulse 1, and Phase 5C dual-pulse oracle/RTL comparisons,
+Pulse 1, Phase 5C dual-pulse, and Phase 5D three-channel Triangle oracle/RTL
+comparisons,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -1048,7 +1072,7 @@ before use.
 - `rtl/cartridge` — build-time and runtime Mapper 0/NROM cartridge storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — standalone OAM DMA bus master
-- `rtl/apu` — APU register, frame-sequencer, status, and timing foundation
+- `rtl/apu` — APU frame/status logic plus Pulse 1, Pulse 2, and Triangle channels
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
 - `rtl/loader` — runtime-loader protocol, manifest, and transfer validation
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion

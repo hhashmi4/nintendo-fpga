@@ -1,4 +1,4 @@
-"""Independent cycle model for the NTSC NES APU foundation and pulse channels."""
+"""Independent NTSC NES APU model for the frame, pulse, and triangle units."""
 
 from dataclasses import dataclass
 
@@ -33,6 +33,13 @@ PULSE_DUTY_TABLE = (
     (1, 1, 1, 1, 1, 1, 0, 0),
 )
 
+TRIANGLE_SEQUENCE = (
+    15, 14, 13, 12, 11, 10, 9, 8,
+    7, 6, 5, 4, 3, 2, 1, 0,
+    0, 1, 2, 3, 4, 5, 6, 7,
+    8, 9, 10, 11, 12, 13, 14, 15,
+)
+
 
 def pulse_sequence_cpu_cycles(timer_period: int) -> int:
     """Return CPU cycles in one complete eight-step pulse waveform."""
@@ -46,6 +53,22 @@ def pulse_frequency_hz(timer_period: int, cpu_hz: float = 1_789_773.0) -> float:
     """Human-readable NTSC frequency; no floating point is used by RTL."""
 
     return cpu_hz / pulse_sequence_cpu_cycles(timer_period)
+
+
+def triangle_sequence_cpu_cycles(timer_period: int) -> int:
+    """Return CPU cycles in one complete 32-step triangle waveform."""
+
+    if not 0 <= timer_period <= 0x7FF:
+        raise ValueError("timer_period must be 11 bits")
+    return 32 * (timer_period + 1)
+
+
+def triangle_frequency_hz(
+    timer_period: int, cpu_hz: float = 1_789_773.0
+) -> float:
+    """Human-readable NTSC frequency; no floating point is used by RTL."""
+
+    return cpu_hz / triangle_sequence_cpu_cycles(timer_period)
 
 
 @dataclass(frozen=True)
@@ -273,6 +296,135 @@ class Pulse2Model(PulseModel):
 
 
 @dataclass(frozen=True)
+class TriangleInputs:
+    reset: bool = False
+    cpu_cycle_enable: bool = False
+    enable: bool = False
+    write: bool = False
+    write_register: int = 0
+    write_data: int = 0
+    quarter_frame_tick: bool = False
+    half_frame_tick: bool = False
+
+
+@dataclass(frozen=True)
+class TriangleOutputs:
+    active: bool
+    raw_output: int
+
+
+@dataclass(frozen=True)
+class TriangleState:
+    control_flag: bool
+    linear_reload_value: int
+    linear_counter: int
+    linear_reload_flag: bool
+    sequence_position: int
+    timer_period: int
+    timer_counter: int
+    length_counter: int
+
+
+class TriangleModel:
+    """Behavioral specification of the 2A03 triangle channel."""
+
+    def __init__(self) -> None:
+        self.reset_state()
+
+    def reset_state(self) -> None:
+        self.control_flag = False
+        self.linear_reload_value = 0
+        self.linear_counter = 0
+        self.linear_reload_flag = False
+        self.sequence_position = 0
+        self.timer_period = 0
+        self.timer_counter = 0
+        self.length_counter = 0
+
+    def state(self) -> TriangleState:
+        return TriangleState(
+            control_flag=self.control_flag,
+            linear_reload_value=self.linear_reload_value,
+            linear_counter=self.linear_counter,
+            linear_reload_flag=self.linear_reload_flag,
+            sequence_position=self.sequence_position,
+            timer_period=self.timer_period,
+            timer_counter=self.timer_counter,
+            length_counter=self.length_counter,
+        )
+
+    @staticmethod
+    def _validate(inputs: TriangleInputs) -> None:
+        if not 0 <= inputs.write_register <= 3:
+            raise ValueError("write_register must be 2 bits")
+        if not 0 <= inputs.write_data <= 0xFF:
+            raise ValueError("write_data must be 8 bits")
+        if inputs.half_frame_tick and not inputs.quarter_frame_tick:
+            raise ValueError("half-frame ticks must include quarter-frame ticks")
+
+    def evaluate(self) -> TriangleOutputs:
+        return TriangleOutputs(
+            active=self.length_counter != 0,
+            raw_output=TRIANGLE_SEQUENCE[self.sequence_position],
+        )
+
+    def clock(
+        self, inputs: TriangleInputs
+    ) -> tuple[TriangleOutputs, TriangleState]:
+        """Evaluate pre-edge DAC output, then apply one fabric-clock edge."""
+
+        self._validate(inputs)
+        outputs = self.evaluate()
+        if inputs.reset:
+            self.reset_state()
+            return outputs, self.state()
+        if not inputs.cpu_cycle_enable:
+            return outputs, self.state()
+
+        old = self.state()
+
+        # The triangle divider clocks on every CPU slot and is not stopped by
+        # the length/linear gates; only sequence advancement is stopped.
+        if old.timer_counter == 0:
+            self.timer_counter = old.timer_period
+            if old.length_counter != 0 and old.linear_counter != 0:
+                self.sequence_position = (old.sequence_position + 1) & 0x1F
+        else:
+            self.timer_counter = old.timer_counter - 1
+
+        if inputs.quarter_frame_tick:
+            if old.linear_reload_flag:
+                self.linear_counter = old.linear_reload_value
+            elif old.linear_counter != 0:
+                self.linear_counter = old.linear_counter - 1
+            if not old.control_flag:
+                self.linear_reload_flag = False
+
+        if inputs.half_frame_tick and old.length_counter != 0:
+            if not old.control_flag:
+                self.length_counter = old.length_counter - 1
+
+        if inputs.write:
+            if inputs.write_register == 0:  # $4008
+                self.control_flag = bool(inputs.write_data & 0x80)
+                self.linear_reload_value = inputs.write_data & 0x7F
+            elif inputs.write_register == 2:  # $400A
+                self.timer_period = (old.timer_period & 0x700) | inputs.write_data
+            elif inputs.write_register == 3:  # $400B
+                self.timer_period = (
+                    (old.timer_period & 0x0FF) | ((inputs.write_data & 0x07) << 8)
+                )
+                self.linear_reload_flag = True
+                if inputs.enable:
+                    self.length_counter = LENGTH_TABLE[inputs.write_data >> 3]
+
+        if not inputs.enable:
+            self.length_counter = 0
+
+        return outputs, self.state()
+
+
+@dataclass(frozen=True)
 class ApuInputs:
     """Signals presented for one fabric cycle.
 
@@ -296,6 +448,7 @@ class ApuOutputs:
     irq: bool
     pulse1_output: int
     pulse2_output: int
+    triangle_output: int
     quarter_frame_tick: bool
     half_frame_tick: bool
     channel_write: bool
@@ -323,11 +476,13 @@ class ApuFoundationModel:
     def __init__(self) -> None:
         self.pulse1 = Pulse1Model()
         self.pulse2 = Pulse2Model()
+        self.triangle = TriangleModel()
         self.reset_state()
 
     def reset_state(self) -> None:
         self.pulse1.reset_state()
         self.pulse2.reset_state()
+        self.triangle.reset_state()
         self.channel_enable = 0
         self.mode_5_step = False
         self.irq_inhibit = False
@@ -430,8 +585,10 @@ class ApuFoundationModel:
         if status_read:
             pulse1_active = int(self.pulse1.evaluate(bool(self.channel_enable & 1)).active)
             pulse2_active = int(self.pulse2.evaluate(bool(self.channel_enable & 2)).active)
+            triangle_active = int(self.triangle.evaluate().active)
             read_data = (
-                (inputs.channel_active & 0x1C)
+                (inputs.channel_active & 0x18)
+                | (triangle_active << 2)
                 | (pulse2_active << 1)
                 | pulse1_active
             )
@@ -448,12 +605,12 @@ class ApuFoundationModel:
             if status_write
             else bool(self.channel_enable & 0x02)
         )
-
         return ApuOutputs(
             cpu_read_data=read_data,
             irq=not inputs.reset and (self.frame_irq_flag or irq_set),
             pulse1_output=self.pulse1.evaluate(effective_pulse1_enable).raw_output,
             pulse2_output=self.pulse2.evaluate(effective_pulse2_enable).raw_output,
+            triangle_output=self.triangle.evaluate().raw_output,
             quarter_frame_tick=quarter,
             half_frame_tick=half,
             channel_write=channel_write,
@@ -481,6 +638,11 @@ class ApuFoundationModel:
             bool(inputs.cpu_write_data & 0x02)
             if status_write
             else bool(self.channel_enable & 0x02)
+        )
+        effective_triangle_enable = (
+            bool(inputs.cpu_write_data & 0x04)
+            if status_write
+            else bool(self.channel_enable & 0x04)
         )
         self.pulse1.clock(
             PulseInputs(
@@ -511,6 +673,21 @@ class ApuFoundationModel:
                 write=(
                     outputs.channel_write
                     and 0x04 <= outputs.channel_write_register <= 0x07
+                ),
+                write_register=outputs.channel_write_register & 0x03,
+                write_data=outputs.channel_write_data,
+                quarter_frame_tick=outputs.quarter_frame_tick,
+                half_frame_tick=outputs.half_frame_tick,
+            )
+        )
+        self.triangle.clock(
+            TriangleInputs(
+                reset=inputs.reset,
+                cpu_cycle_enable=inputs.cpu_cycle_enable,
+                enable=effective_triangle_enable,
+                write=(
+                    outputs.channel_write
+                    and 0x08 <= outputs.channel_write_register <= 0x0B
                 ),
                 write_register=outputs.channel_write_register & 0x03,
                 write_data=outputs.channel_write_data,

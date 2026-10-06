@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
-// NES APU foundation plus the Phase 5B/5C pulse channels. All state is in the
+// NES APU foundation plus the Phase 5B/5C pulse and Phase 5D triangle channels.
+// All state is in the
 // fabric clock domain and advances only on cpu_cycle_enable. The enable is the
 // complete NES CPU-time slot stream, including OAM-DMA stalls; accepted bus
 // strobes remain CPU-only.
@@ -15,8 +16,8 @@ module nes_apu (
     input  logic [7:0]  cpu_write_data,
     output logic [7:0]  cpu_read_data,
 
-    // Bits 4:2 remain external placeholders for later channels. The two pulse
-    // channels own bits 1:0 internally. Enable and active are distinct.
+    // Bits 4:3 remain external placeholders for later channels. Triangle and
+    // the two pulse channels own bits 2:0 internally. Enable and active differ.
     /* verilator lint_off UNUSEDSIGNAL */
     input  nes_apu_pkg::nes_apu_channel_mask_t channel_active,
     /* verilator lint_on UNUSEDSIGNAL */
@@ -34,6 +35,7 @@ module nes_apu (
     output logic        irq,
     output logic [3:0]  pulse1_output,
     output logic [3:0]  pulse2_output,
+    output logic [3:0]  triangle_output,
 
     // Architectural/debug state used by verification and future snapshots.
     output nes_apu_pkg::nes_apu_frame_mode_t frame_mode,
@@ -66,6 +68,8 @@ module nes_apu (
     logic pulse1_enable;
     logic pulse2_active;
     logic pulse2_enable;
+    logic triangle_active;
+    logic triangle_enable;
     logic pulse_timer_tick;
     nes_apu_channel_mask_t effective_channel_active;
 
@@ -92,9 +96,11 @@ module nes_apu (
                            channel_enable[APU_STATUS_PULSE1_BIT];
     assign pulse2_enable = status_write ? cpu_write_data[1] :
                            channel_enable[APU_STATUS_PULSE2_BIT];
+    assign triangle_enable = status_write ? cpu_write_data[2] :
+                             channel_enable[APU_STATUS_TRIANGLE_BIT];
     assign pulse_timer_tick = cpu_cycle_enable && !cpu_cycle_odd;
     assign effective_channel_active = {
-        channel_active[4:2], pulse2_active, pulse1_active
+        channel_active[4:3], triangle_active, pulse2_active, pulse1_active
     };
 
     assign next_frame_cycle = frame_sequence_cycle + 16'd1;
@@ -250,6 +256,30 @@ module nes_apu (
         .sweep_divider(),
         .sweep_target(),
         .sweep_mute()
+    );
+    /* verilator lint_on PINCONNECTEMPTY */
+
+    /* verilator lint_off PINCONNECTEMPTY */
+    nes_apu_triangle triangle (
+        .clk(clk),
+        .reset(reset),
+        .cpu_cycle_enable(cpu_cycle_enable),
+        .enable(triangle_enable),
+        .write(channel_write && channel_write_register[4:2] == 3'd2),
+        .write_register(channel_write_register[1:0]),
+        .write_data(channel_write_data),
+        .quarter_frame_tick(quarter_frame_tick),
+        .half_frame_tick(half_frame_tick),
+        .active(triangle_active),
+        .raw_output(triangle_output),
+        .control_flag(),
+        .linear_reload_value(),
+        .linear_counter(),
+        .linear_reload_flag(),
+        .sequence_position(),
+        .timer_period(),
+        .timer_counter(),
+        .length_counter()
     );
     /* verilator lint_on PINCONNECTEMPTY */
 
