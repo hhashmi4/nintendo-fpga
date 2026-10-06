@@ -40,6 +40,16 @@ package nes_apu_pkg;
         8'b0011_1111
     };
 
+    // The triangle sequencer is a 32-entry, 4-bit DAC lookup rather than an
+    // arithmetic waveform. Position zero is the deterministic FPGA-reset
+    // phase; timer expirations advance upward through the table.
+    localparam logic [3:0] APU_TRIANGLE_SEQUENCE [0:31] = '{
+        4'd15, 4'd14, 4'd13, 4'd12, 4'd11, 4'd10, 4'd9,  4'd8,
+        4'd7,  4'd6,  4'd5,  4'd4,  4'd3,  4'd2,  4'd1,  4'd0,
+        4'd0,  4'd1,  4'd2,  4'd3,  4'd4,  4'd5,  4'd6,  4'd7,
+        4'd8,  4'd9,  4'd10, 4'd11, 4'd12, 4'd13, 4'd14, 4'd15
+    };
+
     // NTSC 2A03 CPU-cycle positions. The 4-step terminal IRQ is asserted
     // across three consecutive CPU cycles; the quarter/half event is on the
     // middle cycle. The final entry in each sequence resets the cycle count.
