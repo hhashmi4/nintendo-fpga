@@ -1,8 +1,8 @@
 `timescale 1ns/1ps
 
-// Reusable NES pulse-channel datapath. Phase 5B instantiates only Pulse 1;
-// CHANNEL_ONE keeps its one's-complement sweep-negate quirk explicit so a
-// later Pulse 2 instance can select the distinct two's-complement behavior.
+// Reusable NES pulse-channel datapath. CHANNEL_ONE keeps Pulse 1's
+// one's-complement sweep-negate quirk explicit; Pulse 2 selects the distinct
+// two's-complement behavior without duplicating the channel implementation.
 module nes_apu_pulse #(
     parameter bit CHANNEL_ONE = 1'b1
 ) (

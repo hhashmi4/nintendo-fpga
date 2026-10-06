@@ -22,6 +22,7 @@ module nes_apu_phase5a_tb;
     logic half_frame_tick;
     logic irq;
     logic [3:0] pulse1_output;
+    logic [3:0] pulse2_output;
     nes_apu_frame_mode_t frame_mode;
     logic frame_irq_inhibit;
     logic frame_irq_flag;
@@ -54,6 +55,7 @@ module nes_apu_phase5a_tb;
     logic [7:0] expected_read_data;
     logic expected_irq;
     logic [3:0] expected_pulse1_output;
+    logic [3:0] expected_pulse2_output;
     logic expected_quarter;
     logic expected_half;
     logic expected_channel_write;
@@ -90,6 +92,10 @@ module nes_apu_phase5a_tb;
                 else $fatal(1, "Pulse 1 output row %0d: got %0x expected %0x",
                             vector_count, pulse1_output,
                             expected_pulse1_output);
+            assert (pulse2_output == expected_pulse2_output)
+                else $fatal(1, "Pulse 2 output row %0d: got %0x expected %0x",
+                            vector_count, pulse2_output,
+                            expected_pulse2_output);
             assert (quarter_frame_tick == expected_quarter &&
                     half_frame_tick == expected_half)
                 else $fatal(1, "frame tick mismatch row %0d", vector_count);
@@ -137,12 +143,13 @@ module nes_apu_phase5a_tb;
         while (!$feof(vector_file)) begin
             scan_result = $fscanf(
                 vector_file,
-                "%d %d %d %d %d %x %x %x %d %x %d %x %d %d %d %x %x %d %x %d %d %d %x %d %d %d %d\n",
+                "%d %d %d %d %d %x %x %x %d %x %d %x %x %d %d %d %x %x %d %x %d %d %d %x %d %d %d %d\n",
                 scenario, expected_reset, expected_enable,
                 expected_read, expected_write, expected_address,
                 expected_write_data, expected_channel_active,
                 expected_dmc_irq, expected_read_data, expected_irq,
-                expected_pulse1_output, expected_quarter, expected_half,
+                expected_pulse1_output, expected_pulse2_output,
+                expected_quarter, expected_half,
                 expected_channel_write,
                 expected_channel_register, expected_channel_data,
                 expected_dmc_clear, expected_channel_enable, expected_mode,
@@ -150,7 +157,7 @@ module nes_apu_phase5a_tb;
                 expected_cycle_odd, expected_reset_pending,
                 expected_reset_delay, expected_tick_block
             );
-            if (scan_result == 27) begin
+            if (scan_result == 28) begin
                 @(negedge clk);
                 reset = expected_reset;
                 cpu_cycle_enable = expected_enable;

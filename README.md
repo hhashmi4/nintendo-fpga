@@ -80,8 +80,11 @@ parity-delayed `$4017` control, frame IRQ state, channel extension interfaces,
 and independent Python/RTL model comparison. Phase 5B adds the first sound-
 producing channel: register-accurate Pulse 1 duty/timer, envelope, length and
 sweep units, raw 0..15 output, the channel-one negate quirk, and real `$4015`
-activity. Final mixing, CPU IRQ consumption, DMC DMA, resampling, and codec
-output remain later Phase 5 work.
+activity. Phase 5C reuses that pulse datapath for Pulse 2, integrates
+`$4004-$4007` and `$4015` bit 1, selects the channel-two sweep-negate rule, and
+proves both raw 0..15 outputs simultaneously and independently. Final mixing,
+CPU IRQ consumption, DMC DMA, resampling, and codec output remain later Phase
+5 work.
 
 ## Phase 1 foundation
 
@@ -793,6 +796,24 @@ Architecture, register semantics, timing, verification, synthesis results, and
 limitations are documented in
 [`docs/apu-phase5b-pulse1.md`](docs/apu-phase5b-pulse1.md).
 
+## Phase 5C — APU Pulse 2
+
+- A second instance of the proven shared pulse RTL for `$4004-$4007`
+- Explicit Pulse 2 two's-complement sweep-negate behavior, differing from
+  Pulse 1 by exactly one timer count for negative sweeps
+- Independent duty phase, timer, envelope, length, sweep, enable, status, and
+  raw four-bit amplitude for each pulse channel
+- Shared Phase 5A quarter/half-frame events and complete CPU-time slot stream;
+  no duplicate bus decoder or frame sequencer
+- All four `$4015` Pulse 1/Pulse 2 enable and active-status combinations
+- 36 directed Python tests plus a 272,426-cycle fixed-seed, top-level dual-pulse
+  RTL/model comparison with zero mismatches and FST waveform capture
+- No mixer, resampler, sample pipeline, or board audio path in this phase
+
+Architecture, channel differences, simultaneous operation, verification,
+synthesis results, and limitations are documented in
+[`docs/apu-phase5c-pulse2.md`](docs/apu-phase5c-pulse2.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -831,8 +852,8 @@ suite for pull requests to `main`; the event policy, fail-safe `main` behavior,
 caching, concurrency, and timeout are documented in
 [`docs/ci-verification.md`](docs/ci-verification.md).
 
-This runs pytest, synthesizable RTL lint, the Phase 5A APU foundation and Phase
-5B Pulse 1 oracle/RTL comparisons,
+This runs pytest, synthesizable RTL lint, the Phase 5A APU foundation, Phase 5B
+Pulse 1, and Phase 5C dual-pulse oracle/RTL comparisons,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
