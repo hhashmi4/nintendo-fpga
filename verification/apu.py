@@ -1,4 +1,4 @@
-"""Independent cycle model for the NTSC NES APU foundation and Pulse 1."""
+"""Independent cycle model for the NTSC NES APU foundation and pulse channels."""
 
 from dataclasses import dataclass
 
@@ -90,10 +90,11 @@ class PulseState:
     sweep_divider: int
 
 
-class Pulse1Model:
-    """Behavioral specification of one 2A03 Pulse 1 channel."""
+class PulseModel:
+    """Behavioral specification of a 2A03 pulse channel."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, channel_one: bool) -> None:
+        self.channel_one = channel_one
         self.reset_state()
 
     def reset_state(self) -> None:
@@ -150,7 +151,8 @@ class Pulse1Model:
     def sweep_target(self) -> int:
         change = self.timer_period >> self.sweep_shift
         if self.sweep_negate:
-            return (self.timer_period - change - 1) & 0xFFF
+            correction = 1 if self.channel_one else 0
+            return (self.timer_period - change - correction) & 0xFFF
         return self.timer_period + change
 
     def sweep_mute(self) -> bool:
@@ -256,6 +258,20 @@ class Pulse1Model:
         return outputs, self.state()
 
 
+class Pulse1Model(PulseModel):
+    """Pulse 1 model with the channel-one sweep-negate correction."""
+
+    def __init__(self) -> None:
+        super().__init__(channel_one=True)
+
+
+class Pulse2Model(PulseModel):
+    """Pulse 2 model with the channel-two sweep-negate calculation."""
+
+    def __init__(self) -> None:
+        super().__init__(channel_one=False)
+
+
 @dataclass(frozen=True)
 class ApuInputs:
     """Signals presented for one fabric cycle.
@@ -279,6 +295,7 @@ class ApuOutputs:
     cpu_read_data: int
     irq: bool
     pulse1_output: int
+    pulse2_output: int
     quarter_frame_tick: bool
     half_frame_tick: bool
     channel_write: bool
@@ -305,10 +322,12 @@ class ApuFoundationModel:
 
     def __init__(self) -> None:
         self.pulse1 = Pulse1Model()
+        self.pulse2 = Pulse2Model()
         self.reset_state()
 
     def reset_state(self) -> None:
         self.pulse1.reset_state()
+        self.pulse2.reset_state()
         self.channel_enable = 0
         self.mode_5_step = False
         self.irq_inhibit = False
@@ -410,7 +429,12 @@ class ApuFoundationModel:
         read_data = 0
         if status_read:
             pulse1_active = int(self.pulse1.evaluate(bool(self.channel_enable & 1)).active)
-            read_data = (inputs.channel_active & 0x1E) | pulse1_active
+            pulse2_active = int(self.pulse2.evaluate(bool(self.channel_enable & 2)).active)
+            read_data = (
+                (inputs.channel_active & 0x1C)
+                | (pulse2_active << 1)
+                | pulse1_active
+            )
             read_data |= int(self.frame_irq_flag or irq_set) << 6
             read_data |= int(inputs.dmc_irq_flag) << 7
 
@@ -419,11 +443,17 @@ class ApuFoundationModel:
             if status_write
             else bool(self.channel_enable & 0x01)
         )
+        effective_pulse2_enable = (
+            bool(inputs.cpu_write_data & 0x02)
+            if status_write
+            else bool(self.channel_enable & 0x02)
+        )
 
         return ApuOutputs(
             cpu_read_data=read_data,
             irq=not inputs.reset and (self.frame_irq_flag or irq_set),
             pulse1_output=self.pulse1.evaluate(effective_pulse1_enable).raw_output,
+            pulse2_output=self.pulse2.evaluate(effective_pulse2_enable).raw_output,
             quarter_frame_tick=quarter,
             half_frame_tick=half,
             channel_write=channel_write,
@@ -447,6 +477,11 @@ class ApuFoundationModel:
             if status_write
             else bool(self.channel_enable & 0x01)
         )
+        effective_pulse2_enable = (
+            bool(inputs.cpu_write_data & 0x02)
+            if status_write
+            else bool(self.channel_enable & 0x02)
+        )
         self.pulse1.clock(
             PulseInputs(
                 reset=inputs.reset,
@@ -458,6 +493,24 @@ class ApuFoundationModel:
                 write=(
                     outputs.channel_write
                     and outputs.channel_write_register <= 0x03
+                ),
+                write_register=outputs.channel_write_register & 0x03,
+                write_data=outputs.channel_write_data,
+                quarter_frame_tick=outputs.quarter_frame_tick,
+                half_frame_tick=outputs.half_frame_tick,
+            )
+        )
+        self.pulse2.clock(
+            PulseInputs(
+                reset=inputs.reset,
+                cpu_cycle_enable=inputs.cpu_cycle_enable,
+                timer_tick=(
+                    inputs.cpu_cycle_enable and not self.cpu_cycle_odd
+                ),
+                enable=effective_pulse2_enable,
+                write=(
+                    outputs.channel_write
+                    and 0x04 <= outputs.channel_write_register <= 0x07
                 ),
                 write_register=outputs.channel_write_register & 0x03,
                 write_data=outputs.channel_write_data,

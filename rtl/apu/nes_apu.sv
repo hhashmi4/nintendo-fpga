@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-// NES APU foundation plus the Phase 5B Pulse 1 channel. All state is in the
+// NES APU foundation plus the Phase 5B/5C pulse channels. All state is in the
 // fabric clock domain and advances only on cpu_cycle_enable. The enable is the
 // complete NES CPU-time slot stream, including OAM-DMA stalls; accepted bus
 // strobes remain CPU-only.
@@ -15,8 +15,8 @@ module nes_apu (
     input  logic [7:0]  cpu_write_data,
     output logic [7:0]  cpu_read_data,
 
-    // Bits 4:1 remain external placeholders for later channels. Pulse 1 owns
-    // bit 0 internally from Phase 5B onward. Enable and active are distinct.
+    // Bits 4:2 remain external placeholders for later channels. The two pulse
+    // channels own bits 1:0 internally. Enable and active are distinct.
     /* verilator lint_off UNUSEDSIGNAL */
     input  nes_apu_pkg::nes_apu_channel_mask_t channel_active,
     /* verilator lint_on UNUSEDSIGNAL */
@@ -33,6 +33,7 @@ module nes_apu (
     output logic        half_frame_tick,
     output logic        irq,
     output logic [3:0]  pulse1_output,
+    output logic [3:0]  pulse2_output,
 
     // Architectural/debug state used by verification and future snapshots.
     output nes_apu_pkg::nes_apu_frame_mode_t frame_mode,
@@ -63,7 +64,9 @@ module nes_apu (
     logic effective_irq_inhibit;
     logic pulse1_active;
     logic pulse1_enable;
-    logic pulse1_timer_tick;
+    logic pulse2_active;
+    logic pulse2_enable;
+    logic pulse_timer_tick;
     nes_apu_channel_mask_t effective_channel_active;
 
     assign accepted_read = !reset && cpu_cycle_enable && cpu_read;
@@ -83,13 +86,15 @@ module nes_apu (
     // A future DMC consumes this pulse to clear its own IRQ latch.
     assign dmc_irq_clear = status_write;
 
-    // A $4015 write affects Pulse 1 on its accepted CPU edge rather than one
-    // slot later. The stored mask remains the externally visible enable state.
+    // A $4015 write affects both pulse channels on its accepted CPU edge rather
+    // than one slot later. The stored mask remains externally visible state.
     assign pulse1_enable = status_write ? cpu_write_data[0] :
                            channel_enable[APU_STATUS_PULSE1_BIT];
-    assign pulse1_timer_tick = cpu_cycle_enable && !cpu_cycle_odd;
+    assign pulse2_enable = status_write ? cpu_write_data[1] :
+                           channel_enable[APU_STATUS_PULSE2_BIT];
+    assign pulse_timer_tick = cpu_cycle_enable && !cpu_cycle_odd;
     assign effective_channel_active = {
-        channel_active[4:1], pulse1_active
+        channel_active[4:2], pulse2_active, pulse1_active
     };
 
     assign next_frame_cycle = frame_sequence_cycle + 16'd1;
@@ -179,7 +184,7 @@ module nes_apu (
         .clk(clk),
         .reset(reset),
         .cpu_cycle_enable(cpu_cycle_enable),
-        .timer_tick(pulse1_timer_tick),
+        .timer_tick(pulse_timer_tick),
         .enable(pulse1_enable),
         .write(channel_write && channel_write_register[4:2] == 3'd0),
         .write_register(channel_write_register[1:0]),
@@ -188,6 +193,44 @@ module nes_apu (
         .half_frame_tick(half_frame_tick),
         .active(pulse1_active),
         .raw_output(pulse1_output),
+        .duty(),
+        .duty_position(),
+        .timer_period(),
+        .timer_counter(),
+        .length_counter(),
+        .length_halt(),
+        .constant_volume(),
+        .envelope_period(),
+        .envelope_start(),
+        .envelope_divider(),
+        .envelope_decay(),
+        .sweep_enabled(),
+        .sweep_period(),
+        .sweep_negate(),
+        .sweep_shift(),
+        .sweep_reload(),
+        .sweep_divider(),
+        .sweep_target(),
+        .sweep_mute()
+    );
+    /* verilator lint_on PINCONNECTEMPTY */
+
+    /* verilator lint_off PINCONNECTEMPTY */
+    nes_apu_pulse #(
+        .CHANNEL_ONE(1'b0)
+    ) pulse2 (
+        .clk(clk),
+        .reset(reset),
+        .cpu_cycle_enable(cpu_cycle_enable),
+        .timer_tick(pulse_timer_tick),
+        .enable(pulse2_enable),
+        .write(channel_write && channel_write_register[4:2] == 3'd1),
+        .write_register(channel_write_register[1:0]),
+        .write_data(channel_write_data),
+        .quarter_frame_tick(quarter_frame_tick),
+        .half_frame_tick(half_frame_tick),
+        .active(pulse2_active),
+        .raw_output(pulse2_output),
         .duty(),
         .duty_position(),
         .timer_period(),

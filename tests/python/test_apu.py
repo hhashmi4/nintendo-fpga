@@ -71,7 +71,7 @@ def test_channel_write_decode_and_status_enable_are_distinct_from_active() -> No
     outputs, _ = cycle(
         model, cpu_read=True, cpu_address=APU_STATUS, channel_active=0x0A
     )
-    assert outputs.cpu_read_data == 0x0A
+    assert outputs.cpu_read_data == 0x08
 
 
 def test_unaccepted_bus_levels_do_not_repeat_writes_or_advance_time() -> None:
@@ -132,7 +132,7 @@ def test_status_read_reports_and_clears_frame_irq_but_not_external_dmc_irq() -> 
         channel_active=0x12,
         dmc_irq_flag=True,
     )
-    assert outputs.cpu_read_data == 0xD2
+    assert outputs.cpu_read_data == 0xD0
     assert outputs.irq
     assert not state.frame_irq_flag
 
