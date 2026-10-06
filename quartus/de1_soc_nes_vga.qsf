@@ -7,6 +7,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/reset_sync.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/level_sync.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/nes_timing_gen.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_pulse.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot.sv

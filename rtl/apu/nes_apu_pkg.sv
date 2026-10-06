@@ -22,6 +22,24 @@ package nes_apu_pkg;
         NES_APU_FRAME_MODE_5_STEP = 1'b1
     } nes_apu_frame_mode_t;
 
+    // Shared channel constants. The length table is indexed by bits 7:3 of
+    // the pulse/triangle/noise high-timer register. Pulse sequencers count
+    // downward, so position zero is the first value after a $4003 write and
+    // position seven is selected by the first timer expiration.
+    localparam logic [7:0] APU_LENGTH_TABLE [0:31] = '{
+        8'd10,  8'd254, 8'd20,  8'd2,   8'd40,  8'd4,   8'd80,  8'd6,
+        8'd160, 8'd8,   8'd60,  8'd10,  8'd14,  8'd12,  8'd26,  8'd14,
+        8'd12,  8'd16,  8'd24,  8'd18,  8'd48,  8'd20,  8'd96,  8'd22,
+        8'd192, 8'd24,  8'd72,  8'd26,  8'd16,  8'd28,  8'd32,  8'd30
+    };
+
+    localparam logic [7:0] APU_PULSE_DUTY_TABLE [0:3] = '{
+        8'b1000_0000,
+        8'b1100_0000,
+        8'b1111_0000,
+        8'b0011_1111
+    };
+
     // NTSC 2A03 CPU-cycle positions. The 4-step terminal IRQ is asserted
     // across three consecutive CPU cycles; the quarter/half event is on the
     // middle cycle. The final entry in each sequence resets the cycle count.
