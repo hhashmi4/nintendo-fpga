@@ -220,6 +220,7 @@ module de1_soc_nes_vga_top #(
     logic [3:0] apu_pulse1_output;
     logic [3:0] apu_pulse2_output;
     logic [3:0] apu_triangle_output;
+    logic [3:0] apu_noise_output;
     nes_apu_pkg::nes_apu_channel_mask_t apu_channel_enable;
     logic dma_complete_event;
     logic dma_start_event;
@@ -862,6 +863,7 @@ module de1_soc_nes_vga_top #(
         .pulse1_output(apu_pulse1_output),
         .pulse2_output(apu_pulse2_output),
         .triangle_output(apu_triangle_output),
+        .noise_output(apu_noise_output),
         .frame_mode(),
         .frame_irq_inhibit(),
         .frame_irq_flag(),
@@ -1243,7 +1245,7 @@ module de1_soc_nes_vga_top #(
                            apu_irq || apu_quarter_frame_tick ||
                            apu_half_frame_tick || ^apu_channel_enable ||
                            ^apu_pulse1_output || ^apu_pulse2_output ||
-                           ^apu_triangle_output ||
+                           ^apu_triangle_output || ^apu_noise_output ||
                            cartridge_debug_prg_read ||
                            cartridge_debug_prg_write ||
                            cartridge_debug_prg_ram_read ||

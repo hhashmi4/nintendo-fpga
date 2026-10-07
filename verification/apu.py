@@ -1,4 +1,4 @@
-"""Independent NTSC NES APU model for the frame, pulse, and triangle units."""
+"""Independent NTSC NES APU model for frame, pulse, triangle, and Noise."""
 
 from dataclasses import dataclass
 
@@ -40,6 +40,11 @@ TRIANGLE_SEQUENCE = (
     8, 9, 10, 11, 12, 13, 14, 15,
 )
 
+NOISE_PERIOD_TABLE = (
+    4, 8, 16, 32, 64, 96, 128, 160,
+    202, 254, 380, 508, 762, 1016, 2034, 4068,
+)
+
 
 def pulse_sequence_cpu_cycles(timer_period: int) -> int:
     """Return CPU cycles in one complete eight-step pulse waveform."""
@@ -69,6 +74,22 @@ def triangle_frequency_hz(
     """Human-readable NTSC frequency; no floating point is used by RTL."""
 
     return cpu_hz / triangle_sequence_cpu_cycles(timer_period)
+
+
+def noise_shift_cpu_cycles(period_index: int) -> int:
+    """Return CPU cycles between Noise LFSR shifts for an NTSC period index."""
+
+    if not 0 <= period_index <= 0x0F:
+        raise ValueError("period_index must be 4 bits")
+    return NOISE_PERIOD_TABLE[period_index]
+
+
+def noise_shift_rate_hz(
+    period_index: int, cpu_hz: float = 1_789_773.0
+) -> float:
+    """Human-readable LFSR shift rate; RTL uses integer divider logic."""
+
+    return cpu_hz / noise_shift_cpu_cycles(period_index)
 
 
 @dataclass(frozen=True)
@@ -425,6 +446,164 @@ class TriangleModel:
 
 
 @dataclass(frozen=True)
+class NoiseInputs:
+    reset: bool = False
+    cpu_cycle_enable: bool = False
+    timer_tick: bool = False
+    enable: bool = False
+    write: bool = False
+    write_register: int = 0
+    write_data: int = 0
+    quarter_frame_tick: bool = False
+    half_frame_tick: bool = False
+
+
+@dataclass(frozen=True)
+class NoiseOutputs:
+    active: bool
+    raw_output: int
+
+
+@dataclass(frozen=True)
+class NoiseState:
+    length_halt: bool
+    constant_volume: bool
+    envelope_period: int
+    envelope_start: bool
+    envelope_divider: int
+    envelope_decay: int
+    mode: bool
+    period_index: int
+    timer_counter: int
+    length_counter: int
+    lfsr: int
+
+
+class NoiseModel:
+    """Behavioral specification of the 2A03 Noise channel."""
+
+    def __init__(self) -> None:
+        self.reset_state()
+
+    def reset_state(self) -> None:
+        self.length_halt = False
+        self.constant_volume = False
+        self.envelope_period = 0
+        self.envelope_start = False
+        self.envelope_divider = 0
+        self.envelope_decay = 0
+        self.mode = False
+        self.period_index = 0
+        self.timer_counter = 0
+        self.length_counter = 0
+        self.lfsr = 1
+
+    def state(self) -> NoiseState:
+        return NoiseState(
+            length_halt=self.length_halt,
+            constant_volume=self.constant_volume,
+            envelope_period=self.envelope_period,
+            envelope_start=self.envelope_start,
+            envelope_divider=self.envelope_divider,
+            envelope_decay=self.envelope_decay,
+            mode=self.mode,
+            period_index=self.period_index,
+            timer_counter=self.timer_counter,
+            length_counter=self.length_counter,
+            lfsr=self.lfsr,
+        )
+
+    @staticmethod
+    def _validate(inputs: NoiseInputs) -> None:
+        if not 0 <= inputs.write_register <= 3:
+            raise ValueError("write_register must be 2 bits")
+        if not 0 <= inputs.write_data <= 0xFF:
+            raise ValueError("write_data must be 8 bits")
+        if inputs.half_frame_tick and not inputs.quarter_frame_tick:
+            raise ValueError("half-frame ticks must include quarter-frame ticks")
+        if inputs.timer_tick and not inputs.cpu_cycle_enable:
+            raise ValueError("timer_tick requires cpu_cycle_enable")
+
+    @property
+    def timer_period(self) -> int:
+        return NOISE_PERIOD_TABLE[self.period_index]
+
+    def evaluate(self, enable: bool) -> NoiseOutputs:
+        active = self.length_counter != 0
+        volume = (
+            self.envelope_period if self.constant_volume else self.envelope_decay
+        )
+        output = volume if enable and active and not (self.lfsr & 1) else 0
+        return NoiseOutputs(active=active, raw_output=output)
+
+    def clock(self, inputs: NoiseInputs) -> tuple[NoiseOutputs, NoiseState]:
+        """Evaluate pre-edge output, then apply one fabric-clock edge."""
+
+        self._validate(inputs)
+        outputs = self.evaluate(inputs.enable)
+        if inputs.reset:
+            self.reset_state()
+            return outputs, self.state()
+        if not inputs.cpu_cycle_enable:
+            return outputs, self.state()
+
+        old = self.state()
+
+        if inputs.timer_tick:
+            if old.timer_counter == 0:
+                tap = 6 if old.mode else 1
+                feedback = (old.lfsr & 1) ^ ((old.lfsr >> tap) & 1)
+                self.lfsr = (old.lfsr >> 1) | (feedback << 14)
+                self.timer_counter = NOISE_PERIOD_TABLE[old.period_index] // 2 - 1
+            else:
+                self.timer_counter = old.timer_counter - 1
+
+        if inputs.quarter_frame_tick:
+            if old.envelope_start:
+                self.envelope_start = False
+                self.envelope_decay = 15
+                self.envelope_divider = old.envelope_period
+            elif old.envelope_divider != 0:
+                self.envelope_divider = old.envelope_divider - 1
+            else:
+                self.envelope_divider = old.envelope_period
+                if old.envelope_decay != 0:
+                    self.envelope_decay = old.envelope_decay - 1
+                elif old.length_halt:
+                    self.envelope_decay = 15
+
+        if (
+            inputs.half_frame_tick
+            and old.length_counter != 0
+            and not old.length_halt
+        ):
+            self.length_counter = old.length_counter - 1
+
+        if inputs.write:
+            if inputs.write_register == 0:  # $400C
+                self.length_halt = bool(inputs.write_data & 0x20)
+                self.constant_volume = bool(inputs.write_data & 0x10)
+                self.envelope_period = inputs.write_data & 0x0F
+            elif inputs.write_register == 1:  # $400D, unused
+                pass
+            elif inputs.write_register == 2:  # $400E
+                self.mode = bool(inputs.write_data & 0x80)
+                self.period_index = inputs.write_data & 0x0F
+            else:  # $400F
+                self.envelope_start = True
+                if inputs.enable:
+                    self.length_counter = LENGTH_TABLE[inputs.write_data >> 3]
+
+        if not inputs.enable:
+            self.length_counter = 0
+
+        if self.lfsr == 0:
+            raise AssertionError("Noise LFSR entered the all-zero lock state")
+
+        return outputs, self.state()
+
+
+@dataclass(frozen=True)
 class ApuInputs:
     """Signals presented for one fabric cycle.
 
@@ -449,6 +628,7 @@ class ApuOutputs:
     pulse1_output: int
     pulse2_output: int
     triangle_output: int
+    noise_output: int
     quarter_frame_tick: bool
     half_frame_tick: bool
     channel_write: bool
@@ -477,12 +657,14 @@ class ApuFoundationModel:
         self.pulse1 = Pulse1Model()
         self.pulse2 = Pulse2Model()
         self.triangle = TriangleModel()
+        self.noise = NoiseModel()
         self.reset_state()
 
     def reset_state(self) -> None:
         self.pulse1.reset_state()
         self.pulse2.reset_state()
         self.triangle.reset_state()
+        self.noise.reset_state()
         self.channel_enable = 0
         self.mode_5_step = False
         self.irq_inhibit = False
@@ -586,8 +768,10 @@ class ApuFoundationModel:
             pulse1_active = int(self.pulse1.evaluate(bool(self.channel_enable & 1)).active)
             pulse2_active = int(self.pulse2.evaluate(bool(self.channel_enable & 2)).active)
             triangle_active = int(self.triangle.evaluate().active)
+            noise_active = int(self.noise.evaluate(bool(self.channel_enable & 8)).active)
             read_data = (
-                (inputs.channel_active & 0x18)
+                (inputs.channel_active & 0x10)
+                | (noise_active << 3)
                 | (triangle_active << 2)
                 | (pulse2_active << 1)
                 | pulse1_active
@@ -605,12 +789,18 @@ class ApuFoundationModel:
             if status_write
             else bool(self.channel_enable & 0x02)
         )
+        effective_noise_enable = (
+            bool(inputs.cpu_write_data & 0x08)
+            if status_write
+            else bool(self.channel_enable & 0x08)
+        )
         return ApuOutputs(
             cpu_read_data=read_data,
             irq=not inputs.reset and (self.frame_irq_flag or irq_set),
             pulse1_output=self.pulse1.evaluate(effective_pulse1_enable).raw_output,
             pulse2_output=self.pulse2.evaluate(effective_pulse2_enable).raw_output,
             triangle_output=self.triangle.evaluate().raw_output,
+            noise_output=self.noise.evaluate(effective_noise_enable).raw_output,
             quarter_frame_tick=quarter,
             half_frame_tick=half,
             channel_write=channel_write,
@@ -643,6 +833,11 @@ class ApuFoundationModel:
             bool(inputs.cpu_write_data & 0x04)
             if status_write
             else bool(self.channel_enable & 0x04)
+        )
+        effective_noise_enable = (
+            bool(inputs.cpu_write_data & 0x08)
+            if status_write
+            else bool(self.channel_enable & 0x08)
         )
         self.pulse1.clock(
             PulseInputs(
@@ -688,6 +883,24 @@ class ApuFoundationModel:
                 write=(
                     outputs.channel_write
                     and 0x08 <= outputs.channel_write_register <= 0x0B
+                ),
+                write_register=outputs.channel_write_register & 0x03,
+                write_data=outputs.channel_write_data,
+                quarter_frame_tick=outputs.quarter_frame_tick,
+                half_frame_tick=outputs.half_frame_tick,
+            )
+        )
+        self.noise.clock(
+            NoiseInputs(
+                reset=inputs.reset,
+                cpu_cycle_enable=inputs.cpu_cycle_enable,
+                timer_tick=(
+                    inputs.cpu_cycle_enable and not self.cpu_cycle_odd
+                ),
+                enable=effective_noise_enable,
+                write=(
+                    outputs.channel_write
+                    and 0x0C <= outputs.channel_write_register <= 0x0F
                 ),
                 write_register=outputs.channel_write_register & 0x03,
                 write_data=outputs.channel_write_data,

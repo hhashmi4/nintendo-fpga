@@ -1,9 +1,8 @@
 `timescale 1ns/1ps
 
-// NES APU foundation plus the Phase 5B/5C pulse and Phase 5D triangle channels.
-// All state is in the
-// fabric clock domain and advances only on cpu_cycle_enable. The enable is the
-// complete NES CPU-time slot stream, including OAM-DMA stalls; accepted bus
+// NES APU foundation plus both pulse, triangle, and Noise channels. All state
+// is in the fabric clock domain and advances only on cpu_cycle_enable, the
+// complete NES CPU-time slot stream including OAM-DMA stalls. Accepted bus
 // strobes remain CPU-only.
 module nes_apu (
     input  logic        clk,
@@ -16,15 +15,15 @@ module nes_apu (
     input  logic [7:0]  cpu_write_data,
     output logic [7:0]  cpu_read_data,
 
-    // Bits 4:3 remain external placeholders for later channels. Triangle and
-    // the two pulse channels own bits 2:0 internally. Enable and active differ.
+    // Bit 4 remains an external placeholder for the future DMC. Noise,
+    // Triangle, and both pulse channels own bits 3:0 internally.
     /* verilator lint_off UNUSEDSIGNAL */
     input  nes_apu_pkg::nes_apu_channel_mask_t channel_active,
     /* verilator lint_on UNUSEDSIGNAL */
     input  logic        dmc_irq_flag,
     output nes_apu_pkg::nes_apu_channel_mask_t channel_enable,
 
-    // Exactly-once write event for the not-yet-implemented channel modules.
+    // Exactly-once write event shared by the channel modules.
     output logic        channel_write,
     output logic [4:0]  channel_write_register,
     output logic [7:0]  channel_write_data,
@@ -36,6 +35,7 @@ module nes_apu (
     output logic [3:0]  pulse1_output,
     output logic [3:0]  pulse2_output,
     output logic [3:0]  triangle_output,
+    output logic [3:0]  noise_output,
 
     // Architectural/debug state used by verification and future snapshots.
     output nes_apu_pkg::nes_apu_frame_mode_t frame_mode,
@@ -70,6 +70,8 @@ module nes_apu (
     logic pulse2_enable;
     logic triangle_active;
     logic triangle_enable;
+    logic noise_active;
+    logic noise_enable;
     logic pulse_timer_tick;
     nes_apu_channel_mask_t effective_channel_active;
 
@@ -90,17 +92,20 @@ module nes_apu (
     // A future DMC consumes this pulse to clear its own IRQ latch.
     assign dmc_irq_clear = status_write;
 
-    // A $4015 write affects both pulse channels on its accepted CPU edge rather
-    // than one slot later. The stored mask remains externally visible state.
+    // A $4015 write affects all implemented channels on its accepted CPU edge
+    // rather than one slot later. The stored mask remains visible state.
     assign pulse1_enable = status_write ? cpu_write_data[0] :
                            channel_enable[APU_STATUS_PULSE1_BIT];
     assign pulse2_enable = status_write ? cpu_write_data[1] :
                            channel_enable[APU_STATUS_PULSE2_BIT];
     assign triangle_enable = status_write ? cpu_write_data[2] :
                              channel_enable[APU_STATUS_TRIANGLE_BIT];
+    assign noise_enable = status_write ? cpu_write_data[3] :
+                          channel_enable[APU_STATUS_NOISE_BIT];
     assign pulse_timer_tick = cpu_cycle_enable && !cpu_cycle_odd;
     assign effective_channel_active = {
-        channel_active[4:3], triangle_active, pulse2_active, pulse1_active
+        channel_active[4], noise_active, triangle_active,
+        pulse2_active, pulse1_active
     };
 
     assign next_frame_cycle = frame_sequence_cycle + 16'd1;
@@ -280,6 +285,35 @@ module nes_apu (
         .timer_period(),
         .timer_counter(),
         .length_counter()
+    );
+    /* verilator lint_on PINCONNECTEMPTY */
+
+    /* verilator lint_off PINCONNECTEMPTY */
+    nes_apu_noise noise (
+        .clk(clk),
+        .reset(reset),
+        .cpu_cycle_enable(cpu_cycle_enable),
+        .timer_tick(pulse_timer_tick),
+        .quarter_frame_tick(quarter_frame_tick),
+        .half_frame_tick(half_frame_tick),
+        .enable(noise_enable),
+        .write(channel_write && channel_write_register[4:2] == 3'd3),
+        .write_register(channel_write_register[1:0]),
+        .write_data(channel_write_data),
+        .active(noise_active),
+        .raw_output(noise_output),
+        .length_halt(),
+        .constant_volume(),
+        .envelope_period(),
+        .envelope_start(),
+        .envelope_divider(),
+        .envelope_decay(),
+        .mode(),
+        .period_index(),
+        .timer_period(),
+        .timer_counter(),
+        .length_counter(),
+        .lfsr()
     );
     /* verilator lint_on PINCONNECTEMPTY */
 

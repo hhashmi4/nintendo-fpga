@@ -33,6 +33,15 @@ package nes_apu_pkg;
         8'd192, 8'd24,  8'd72,  8'd26,  8'd16,  8'd28,  8'd32,  8'd30
     };
 
+    // NTSC 2A03 Noise timer periods in CPU cycles. The Noise timer is
+    // clocked on every other CPU cycle, so its reload is (period / 2) - 1.
+    localparam logic [11:0] APU_NOISE_PERIOD_TABLE [0:15] = '{
+        12'd4,    12'd8,    12'd16,   12'd32,
+        12'd64,   12'd96,   12'd128,  12'd160,
+        12'd202,  12'd254,  12'd380,  12'd508,
+        12'd762,  12'd1016, 12'd2034, 12'd4068
+    };
+
     localparam logic [7:0] APU_PULSE_DUTY_TABLE [0:3] = '{
         8'b1000_0000,
         8'b1100_0000,

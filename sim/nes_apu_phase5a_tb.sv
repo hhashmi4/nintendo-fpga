@@ -25,6 +25,7 @@ module nes_apu_phase5a_tb;
     logic [3:0] pulse2_output;
     /* verilator lint_off UNUSEDSIGNAL */
     logic [3:0] triangle_output;
+    logic [3:0] noise_output;
     /* verilator lint_on UNUSEDSIGNAL */
     nes_apu_frame_mode_t frame_mode;
     logic frame_irq_inhibit;
