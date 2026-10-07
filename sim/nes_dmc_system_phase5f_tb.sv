@@ -53,6 +53,9 @@ module nes_dmc_system_phase5f_tb;
     logic [3:0] triangle_output;
     logic [3:0] noise_output;
     logic [6:0] dmc_output;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [19:0] mixed_audio;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic frame_irq_flag;
     logic [15:0] frame_sequence_cycle;
     logic dmc_mem_request;
@@ -178,6 +181,7 @@ module nes_dmc_system_phase5f_tb;
         .triangle_output(triangle_output),
         .noise_output(noise_output),
         .dmc_output(dmc_output),
+        .mixed_audio(mixed_audio),
         .frame_mode(),
         .frame_irq_inhibit(),
         .frame_irq_flag(frame_irq_flag),

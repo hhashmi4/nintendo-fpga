@@ -30,6 +30,9 @@ module nes_apu_noise_phase5e_tb;
     logic [3:0] triangle_output;
     logic [3:0] noise_output;
     logic [6:0] dmc_output;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [19:0] mixed_audio;
+    /* verilator lint_on UNUSEDSIGNAL */
     nes_apu_frame_mode_t frame_mode;
     logic frame_irq_inhibit;
     logic frame_irq_flag;

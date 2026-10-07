@@ -4,7 +4,7 @@ module nes_apu_complete_phase5g_tb;
     import nes_apu_pkg::*;
 
     localparam int INPUT_WIDTH = 43;
-    localparam int EVENT_WIDTH = 66;
+    localparam int EVENT_WIDTH = 86;
     localparam int STATE_WIDTH = 377;
     localparam int POST_WIDTH = EVENT_WIDTH + STATE_WIDTH;
 
@@ -35,6 +35,8 @@ module nes_apu_complete_phase5g_tb;
     logic [3:0] triangle_output;
     logic [3:0] noise_output;
     logic [6:0] dmc_output;
+    logic [19:0] mixed_audio;
+    logic delayed_raw_nonzero = 1'b0;
     nes_apu_frame_mode_t frame_mode;
     logic frame_irq_inhibit;
     logic frame_irq_flag;
@@ -71,6 +73,19 @@ module nes_apu_complete_phase5g_tb;
 
     always #5 clk <= !clk;
 
+    // Mirrors the mixer's one-edge input latency for the explicit silence
+    // invariant; functional values are still checked against the oracle.
+    always_ff @(posedge clk) begin
+        if (reset)
+            delayed_raw_nonzero <= 1'b0;
+        else
+            delayed_raw_nonzero <= (pulse1_output != 0) ||
+                                   (pulse2_output != 0) ||
+                                   (triangle_output != 0) ||
+                                   (noise_output != 0) ||
+                                   (dmc_output != 0);
+    end
+
     assign actual_event = {
         cpu_read_data,
         irq,
@@ -79,6 +94,7 @@ module nes_apu_complete_phase5g_tb;
         triangle_output,
         noise_output,
         dmc_output,
+        mixed_audio,
         quarter_frame_tick,
         half_frame_tick,
         channel_write,
@@ -184,6 +200,8 @@ module nes_apu_complete_phase5g_tb;
             assert (!$isunknown({actual_event, actual_state}))
                 else $fatal(1, "unknown complete APU state row %0d scenario %0d",
                             vector_count, scenario);
+            assert (delayed_raw_nonzero || (mixed_audio == 0))
+                else $fatal(1, "nonzero mixed silence row %0d", vector_count);
         end
     endtask
 
@@ -262,7 +280,7 @@ module nes_apu_complete_phase5g_tb;
         $fclose(vector_file);
 
         assert (vector_count > 750_000);
-        assert (previous_scenario == 9);
+        assert (previous_scenario == 10);
         assert (stall_count > 100_000 && reset_count >= 40);
         assert (read_count > 10_000 && write_count > 60_000);
         assert (ack_count > 300);
@@ -270,7 +288,7 @@ module nes_apu_complete_phase5g_tb;
         assert (all_active_count > 30_000 && all_nonzero_count > 30_000);
         assert (&status_seen);
         $display(
-            "PASS: Phase 5G complete APU model comparison cycles=%0d stalls=%0d resets=%0d reads=%0d writes=%0d acks=%0d quarter=%0d half=%0d all-active=%0d all-nonzero=%0d seed=00572026 zero mismatches",
+            "PASS: Phase 5G+5H complete APU model comparison cycles=%0d stalls=%0d resets=%0d reads=%0d writes=%0d acks=%0d quarter=%0d half=%0d all-active=%0d all-nonzero=%0d seed=00572026 zero mismatches",
             vector_count, stall_count, reset_count, read_count, write_count,
             ack_count, quarter_count, half_count, all_active_count,
             all_nonzero_count

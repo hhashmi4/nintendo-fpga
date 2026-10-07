@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from verification.apu_mixer import quantized_mix
+
 
 APU_CHANNEL_FIRST = 0x4000
 APU_CHANNEL_LAST = 0x4013
@@ -889,6 +891,7 @@ class ApuOutputs:
     channel_write_data: int
     dmc_irq_clear: bool
     dmc_output: int
+    mixed_audio: int
     dmc_mem_request: bool
     dmc_mem_address: int
 
@@ -919,7 +922,7 @@ class CompleteApuState:
 
 
 class ApuModel:
-    """Independent complete pre-mixer APU executable specification."""
+    """Independent complete APU and registered-mixer specification."""
 
     def __init__(self) -> None:
         self.pulse1 = Pulse1Model()
@@ -945,6 +948,7 @@ class ApuModel:
         self.frame_reset_delay = 0
         self.pending_mode_5_step = False
         self.frame_tick_block = False
+        self.mixed_audio = 0
 
     def state(self) -> ApuState:
         return ApuState(
@@ -1079,16 +1083,20 @@ class ApuModel:
             if status_write
             else bool(self.channel_enable & 0x08)
         )
+        pulse1_output = self.pulse1.evaluate(effective_pulse1_enable).raw_output
+        pulse2_output = self.pulse2.evaluate(effective_pulse2_enable).raw_output
+        triangle_output = self.triangle.evaluate().raw_output
+        noise_output = self.noise.evaluate(effective_noise_enable).raw_output
         return ApuOutputs(
             cpu_read_data=read_data,
             irq=(
                 not inputs.reset
                 and (self.frame_irq_flag or irq_set or dmc_outputs.irq_flag)
             ),
-            pulse1_output=self.pulse1.evaluate(effective_pulse1_enable).raw_output,
-            pulse2_output=self.pulse2.evaluate(effective_pulse2_enable).raw_output,
-            triangle_output=self.triangle.evaluate().raw_output,
-            noise_output=self.noise.evaluate(effective_noise_enable).raw_output,
+            pulse1_output=pulse1_output,
+            pulse2_output=pulse2_output,
+            triangle_output=triangle_output,
+            noise_output=noise_output,
             quarter_frame_tick=quarter,
             half_frame_tick=half,
             channel_write=channel_write,
@@ -1096,6 +1104,7 @@ class ApuModel:
             channel_write_data=inputs.cpu_write_data,
             dmc_irq_clear=status_write,
             dmc_output=dmc_outputs.raw_output,
+            mixed_audio=self.mixed_audio,
             dmc_mem_request=dmc_outputs.mem_request,
             dmc_mem_address=dmc_outputs.mem_address,
         )
@@ -1104,6 +1113,13 @@ class ApuModel:
         """Evaluate one cycle, apply its edge, and return outputs and new state."""
 
         outputs = self.evaluate(inputs)
+        next_mixed_audio = quantized_mix(
+            outputs.pulse1_output,
+            outputs.pulse2_output,
+            outputs.triangle_output,
+            outputs.noise_output,
+            outputs.dmc_output,
+        )
         status_write = (
             not inputs.reset
             and inputs.cpu_cycle_enable
@@ -1220,6 +1236,7 @@ class ApuModel:
                 mem_read_data=inputs.dmc_mem_read_data,
             )
         )
+        self.mixed_audio = 0 if inputs.reset else next_mixed_audio
         if inputs.reset:
             self.reset_state()
             return outputs, self.state()

@@ -226,6 +226,10 @@ module de1_soc_nes_vga_top #(
     logic [3:0] apu_triangle_output;
     logic [3:0] apu_noise_output;
     logic [6:0] apu_dmc_output;
+    logic [19:0] apu_mixed_audio;
+    // Retain the future audio-pipeline boundary in the production image so
+    // synthesis/timing qualification covers the mixer before any codec exists.
+    (* preserve, noprune *) logic [19:0] apu_mixed_audio_retention;
     nes_apu_pkg::nes_apu_channel_mask_t apu_channel_enable;
     logic dma_complete_event;
     logic dma_start_event;
@@ -878,6 +882,7 @@ module de1_soc_nes_vga_top #(
         .triangle_output(apu_triangle_output),
         .noise_output(apu_noise_output),
         .dmc_output(apu_dmc_output),
+        .mixed_audio(apu_mixed_audio),
         .frame_mode(),
         .frame_irq_inhibit(),
         .frame_irq_flag(),
@@ -888,6 +893,13 @@ module de1_soc_nes_vga_top #(
         .frame_tick_block()
     );
     /* verilator lint_on PINCONNECTEMPTY */
+
+    always_ff @(posedge CLOCK_50) begin
+        if (nes_functional_reset)
+            apu_mixed_audio_retention <= '0;
+        else
+            apu_mixed_audio_retention <= apu_mixed_audio;
+    end
 
     nes_controller controllers (
         .clk(CLOCK_50),
@@ -1260,7 +1272,9 @@ module de1_soc_nes_vga_top #(
                            apu_half_frame_tick || ^apu_channel_enable ||
                            ^apu_pulse1_output || ^apu_pulse2_output ||
                            ^apu_triangle_output || ^apu_noise_output ||
-                           ^apu_dmc_output || dmc_mem_request ||
+                           ^apu_dmc_output || ^apu_mixed_audio ||
+                           ^apu_mixed_audio_retention ||
+                           dmc_mem_request ||
                            ^dmc_mem_address || dmc_mem_acknowledge ||
                            ^dmc_mem_read_data ||
                            cartridge_debug_prg_read ||

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate deterministic complete pre-mixer APU Phase 5G vectors."""
+"""Generate complete Phase 5G APU vectors, including the Phase 5H mix."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ RANDOM_SEED = 0x0057_2026
 RANDOM_CYCLES = 600_000
 
 INPUT_WIDTH = 43
-EVENT_WIDTH = 66
+EVENT_WIDTH = 86
 STATE_WIDTH = 377
 POST_WIDTH = EVENT_WIDTH + STATE_WIDTH
 
@@ -74,6 +74,7 @@ def pack_event(outputs) -> int:
             (outputs.triangle_output, 4),
             (outputs.noise_output, 4),
             (outputs.dmc_output, 7),
+            (outputs.mixed_audio, 20),
             (outputs.quarter_frame_tick, 1),
             (outputs.half_frame_tick, 1),
             (outputs.channel_write, 1),
@@ -419,6 +420,25 @@ def generate(stream: TextIO) -> Vectors:
                 cpu_address=held_address,
                 cpu_write_data=held_data,
             )
+
+    # 10: Phase 5H integration closure: long digital silence, simultaneous
+    # five-channel activity, then deterministic channel-disable transitions.
+    vectors.cycle(10, reset=True, cpu_cycle_enable=True)
+    for _ in range(4_096):
+        vectors.accepted(10)
+    program_all(vectors, 10)
+    for _ in range(8_192):
+        if vectors.model.dmc.mem_request:
+            vectors.acknowledge(10)
+        else:
+            vectors.accepted(10)
+    for enable_mask in (0x1E, 0x1C, 0x18, 0x10, 0x00):
+        vectors.write(10, APU_STATUS, enable_mask)
+        for _ in range(512):
+            if vectors.model.dmc.mem_request:
+                vectors.acknowledge(10)
+            else:
+                vectors.accepted(10)
 
     return vectors
 
