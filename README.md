@@ -85,8 +85,11 @@ activity. Phase 5C reuses that pulse datapath for Pulse 2, integrates
 proves both raw 0..15 outputs simultaneously and independently. Phase 5D adds
 the every-CPU-cycle Triangle timer, exact 32-step waveform, linear and length
 counters, held-DAC semantics, `$4008/$400A/$400B`, and `$4015` bit 2 while
-preserving both pulse channels. Final mixing, CPU IRQ consumption, Noise, DMC
-DMA, resampling, and codec output remain later Phase 5 work.
+preserving both pulse channels. Phase 5E adds the Noise envelope/length unit,
+all 16 NTSC timer periods, deterministic 15-bit long/short-mode LFSR,
+`$400C/$400E/$400F`, harmless `$400D`, raw 0..15 output, and `$4015` bit 3.
+Final mixing, CPU IRQ consumption, DMC DMA, resampling, and codec output remain
+later Phase 5 work.
 
 ## Phase 1 foundation
 
@@ -837,6 +840,25 @@ Architecture, register behavior, counter semantics, waveform verification,
 synthesis results, and limitations are documented in
 [`docs/apu-phase5d-triangle.md`](docs/apu-phase5d-triangle.md).
 
+## Phase 5E — APU Noise
+
+- Authentic `$400C`, `$400E`, and `$400F` behavior with unused `$400D`
+  accepted harmlessly and `$4015` bit 3 providing enable/active status
+- Shared quarter-frame envelope and half-frame length events, with independent
+  state from both pulse envelopes and the existing shared length table
+- All 16 centralized NTSC periods driving an every-other-CPU-slot divider
+- Deterministic 15-bit right-shifting LFSR: bit 0 XOR bit 1 in normal mode,
+  bit 0 XOR bit 6 in short mode, one seed, and bit-0 output gating
+- Simultaneous independent Pulse 1, Pulse 2, Triangle, and Noise raw outputs;
+  pause, step, DMA, reset, register isolation, and all status masks verified
+- 106 directed Python cases plus a 371,608-cycle fixed-seed top-level
+  RTL/model comparison with 6,930 exact LFSR shifts and zero mismatches
+- No DMC, mixer, resampler, sample pipeline, or board audio path in this phase
+
+Architecture, period/LFSR semantics, deterministic sequences, verification,
+synthesis results, and limitations are documented in
+[`docs/apu-phase5e-noise.md`](docs/apu-phase5e-noise.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -876,8 +898,8 @@ caching, concurrency, and timeout are documented in
 [`docs/ci-verification.md`](docs/ci-verification.md).
 
 This runs pytest, synthesizable RTL lint, the Phase 5A APU foundation, Phase 5B
-Pulse 1, Phase 5C dual-pulse, and Phase 5D three-channel Triangle oracle/RTL
-comparisons,
+Pulse 1, Phase 5C dual-pulse, Phase 5D three-channel Triangle, and Phase 5E
+four-channel Noise oracle/RTL comparisons,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -1072,7 +1094,8 @@ before use.
 - `rtl/cartridge` — build-time and runtime Mapper 0/NROM cartridge storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — standalone OAM DMA bus master
-- `rtl/apu` — APU frame/status logic plus Pulse 1, Pulse 2, and Triangle channels
+- `rtl/apu` — APU frame/status logic plus Pulse 1, Pulse 2, Triangle, and Noise
+  channels
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
 - `rtl/loader` — runtime-loader protocol, manifest, and transfer validation
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
