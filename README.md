@@ -91,8 +91,12 @@ all 16 NTSC timer periods, deterministic 15-bit long/short-mode LFSR,
 Phase 5F adds the DMC reader/buffer/output unit, all 16 NTSC rates, raw 0..127
 delta DAC, looping and terminal IRQ, `$4010-$4013` plus `$4015` bit 4/bit 7,
 and an acknowledged 3/4-slot CPU-space fetch master integrated with CPU and
-OAM-DMA arbitration through the runtime Mapper-0 path. Final nonlinear mixing,
-CPU IRQ consumption, resampling, and codec output remain later Phase 5 work.
+OAM-DMA arbitration through the runtime Mapper-0 path. Phase 5G closes the
+complete raw APU with all-five-channel full-state comparison, exhaustive
+`$4015` composition, frame/DMC IRQ interaction, frame-event collisions,
+debugger/reset behavior, systematic DMC/OAM/controller stress, and runtime
+NROM-128/NROM-256 replacement coverage. Final nonlinear mixing, CPU IRQ
+consumption, resampling, and codec output remain later Phase 5 work.
 
 ## Phase 1 foundation
 
@@ -884,6 +888,27 @@ Architecture, timing accuracy boundary, bus arbitration, runtime integration,
 verification, synthesis results, and limitations are documented in
 [`docs/apu-phase5f-dmc.md`](docs/apu-phase5f-dmc.md).
 
+## Phase 5G — complete APU closure
+
+- Complete pre-mixer `ApuModel`/`CompleteApuState` spanning the frame
+  sequencer, both pulses, Triangle, Noise, DMC, both IRQs, `$4015`, `$4017`,
+  and DMC memory transactions
+- Exhaustive 32-mask `$4015` enable/activity coverage and independent frame/
+  DMC IRQ set, coexistence, read-clear, write-clear, and reset behavior
+- Real-channel 4-step/5-step, parity-delay, adjacent-event, and register-write
+  collision tests with explicit pre-edge event ordering
+- Simultaneous five-source pause, debugger step, OAM-time, reset, disable,
+  dense-write, and long-run stability tests
+- Systematic DMC/OAM collision placement, controller-read non-duplication,
+  and all-active runtime replacement from NROM-128 to NROM-256
+- A 759,254-cycle fixed-seed full-output/377-bit-state RTL comparison with
+  600,000 randomized cycles, 398 DMC acknowledgements, and zero mismatches
+- Five separate raw outputs only; no mixer, PCM/WAV, resampling, I2S, or codec
+
+Architecture audit, deferred-issue inventory, event ordering, integration
+coverage, baseline, and qualification results are documented in
+[`docs/apu-phase5g-completion.md`](docs/apu-phase5g-completion.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -924,7 +949,8 @@ caching, concurrency, and timeout are documented in
 
 This runs pytest, synthesizable RTL lint, the Phase 5A APU foundation, Phase 5B
 Pulse 1, Phase 5C dual-pulse, Phase 5D three-channel Triangle, Phase 5E
-four-channel Noise, and Phase 5F DMC oracle/RTL and DMA/system comparisons,
+four-channel Noise, Phase 5F DMC oracle/RTL and DMA/system comparisons, and the
+Phase 5G complete-APU full-state comparison and interaction closure,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -973,7 +999,11 @@ Waveforms are written under `build/sim`, including `platform_foundation.fst`,
 `nes_runtime_activation_phase4fd.fst`,
 `nes_runtime_loader_mmio_phase4ff.fst`,
 `nes_runtime_boot_phase4fg.fst`,
-`nes_apu_phase5a.fst`,
+`nes_apu_phase5a.fst`, `nes_apu_pulse1_phase5b.fst`,
+`nes_apu_pulse2_phase5c.fst`, `nes_apu_triangle_phase5d.fst`,
+`nes_apu_noise_phase5e.fst`, `nes_apu_dmc_phase5f.fst`,
+`nes_apu_complete_phase5g.fst`, `nes_dmc_dma_phase5f.fst`,
+`nes_dmc_system_phase5f.fst`,
 `nes_phase3j.fst`, `vga_phase3k.fst`,
 `cpu_phase2a.fst`, `cpu_alu.fst`,
 `cpu_address_gen.fst`, `cpu_phase2d.fst`,

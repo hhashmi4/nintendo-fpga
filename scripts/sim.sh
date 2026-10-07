@@ -63,6 +63,7 @@ mkdir -p \
     build/verilator/nes_apu_triangle_phase5d \
     build/verilator/nes_apu_noise_phase5e \
     build/verilator/nes_apu_dmc_phase5f \
+    build/verilator/nes_apu_complete_phase5g \
     build/verilator/nes_dmc_dma_phase5f \
     build/verilator/nes_dmc_system_phase5f \
     build/verilator/cpu \
@@ -176,6 +177,8 @@ NES_APU_NOISE_PHASE5E_WAVEFORM="build/sim/nes_apu_noise_phase5e.fst"
 NES_APU_NOISE_PHASE5E_REFERENCE="build/sim/nes_apu_noise_phase5e_reference.txt"
 NES_APU_DMC_PHASE5F_WAVEFORM="build/sim/nes_apu_dmc_phase5f.fst"
 NES_APU_DMC_PHASE5F_REFERENCE="build/sim/nes_apu_dmc_phase5f_reference.txt"
+NES_APU_COMPLETE_PHASE5G_WAVEFORM="build/sim/nes_apu_complete_phase5g.fst"
+NES_APU_COMPLETE_PHASE5G_REFERENCE="build/sim/nes_apu_complete_phase5g_reference.txt"
 NES_DMC_DMA_PHASE5F_WAVEFORM="build/sim/nes_dmc_dma_phase5f.fst"
 NES_DMC_SYSTEM_PHASE5F_WAVEFORM="build/sim/nes_dmc_system_phase5f.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
@@ -288,6 +291,8 @@ rm -f \
     "$NES_APU_NOISE_PHASE5E_REFERENCE" \
     "$NES_APU_DMC_PHASE5F_WAVEFORM" \
     "$NES_APU_DMC_PHASE5F_REFERENCE" \
+    "$NES_APU_COMPLETE_PHASE5G_WAVEFORM" \
+    "$NES_APU_COMPLETE_PHASE5G_REFERENCE" \
     "$NES_DMC_DMA_PHASE5F_WAVEFORM" \
     "$NES_DMC_SYSTEM_PHASE5F_WAVEFORM" \
     "$CPU_WAVEFORM" \
@@ -456,6 +461,29 @@ if [[ ! -s "$NES_APU_DMC_PHASE5F_WAVEFORM" ]]; then
     exit 1
 fi
 
+python3 scripts/generate_apu_complete_phase5g_vectors.py \
+    "$NES_APU_COMPLETE_PHASE5G_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
+    --assert \
+    --Mdir build/verilator/nes_apu_complete_phase5g \
+    --top-module nes_apu_complete_phase5g_tb \
+    -o nes_apu_complete_phase5g_tb \
+    rtl/apu/nes_apu_pkg.sv \
+    rtl/apu/nes_apu_pulse.sv \
+    rtl/apu/nes_apu_triangle.sv \
+    rtl/apu/nes_apu_noise.sv \
+    rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu.sv \
+    sim/nes_apu_complete_phase5g_tb.sv
+
+build/verilator/nes_apu_complete_phase5g/nes_apu_complete_phase5g_tb
+
+if [[ ! -s "$NES_APU_COMPLETE_PHASE5G_WAVEFORM" ]]; then
+    echo "ERROR: Phase 5G complete APU waveform is missing" >&2
+    exit 1
+fi
+
 python3 scripts/generate_runtime_loader_vectors.py \
     "$NES_RUNTIME_LOADER_PHASE4FA_REFERENCE"
 
@@ -517,7 +545,7 @@ if [[ ! -s "$NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM" ]]; then
 fi
 
 if [[ "$SIM_PROFILE" == "--fast" ]]; then
-    echo "FAST RTL smoke passed: platform, Phase 5A/5B/5C/5D/5E APU, and Phase 4F-A/B/C runtime loading"
+    echo "FAST RTL smoke passed: platform, Phase 5A-5G APU, and Phase 4F-A/B/C runtime loading"
     exit 0
 fi
 
@@ -1787,6 +1815,7 @@ echo "NES APU Pulse 2 Phase 5C waveform: $ROOT_DIR/$NES_APU_PULSE2_PHASE5C_WAVEF
 echo "NES APU Triangle Phase 5D waveform: $ROOT_DIR/$NES_APU_TRIANGLE_PHASE5D_WAVEFORM"
 echo "NES APU Noise Phase 5E waveform: $ROOT_DIR/$NES_APU_NOISE_PHASE5E_WAVEFORM"
 echo "NES APU DMC Phase 5F waveform: $ROOT_DIR/$NES_APU_DMC_PHASE5F_WAVEFORM"
+echo "NES complete APU Phase 5G waveform: $ROOT_DIR/$NES_APU_COMPLETE_PHASE5G_WAVEFORM"
 echo "NES DMC DMA Phase 5F waveform: $ROOT_DIR/$NES_DMC_DMA_PHASE5F_WAVEFORM"
 echo "NES DMC system Phase 5F waveform: $ROOT_DIR/$NES_DMC_SYSTEM_PHASE5F_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
