@@ -48,6 +48,13 @@ module nes_dmc_system_phase5f_tb;
     logic [7:0] apu_cpu_read_data;
     logic apu_irq;
     nes_apu_channel_mask_t apu_channel_enable;
+    logic [3:0] pulse1_output;
+    logic [3:0] pulse2_output;
+    logic [3:0] triangle_output;
+    logic [3:0] noise_output;
+    logic [6:0] dmc_output;
+    logic frame_irq_flag;
+    logic [15:0] frame_sequence_cycle;
     logic dmc_mem_request;
     logic [15:0] dmc_mem_address;
     logic dmc_mem_acknowledge;
@@ -84,6 +91,10 @@ module nes_dmc_system_phase5f_tb;
     integer controller_reads = 0;
     integer pause_cycles = 0;
     integer replacement_count = 0;
+    integer all_active_cycles = 0;
+    integer all_nonzero_cycles = 0;
+    integer nrom128_fetches = 0;
+    integer nrom256_fetches = 0;
     logic image_b_active = 1'b0;
 
     assign functional_reset = reset || nes_hold_reset;
@@ -162,15 +173,15 @@ module nes_dmc_system_phase5f_tb;
         .quarter_frame_tick(),
         .half_frame_tick(),
         .irq(apu_irq),
-        .pulse1_output(),
-        .pulse2_output(),
-        .triangle_output(),
-        .noise_output(),
-        .dmc_output(),
+        .pulse1_output(pulse1_output),
+        .pulse2_output(pulse2_output),
+        .triangle_output(triangle_output),
+        .noise_output(noise_output),
+        .dmc_output(dmc_output),
         .frame_mode(),
         .frame_irq_inhibit(),
-        .frame_irq_flag(),
-        .frame_sequence_cycle(),
+        .frame_irq_flag(frame_irq_flag),
+        .frame_sequence_cycle(frame_sequence_cycle),
         .cpu_cycle_odd(),
         .frame_reset_pending(),
         .frame_reset_delay(),
@@ -271,78 +282,137 @@ module nes_dmc_system_phase5f_tb;
 
     always #5 clk <= !clk;
 
+    function automatic logic [7:0] setup_value(input logic [4:0] index);
+        begin
+            case (index)
+                0: setup_value = 8'h0f; // enable P1/P2/T/N before length loads
+                1: setup_value = 8'hff; // Pulse 1 duty/halt/constant volume
+                2: setup_value = 8'h08;
+                3: setup_value = 8'h08;
+                4: setup_value = 8'hba; // Pulse 2 distinct duty/volume
+                5: setup_value = 8'h80;
+                6: setup_value = 8'h08;
+                7: setup_value = 8'hff; // Triangle control/linear reload
+                8: setup_value = 8'h06;
+                9: setup_value = 8'h08;
+                10: setup_value = 8'h3d; // Noise halt/constant volume
+                11: setup_value = 8'h82;
+                12: setup_value = 8'h08;
+                13: setup_value = 8'h4f; // DMC loop, fastest NTSC rate
+                14: setup_value = 8'h40;
+                15: setup_value = 8'h00;
+                16: setup_value = 8'h01;
+                17: setup_value = 8'h1f; // all five enabled
+                default: setup_value = 8'h00;
+            endcase
+        end
+    endfunction
+
+    function automatic logic [7:0] setup_register(input logic [4:0] index);
+        begin
+            case (index)
+                0: setup_register = 8'h15;
+                1: setup_register = 8'h00;
+                2: setup_register = 8'h02;
+                3: setup_register = 8'h03;
+                4: setup_register = 8'h04;
+                5: setup_register = 8'h06;
+                6: setup_register = 8'h07;
+                7: setup_register = 8'h08;
+                8: setup_register = 8'h0a;
+                9: setup_register = 8'h0b;
+                10: setup_register = 8'h0c;
+                11: setup_register = 8'h0e;
+                12: setup_register = 8'h0f;
+                13: setup_register = 8'h10;
+                14: setup_register = 8'h11;
+                15: setup_register = 8'h12;
+                16: setup_register = 8'h13;
+                17: setup_register = 8'h15;
+                default: setup_register = 8'h00;
+            endcase
+        end
+    endfunction
+
+    function automatic logic [7:0] setup_program_byte(
+        input logic [15:0] address
+    );
+        logic [4:0] instruction;
+        logic [2:0] byte_index;
+        begin
+            instruction = 5'(address / 5);
+            byte_index = 3'(address % 5);
+            case (byte_index)
+                0: setup_program_byte = 8'ha9; // LDA immediate
+                1: setup_program_byte = setup_value(instruction);
+                2: setup_program_byte = 8'h8d; // STA absolute
+                3: setup_program_byte = setup_register(instruction);
+                default: setup_program_byte = 8'h40;
+            endcase
+        end
+    endfunction
+
     function automatic logic [7:0] image_a_prg(input logic [15:0] address);
         begin
             image_a_prg = address[7:0] ^ address[15:8] ^ 8'h5a;
-            case (address)
-                16'h0000: image_a_prg = 8'ha9; // LDA #$4f: loop, rate 15
-                16'h0001: image_a_prg = 8'h4f;
-                16'h0002: image_a_prg = 8'h8d; // STA $4010
-                16'h0003: image_a_prg = 8'h10;
-                16'h0004: image_a_prg = 8'h40;
-                16'h0005: image_a_prg = 8'ha9; // LDA #$40
-                16'h0006: image_a_prg = 8'h40;
-                16'h0007: image_a_prg = 8'h8d; // STA $4011
-                16'h0008: image_a_prg = 8'h11;
-                16'h0009: image_a_prg = 8'h40;
-                16'h000a: image_a_prg = 8'ha9; // LDA #$00
-                16'h000b: image_a_prg = 8'h00;
-                16'h000c: image_a_prg = 8'h8d; // STA $4012
-                16'h000d: image_a_prg = 8'h12;
-                16'h000e: image_a_prg = 8'h40;
-                16'h000f: image_a_prg = 8'ha9; // LDA #$01 (17 bytes)
-                16'h0010: image_a_prg = 8'h01;
-                16'h0011: image_a_prg = 8'h8d; // STA $4013
-                16'h0012: image_a_prg = 8'h13;
-                16'h0013: image_a_prg = 8'h40;
-                16'h0014: image_a_prg = 8'ha9; // LDA #$10
-                16'h0015: image_a_prg = 8'h10;
-                16'h0016: image_a_prg = 8'h8d; // STA $4015
-                16'h0017: image_a_prg = 8'h15;
-                16'h0018: image_a_prg = 8'h40;
-                16'h0019: image_a_prg = 8'ha9; // LDA #$02
-                16'h001a: image_a_prg = 8'h02;
-                16'h001b: image_a_prg = 8'h8d; // STA $4014
-                16'h001c: image_a_prg = 8'h14;
-                16'h001d: image_a_prg = 8'h40;
-                16'h001e: image_a_prg = 8'had; // LDA $4016
-                16'h001f: image_a_prg = 8'h16;
-                16'h0020: image_a_prg = 8'h40;
-                16'h0021: image_a_prg = 8'h4c; // JMP $8019
-                16'h0022: image_a_prg = 8'h19;
-                16'h0023: image_a_prg = 8'h80;
-                16'h0030: image_a_prg = 8'h40; // RTI
-                16'h3ffa: image_a_prg = 8'h30;
-                16'h3ffb: image_a_prg = 8'h80;
-                16'h3ffc: image_a_prg = 8'h00;
-                16'h3ffd: image_a_prg = 8'h80;
-                16'h3ffe: image_a_prg = 8'h30;
-                16'h3fff: image_a_prg = 8'h80;
-                default: begin end
-            endcase
+            if (address < 16'd90) begin
+                image_a_prg = setup_program_byte(address);
+            end else begin
+                case (address)
+                    16'd90: image_a_prg = 8'ha9; // LDA #$02
+                    16'd91: image_a_prg = 8'h02;
+                    16'd92: image_a_prg = 8'h8d; // STA $4014
+                    16'd93: image_a_prg = 8'h14;
+                    16'd94: image_a_prg = 8'h40;
+                    16'd95: image_a_prg = 8'had; // LDA $4016
+                    16'd96: image_a_prg = 8'h16;
+                    16'd97: image_a_prg = 8'h40;
+                    16'd98: image_a_prg = 8'h4c; // JMP $805a
+                    16'd99: image_a_prg = 8'h5a;
+                    16'd100: image_a_prg = 8'h80;
+                    16'h3ffa: image_a_prg = 8'h00;
+                    16'h3ffb: image_a_prg = 8'h80;
+                    16'h3ffc: image_a_prg = 8'h00;
+                    16'h3ffd: image_a_prg = 8'h80;
+                    16'h3ffe: image_a_prg = 8'h00;
+                    16'h3fff: image_a_prg = 8'h80;
+                    default: begin end
+                endcase
+            end
         end
     endfunction
 
     function automatic logic [7:0] image_b_prg(input logic [15:0] address);
         begin
-            image_b_prg = 8'hea;
-            case (address)
-                16'h0000: image_b_prg = 8'ha9; // LDA #$99
-                16'h0001: image_b_prg = 8'h99;
-                16'h0002: image_b_prg = 8'h85; // STA $03
-                16'h0003: image_b_prg = 8'h03;
-                16'h0004: image_b_prg = 8'h4c; // JMP $8004
-                16'h0005: image_b_prg = 8'h04;
-                16'h0006: image_b_prg = 8'h80;
-                16'h0030: image_b_prg = 8'h40;
-                16'h3ffa: image_b_prg = 8'h30;
-                16'h3ffb: image_b_prg = 8'h80;
-                16'h3ffc: image_b_prg = 8'h00;
-                16'h3ffd: image_b_prg = 8'h80;
-                16'h3ffe: image_b_prg = 8'h30;
-                16'h3fff: image_b_prg = 8'h80;
-                default: begin end
-            endcase
+            image_b_prg = address[7:0] ^ address[15:8] ^ 8'ha6;
+            if (address < 16'd90) begin
+                image_b_prg = setup_program_byte(address);
+            end else begin
+                case (address)
+                    16'd90: image_b_prg = 8'ha9; // LDA #$99
+                    16'd91: image_b_prg = 8'h99;
+                    16'd92: image_b_prg = 8'h85; // STA $03
+                    16'd93: image_b_prg = 8'h03;
+                    16'd94: image_b_prg = 8'ha9; // LDA #$02
+                    16'd95: image_b_prg = 8'h02;
+                    16'd96: image_b_prg = 8'h8d; // STA $4014
+                    16'd97: image_b_prg = 8'h14;
+                    16'd98: image_b_prg = 8'h40;
+                    16'd99: image_b_prg = 8'had; // LDA $4016
+                    16'd100: image_b_prg = 8'h16;
+                    16'd101: image_b_prg = 8'h40;
+                    16'd102: image_b_prg = 8'h4c; // JMP $805e
+                    16'd103: image_b_prg = 8'h5e;
+                    16'd104: image_b_prg = 8'h80;
+                    16'h7ffa: image_b_prg = 8'h00;
+                    16'h7ffb: image_b_prg = 8'h80;
+                    16'h7ffc: image_b_prg = 8'h00;
+                    16'h7ffd: image_b_prg = 8'h80;
+                    16'h7ffe: image_b_prg = 8'h00;
+                    16'h7fff: image_b_prg = 8'h80;
+                    default: begin end
+                endcase
+            end
         end
     endfunction
 
@@ -374,10 +444,13 @@ module nes_dmc_system_phase5f_tb;
 
     task automatic load_image(input logic select_b);
         integer address;
+        integer prg_bytes;
         begin
+            manifest_prg_bytes = select_b ? 16'h8000 : 16'h4000;
+            prg_bytes = select_b ? 32768 : 16384;
             send_command(LOADER_COMMAND_BEGIN, LOADER_TARGET_NONE, 0, 0);
             assert (nes_hold_reset);
-            for (address = 0; address < 16'h4000; address++)
+            for (address = 0; address < prg_bytes; address++)
                 send_command(
                     LOADER_COMMAND_WRITE,
                     LOADER_TARGET_PRG,
@@ -406,11 +479,21 @@ module nes_dmc_system_phase5f_tb;
                 assert (internal_bus_owner == NES_BUS_MASTER_DMC);
             if (dmc_mem_acknowledge) begin
                 dmc_fetches <= dmc_fetches + 1;
-                assert (dmc_mem_read_data ==
-                        image_a_prg({2'b00, dmc_mem_address[13:0]}))
-                    else $fatal(1, "runtime DMC byte addr=%04x got=%02x expected=%02x",
-                                dmc_mem_address, dmc_mem_read_data,
-                                image_a_prg({2'b00, dmc_mem_address[13:0]}));
+                if (image_b_active) begin
+                    nrom256_fetches <= nrom256_fetches + 1;
+                    assert (dmc_mem_read_data ==
+                            image_b_prg(dmc_mem_address - 16'h8000))
+                        else $fatal(1, "NROM-256 DMC byte addr=%04x got=%02x expected=%02x",
+                                    dmc_mem_address, dmc_mem_read_data,
+                                    image_b_prg(dmc_mem_address - 16'h8000));
+                end else begin
+                    nrom128_fetches <= nrom128_fetches + 1;
+                    assert (dmc_mem_read_data ==
+                            image_a_prg({2'b00, dmc_mem_address[13:0]}))
+                        else $fatal(1, "NROM-128 DMC byte addr=%04x got=%02x expected=%02x",
+                                    dmc_mem_address, dmc_mem_read_data,
+                                    image_a_prg({2'b00, dmc_mem_address[13:0]}));
+                end
             end
             if (dmc_dma_start_event && dma_active)
                 dmc_oam_collisions <= dmc_oam_collisions + 1;
@@ -425,6 +508,12 @@ module nes_dmc_system_phase5f_tb;
             if (dmc_dma_cpu_stall)
                 assert (!controller_cpu_read && !apu_cpu_read &&
                         !apu_cpu_write && !cart_cpu_write);
+            if (apu.pulse1.active && apu.pulse2.active &&
+                apu.triangle.active && apu.noise.active && apu.dmc.active)
+                all_active_cycles <= all_active_cycles + 1;
+            if (pulse1_output != 0 && pulse2_output != 0 &&
+                triangle_output != 0 && noise_output != 0 && dmc_output != 0)
+                all_nonzero_cycles <= all_nonzero_cycles + 1;
         end
     end
 
@@ -489,6 +578,9 @@ module nes_dmc_system_phase5f_tb;
                         dmc_fetches, dmc_oam_collisions, oam_completions,
                         controller_reads, cpu_debug_pc);
         assert (oam_reads == oam_writes || oam_reads == oam_writes + 1);
+        assert (all_active_cycles > 1_000);
+        assert (all_nonzero_cycles > 10);
+        assert (nrom128_fetches >= 8);
 
         // Begin runtime replacement while both bus masters are live. The
         // controlled functional reset cancels the channel request and both
@@ -500,14 +592,23 @@ module nes_dmc_system_phase5f_tb;
         end
         assert (timeout < 500_000);
         fetches_before_replacement = dmc_fetches;
+        manifest_prg_bytes = 16'h8000;
         send_command(LOADER_COMMAND_BEGIN, LOADER_TARGET_NONE, 0, 0);
         repeat (2) @(posedge clk);
         #1;
         assert (functional_reset && !dmc_mem_request && !dmc_dma_active &&
                 !dma_active && apu.dmc.bytes_remaining == 0);
+        assert (apu_channel_enable == 0 && !apu_irq && !frame_irq_flag &&
+                frame_sequence_cycle == 0);
+        assert (apu.pulse1.length_counter == 0 &&
+                apu.pulse2.length_counter == 0 &&
+                apu.triangle.length_counter == 0 &&
+                apu.noise.length_counter == 0 && apu.noise.lfsr == 15'd1);
+        assert (!apu.dmc.mem_request_register && !apu.dmc.irq_flag_register &&
+                apu.dmc.sample_buffer_empty && apu.dmc.silence);
 
         // Finish the already-begun image-B load and activate it.
-        for (int address = 0; address < 16'h4000; address++)
+        for (int address = 0; address < 16'h8000; address++)
             send_command(LOADER_COMMAND_WRITE, LOADER_TARGET_PRG,
                          16'(address), image_b_prg(16'(address)));
         send_command(LOADER_COMMAND_COMMIT, LOADER_TARGET_NONE, 0, 0);
@@ -516,19 +617,27 @@ module nes_dmc_system_phase5f_tb;
             @(posedge clk);
         replacement_count++;
         image_b_active = 1'b1;
-        repeat (10_000) @(posedge clk);
+        timeout = 0;
+        while ((nrom256_fetches < 4 ||
+                nes.internal_cpu_ram.memory[11'h003] != 8'h99) &&
+               timeout < 500_000) begin
+            @(posedge clk);
+            timeout++;
+        end
+        assert (timeout < 500_000);
         assert (nes.internal_cpu_ram.memory[11'h003] == 8'h99);
-        assert (!dmc_mem_request && !dmc_dma_active &&
-                apu.dmc.bytes_remaining == 0);
-        assert (dmc_fetches == fetches_before_replacement);
+        assert (nrom256_fetches >= 4 && dmc_fetches > fetches_before_replacement);
+        assert (apu.pulse1.active && apu.pulse2.active &&
+                apu.triangle.active && apu.noise.active && apu.dmc.active);
 
         assert (pause_cycles == 128 && replacement_count == 1);
         assert (dmc_fetches >= 8 && dmc_oam_collisions >= 2);
         assert (oam_completions >= 2 && controller_reads >= 2);
-        $display("PASS: Phase 5F system runtime DMC fetches=%0d collisions=%0d OAM complete=%0d reads=%0d writes=%0d controller=%0d pause=%0d replacement=%0d",
-                 dmc_fetches, dmc_oam_collisions, oam_completions,
-                 oam_reads, oam_writes, controller_reads, pause_cycles,
-                 replacement_count);
+        $display("PASS: Phase 5F/5G system all-channel runtime DMC fetches=%0d nrom128=%0d nrom256=%0d collisions=%0d OAM complete=%0d reads=%0d writes=%0d controller=%0d pause=%0d replacement=%0d all-active=%0d all-nonzero=%0d",
+                 dmc_fetches, nrom128_fetches, nrom256_fetches,
+                 dmc_oam_collisions, oam_completions, oam_reads, oam_writes,
+                 controller_reads, pause_cycles, replacement_count,
+                 all_active_cycles, all_nonzero_cycles);
         $finish;
     end
 

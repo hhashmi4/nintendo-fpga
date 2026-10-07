@@ -664,6 +664,7 @@ class DmcState:
     timer_counter: int
     mem_request: bool
     mem_address: int
+    irq_flag: bool
 
 
 class DmcModel:
@@ -713,6 +714,7 @@ class DmcModel:
             timer_counter=self.timer_counter,
             mem_request=self.mem_request,
             mem_address=self.mem_address,
+            irq_flag=self.irq_flag,
         )
 
     def evaluate(self, inputs: DmcInputs | None = None) -> DmcOutputs:
@@ -904,8 +906,20 @@ class ApuState:
     frame_tick_block: bool
 
 
-class ApuFoundationModel:
-    """Executable specification of register and frame-counter behavior."""
+@dataclass(frozen=True)
+class CompleteApuState:
+    """Complete pre-mixer APU architectural state at one clock boundary."""
+
+    frame: ApuState
+    pulse1: PulseState
+    pulse2: PulseState
+    triangle: TriangleState
+    noise: NoiseState
+    dmc: DmcState
+
+
+class ApuModel:
+    """Independent complete pre-mixer APU executable specification."""
 
     def __init__(self) -> None:
         self.pulse1 = Pulse1Model()
@@ -943,6 +957,18 @@ class ApuFoundationModel:
             frame_reset_pending=self.frame_reset_pending,
             frame_reset_delay=self.frame_reset_delay,
             frame_tick_block=self.frame_tick_block,
+        )
+
+    def complete_state(self) -> CompleteApuState:
+        """Return every channel plus frame/status state as one snapshot."""
+
+        return CompleteApuState(
+            frame=self.state(),
+            pulse1=self.pulse1.state(),
+            pulse2=self.pulse2.state(),
+            triangle=self.triangle.state(),
+            noise=self.noise.state(),
+            dmc=self.dmc.state(),
         )
 
     @staticmethod
@@ -1260,3 +1286,8 @@ class ApuFoundationModel:
             self.frame_irq_flag = False
 
         return outputs, self.state()
+
+
+# Retain the Phase 5A name for the already-merged phase-specific tests and
+# vector generators. New complete-APU work should use ``ApuModel``.
+ApuFoundationModel = ApuModel
