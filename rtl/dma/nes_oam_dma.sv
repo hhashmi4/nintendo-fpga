@@ -8,6 +8,7 @@ module nes_oam_dma (
     input  logic        reset,
     input  logic        cpu_cycle_slot,
     input  logic        cpu_cycle_odd,
+    input  logic        hold,
 
     input  logic        trigger,
     input  logic [7:0]  trigger_page,
@@ -43,8 +44,8 @@ module nes_oam_dma (
     // the complete read phase. The event is the single CPU slot that consumes
     // the resulting byte.
     assign source_read_request = !reset && active && phase == NES_DMA_READ;
-    assign source_read_event = source_read_request && cpu_cycle_slot;
-    assign oam_write_strobe = !reset && active && cpu_cycle_slot &&
+    assign source_read_event = source_read_request && cpu_cycle_slot && !hold;
+    assign oam_write_strobe = !reset && active && cpu_cycle_slot && !hold &&
                               phase == NES_DMA_WRITE;
     assign oam_write_data = data_latch;
     assign cpu_stall = !reset && active;
@@ -76,7 +77,7 @@ module nes_oam_dma (
                 elapsed_cpu_cycles <= 10'd0;
                 read_count         <= 9'd0;
                 write_count        <= 9'd0;
-            end else if (active && cpu_cycle_slot) begin
+            end else if (active && cpu_cycle_slot && !hold) begin
                 elapsed_cpu_cycles <= elapsed_cpu_cycles + 10'd1;
                 case (phase)
                     NES_DMA_DUMMY:

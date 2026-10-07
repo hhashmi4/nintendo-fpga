@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-// NES APU foundation plus both pulse, triangle, and Noise channels. All state
+// NES APU foundation plus both pulse, triangle, Noise, and DMC channels. All state
 // is in the fabric clock domain and advances only on cpu_cycle_enable, the
 // complete NES CPU-time slot stream including OAM-DMA stalls. Accepted bus
 // strobes remain CPU-only.
@@ -15,8 +15,14 @@ module nes_apu (
     input  logic [7:0]  cpu_write_data,
     output logic [7:0]  cpu_read_data,
 
-    // Bit 4 remains an external placeholder for the future DMC. Noise,
-    // Triangle, and both pulse channels own bits 3:0 internally.
+    output logic        dmc_mem_request,
+    output logic [15:0] dmc_mem_address,
+    input  logic        dmc_mem_acknowledge,
+    input  logic [7:0]  dmc_mem_read_data,
+
+    // Retained compatibility inputs let earlier phase vector suites inject
+    // the then-external bit-4/bit-7 status values. The implemented DMC owns
+    // those bits in production and the top-level ties these inputs low.
     /* verilator lint_off UNUSEDSIGNAL */
     input  nes_apu_pkg::nes_apu_channel_mask_t channel_active,
     /* verilator lint_on UNUSEDSIGNAL */
@@ -36,6 +42,7 @@ module nes_apu (
     output logic [3:0]  pulse2_output,
     output logic [3:0]  triangle_output,
     output logic [3:0]  noise_output,
+    output logic [6:0]  dmc_output,
 
     // Architectural/debug state used by verification and future snapshots.
     output nes_apu_pkg::nes_apu_frame_mode_t frame_mode,
@@ -72,6 +79,9 @@ module nes_apu (
     logic triangle_enable;
     logic noise_active;
     logic noise_enable;
+    logic dmc_enable;
+    logic dmc_active;
+    logic dmc_internal_irq_flag;
     logic pulse_timer_tick;
     nes_apu_channel_mask_t effective_channel_active;
 
@@ -89,7 +99,7 @@ module nes_apu (
                            cpu_address <= APU_CHANNEL_REGISTER_LAST;
     assign channel_write_register = cpu_address[4:0];
     assign channel_write_data = cpu_write_data;
-    // A future DMC consumes this pulse to clear its own IRQ latch.
+    // The DMC consumes every accepted $4015 write to clear its IRQ latch.
     assign dmc_irq_clear = status_write;
 
     // A $4015 write affects all implemented channels on its accepted CPU edge
@@ -102,9 +112,11 @@ module nes_apu (
                              channel_enable[APU_STATUS_TRIANGLE_BIT];
     assign noise_enable = status_write ? cpu_write_data[3] :
                           channel_enable[APU_STATUS_NOISE_BIT];
+    assign dmc_enable = status_write ? cpu_write_data[4] :
+                        channel_enable[APU_STATUS_DMC_BIT];
     assign pulse_timer_tick = cpu_cycle_enable && !cpu_cycle_odd;
     assign effective_channel_active = {
-        channel_active[4], noise_active, triangle_active,
+        (channel_active[4] || dmc_active), noise_active, triangle_active,
         pulse2_active, pulse1_active
     };
 
@@ -180,13 +192,13 @@ module nes_apu (
             cpu_read_data[5] = 1'b0; // project-wide open-bus simplification
             cpu_read_data[APU_STATUS_FRAME_IRQ_BIT] =
                 frame_irq_flag || frame_irq_set_event;
-            cpu_read_data[APU_STATUS_DMC_IRQ_BIT] = dmc_irq_flag;
+            cpu_read_data[APU_STATUS_DMC_IRQ_BIT] =
+                dmc_irq_flag || dmc_internal_irq_flag;
         end
     end
 
-    // Phase 5A exposes only the implemented frame IRQ at this boundary. The
-    // future DMC phase will OR its owned IRQ latch into this expression.
-    assign irq = !reset && (frame_irq_flag || frame_irq_set_event);
+    assign irq = !reset && (frame_irq_flag || frame_irq_set_event ||
+                            dmc_internal_irq_flag);
 
     /* verilator lint_off PINCONNECTEMPTY */
     nes_apu_pulse #(
@@ -314,6 +326,40 @@ module nes_apu (
         .timer_counter(),
         .length_counter(),
         .lfsr()
+    );
+    /* verilator lint_on PINCONNECTEMPTY */
+
+    /* verilator lint_off PINCONNECTEMPTY */
+    nes_apu_dmc dmc (
+        .clk(clk),
+        .reset(reset),
+        .cpu_cycle_enable(cpu_cycle_enable),
+        .enable(dmc_enable),
+        .status_write(status_write),
+        .write(channel_write && channel_write_register[4:2] == 3'd4),
+        .write_register(channel_write_register[1:0]),
+        .write_data(channel_write_data),
+        .mem_request(dmc_mem_request),
+        .mem_address(dmc_mem_address),
+        .mem_acknowledge(dmc_mem_acknowledge),
+        .mem_read_data(dmc_mem_read_data),
+        .active(dmc_active),
+        .irq_flag(dmc_internal_irq_flag),
+        .raw_output(dmc_output),
+        .irq_enable(),
+        .loop(),
+        .rate_index(),
+        .sample_address_register(),
+        .sample_length_register(),
+        .current_address(),
+        .bytes_remaining(),
+        .sample_buffer(),
+        .sample_buffer_empty(),
+        .shift_register(),
+        .bits_remaining(),
+        .silence(),
+        .timer_period(),
+        .timer_counter()
     );
     /* verilator lint_on PINCONNECTEMPTY */
 

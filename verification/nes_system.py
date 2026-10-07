@@ -1,4 +1,4 @@
-"""Independent Phase 3J scheduling, decode, and OAM-DMA reference logic."""
+"""Independent scheduling, CPU-space decode, and DMA reference logic."""
 
 from dataclasses import dataclass
 from enum import IntEnum
@@ -116,6 +116,77 @@ class OamDmaModel:
         )
 
 
+@dataclass(frozen=True)
+class DmcDmaResult:
+    acknowledge: bool
+    data: int
+    cpu_stall: bool
+    start: bool
+    complete: bool
+
+
+class DmcDmaModel:
+    """CPU-slot model of the DMC halt/dummy/align/read transaction."""
+
+    def __init__(self) -> None:
+        self.active = False
+        self.phase = DmaPhase.IDLE
+        self.address = 0
+        self.started_odd = False
+        self.elapsed_cpu_cycles = 0
+
+    def reset(self) -> None:
+        self.__init__()
+
+    def cpu_slot(
+        self,
+        *,
+        request: bool,
+        request_address: int,
+        cpu_cycle_odd: bool,
+        halt_allowed: bool,
+        read_cpu: Callable[[int], int],
+    ) -> DmcDmaResult:
+        start = False
+        complete = False
+        acknowledge = False
+        data = 0
+        stall = self.active or (request and halt_allowed)
+
+        if not self.active:
+            if request and halt_allowed:
+                self.active = True
+                self.phase = DmaPhase.DUMMY
+                self.address = request_address & 0xFFFF
+                self.started_odd = bool(cpu_cycle_odd)
+                self.elapsed_cpu_cycles = 1
+                start = True
+        else:
+            self.elapsed_cpu_cycles += 1
+            if self.phase == DmaPhase.DUMMY:
+                self.phase = (
+                    DmaPhase.ALIGN if self.started_odd else DmaPhase.READ
+                )
+            elif self.phase == DmaPhase.ALIGN:
+                self.phase = DmaPhase.READ
+            elif self.phase == DmaPhase.READ:
+                data = read_cpu(self.address) & 0xFF
+                acknowledge = True
+                complete = True
+                self.active = False
+                self.phase = DmaPhase.IDLE
+            else:
+                raise AssertionError(self.phase)
+
+        return DmcDmaResult(
+            acknowledge=acknowledge,
+            data=data,
+            cpu_stall=stall,
+            start=start,
+            complete=complete,
+        )
+
+
 def mirrored_ram_read(ram: bytes | bytearray, address: int) -> int:
     if len(ram) != 2048:
         raise ValueError("NES internal RAM must contain exactly 2048 bytes")
@@ -163,3 +234,25 @@ def dma_read_cpu_space(
     if target == CpuTarget.CARTRIDGE:
         return cartridge_read(address) & 0xFF
     return 0
+
+
+def dmc_read_cpu_space(
+    address: int,
+    ram: bytes | bytearray,
+    *,
+    ppu_read: Callable[[int], int],
+    cartridge_read: Callable[[int], int],
+) -> int:
+    """Read through the same centralized CPU-space policy as OAM DMA.
+
+    Programmed DMC addresses are always in cartridge space, but sharing this
+    path is intentional: mirrors and any future mapper ownership remain in
+    the system decoder rather than being duplicated by the audio channel.
+    """
+
+    return dma_read_cpu_space(
+        address,
+        ram,
+        ppu_read=ppu_read,
+        cartridge_read=cartridge_read,
+    )

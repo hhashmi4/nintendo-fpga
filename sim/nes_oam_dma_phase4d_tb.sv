@@ -7,6 +7,7 @@ module nes_oam_dma_phase4d_tb;
     logic reset = 1'b1;
     logic cpu_cycle_slot = 1'b0;
     logic cpu_cycle_odd = 1'b0;
+    logic hold = 1'b0;
     logic trigger = 1'b0;
     logic [7:0] trigger_page = 8'h00;
     logic [7:0] source_read_data;
@@ -48,6 +49,7 @@ module nes_oam_dma_phase4d_tb;
         .reset(reset),
         .cpu_cycle_slot(cpu_cycle_slot),
         .cpu_cycle_odd(cpu_cycle_odd),
+        .hold(hold),
         .trigger(trigger),
         .trigger_page(trigger_page),
         .source_read_data(source_read_data),
@@ -200,6 +202,20 @@ module nes_oam_dma_phase4d_tb;
         cpu_cycle_slot = 1'b0;
         assert (active);
         repeat (5) cpu_slot();
+        begin
+            logic [2:0] held_phase;
+            logic [7:0] held_index;
+            logic [9:0] held_elapsed;
+            held_phase = phase;
+            held_index = byte_index;
+            held_elapsed = elapsed_cpu_cycles;
+            hold = 1'b1;
+            repeat (10) cpu_slot();
+            assert (phase == held_phase && byte_index == held_index &&
+                    elapsed_cpu_cycles == held_elapsed);
+            assert (!source_read_event && !oam_write_strobe);
+            hold = 1'b0;
+        end
         reset = 1'b1;
         @(posedge clk);
         #1;

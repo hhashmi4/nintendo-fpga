@@ -11,6 +11,10 @@ module nes_apu_noise_phase5e_tb;
     logic [15:0] cpu_address = 16'h0000;
     logic [7:0] cpu_write_data = 8'h00;
     logic [7:0] cpu_read_data;
+    logic dmc_mem_request;
+    logic [15:0] dmc_mem_address;
+    logic dmc_mem_acknowledge = 1'b0;
+    logic [7:0] dmc_mem_read_data = 8'h00;
     nes_apu_channel_mask_t channel_active = '0;
     logic dmc_irq_flag = 1'b0;
     nes_apu_channel_mask_t channel_enable;
@@ -25,6 +29,7 @@ module nes_apu_noise_phase5e_tb;
     logic [3:0] pulse2_output;
     logic [3:0] triangle_output;
     logic [3:0] noise_output;
+    logic [6:0] dmc_output;
     nes_apu_frame_mode_t frame_mode;
     logic frame_irq_inhibit;
     logic frame_irq_flag;
@@ -107,7 +112,9 @@ module nes_apu_noise_phase5e_tb;
                                  pulse2_output, triangle_output, noise_output,
                                  quarter_frame_tick, half_frame_tick,
                                  channel_write, channel_write_register,
-                                 channel_write_data, dmc_irq_clear}))
+                                 channel_write_data, dmc_irq_clear,
+                                 dmc_mem_request, dmc_mem_address,
+                                 dmc_output}))
                 else $fatal(1, "unknown APU output at row %0d", vector_count);
             assert (cpu_read_data == expected_read_data &&
                     irq == expected_irq &&

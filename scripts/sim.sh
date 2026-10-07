@@ -62,6 +62,9 @@ mkdir -p \
     build/verilator/nes_apu_pulse2_phase5c \
     build/verilator/nes_apu_triangle_phase5d \
     build/verilator/nes_apu_noise_phase5e \
+    build/verilator/nes_apu_dmc_phase5f \
+    build/verilator/nes_dmc_dma_phase5f \
+    build/verilator/nes_dmc_system_phase5f \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -171,6 +174,10 @@ NES_APU_TRIANGLE_PHASE5D_WAVEFORM="build/sim/nes_apu_triangle_phase5d.fst"
 NES_APU_TRIANGLE_PHASE5D_REFERENCE="build/sim/nes_apu_triangle_phase5d_reference.txt"
 NES_APU_NOISE_PHASE5E_WAVEFORM="build/sim/nes_apu_noise_phase5e.fst"
 NES_APU_NOISE_PHASE5E_REFERENCE="build/sim/nes_apu_noise_phase5e_reference.txt"
+NES_APU_DMC_PHASE5F_WAVEFORM="build/sim/nes_apu_dmc_phase5f.fst"
+NES_APU_DMC_PHASE5F_REFERENCE="build/sim/nes_apu_dmc_phase5f_reference.txt"
+NES_DMC_DMA_PHASE5F_WAVEFORM="build/sim/nes_dmc_dma_phase5f.fst"
+NES_DMC_SYSTEM_PHASE5F_WAVEFORM="build/sim/nes_dmc_system_phase5f.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -279,6 +286,10 @@ rm -f \
     "$NES_APU_TRIANGLE_PHASE5D_REFERENCE" \
     "$NES_APU_NOISE_PHASE5E_WAVEFORM" \
     "$NES_APU_NOISE_PHASE5E_REFERENCE" \
+    "$NES_APU_DMC_PHASE5F_WAVEFORM" \
+    "$NES_APU_DMC_PHASE5F_REFERENCE" \
+    "$NES_DMC_DMA_PHASE5F_WAVEFORM" \
+    "$NES_DMC_SYSTEM_PHASE5F_WAVEFORM" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -327,6 +338,7 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_pulse.sv \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
+    rtl/apu/nes_apu_dmc.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_phase5a_tb.sv
 
@@ -368,6 +380,7 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_pulse.sv \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
+    rtl/apu/nes_apu_dmc.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_pulse2_phase5c_tb.sv
 
@@ -390,6 +403,7 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_pulse.sv \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
+    rtl/apu/nes_apu_dmc.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_triangle_phase5d_tb.sv
 
@@ -412,6 +426,7 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_pulse.sv \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
+    rtl/apu/nes_apu_dmc.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_noise_phase5e_tb.sv
 
@@ -419,6 +434,25 @@ build/verilator/nes_apu_noise_phase5e/nes_apu_noise_phase5e_tb
 
 if [[ ! -s "$NES_APU_NOISE_PHASE5E_WAVEFORM" ]]; then
     echo "ERROR: Phase 5E Noise waveform is missing" >&2
+    exit 1
+fi
+
+python3 scripts/generate_apu_dmc_phase5f_vectors.py \
+    "$NES_APU_DMC_PHASE5F_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
+    --assert \
+    --Mdir build/verilator/nes_apu_dmc_phase5f \
+    --top-module nes_apu_dmc_phase5f_tb \
+    -o nes_apu_dmc_phase5f_tb \
+    rtl/apu/nes_apu_pkg.sv \
+    rtl/apu/nes_apu_dmc.sv \
+    sim/nes_apu_dmc_phase5f_tb.sv
+
+build/verilator/nes_apu_dmc_phase5f/nes_apu_dmc_phase5f_tb
+
+if [[ ! -s "$NES_APU_DMC_PHASE5F_WAVEFORM" ]]; then
+    echo "ERROR: Phase 5F DMC waveform is missing" >&2
     exit 1
 fi
 
@@ -919,6 +953,7 @@ NES_PHASE3J_RTL_FILES=(
     rtl/system/nes_cpu_ram.sv
     rtl/system/nes_cpu_bus.sv
     rtl/dma/nes_oam_dma.sv
+    rtl/dma/nes_dmc_dma.sv
     rtl/system/nes_internal_bus_arbiter.sv
     rtl/ppu/ppu_timing.sv
     rtl/ppu/ppu_scroll.sv
@@ -949,6 +984,22 @@ build/verilator/nes_oam_dma_phase4d/nes_oam_dma_phase4d_tb
 
 if [[ ! -s "$NES_OAM_DMA_PHASE4D_WAVEFORM" ]]; then
     echo "ERROR: simulation did not generate a non-empty $NES_OAM_DMA_PHASE4D_WAVEFORM" >&2
+    exit 1
+fi
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_dmc_dma_phase5f \
+    --top-module nes_dmc_dma_phase5f_tb \
+    -o nes_dmc_dma_phase5f_tb \
+    rtl/system/nes_system_pkg.sv \
+    rtl/dma/nes_dmc_dma.sv \
+    sim/nes_dmc_dma_phase5f_tb.sv
+
+build/verilator/nes_dmc_dma_phase5f/nes_dmc_dma_phase5f_tb
+
+if [[ ! -s "$NES_DMC_DMA_PHASE5F_WAVEFORM" ]]; then
+    echo "ERROR: Phase 5F DMC DMA waveform is missing" >&2
     exit 1
 fi
 
@@ -1006,6 +1057,34 @@ build/verilator/nes_runtime_activation_phase4fd/nes_runtime_activation_phase4fd_
 
 if [[ ! -s "$NES_RUNTIME_ACTIVATION_PHASE4FD_WAVEFORM" ]]; then
     echo "ERROR: Phase 4F-D runtime-activation waveform is missing" >&2
+    exit 1
+fi
+
+verilator --binary --timing --trace-fst --Wall -Wno-fatal \
+    -Wno-UNUSEDPARAM -Wno-BLKSEQ \
+    --assert \
+    --Mdir build/verilator/nes_dmc_system_phase5f \
+    --top-module nes_dmc_system_phase5f_tb \
+    -o nes_dmc_system_phase5f_tb \
+    rtl/apu/nes_apu_pkg.sv \
+    rtl/apu/nes_apu_pulse.sv \
+    rtl/apu/nes_apu_triangle.sv \
+    rtl/apu/nes_apu_noise.sv \
+    rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu.sv \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader.sv \
+    rtl/cartridge/nes_runtime_cartridge_storage.sv \
+    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_cartridge.sv \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/controller/nes_controller.sv \
+    sim/nes_dmc_system_phase5f_tb.sv
+
+build/verilator/nes_dmc_system_phase5f/nes_dmc_system_phase5f_tb
+
+if [[ ! -s "$NES_DMC_SYSTEM_PHASE5F_WAVEFORM" ]]; then
+    echo "ERROR: Phase 5F DMC system waveform is missing" >&2
     exit 1
 fi
 
@@ -1600,6 +1679,7 @@ PHASE4EC_TOP_RTL_FILES=(
     rtl/apu/nes_apu_pulse.sv
     rtl/apu/nes_apu_triangle.sv
     rtl/apu/nes_apu_noise.sv
+    rtl/apu/nes_apu_dmc.sv
     rtl/apu/nes_apu.sv
     rtl/platform/platform_config_pkg.sv
     rtl/platform/reset_sync.sv
@@ -1706,6 +1786,9 @@ echo "NES APU Pulse 1 Phase 5B waveform: $ROOT_DIR/$NES_APU_PULSE1_PHASE5B_WAVEF
 echo "NES APU Pulse 2 Phase 5C waveform: $ROOT_DIR/$NES_APU_PULSE2_PHASE5C_WAVEFORM"
 echo "NES APU Triangle Phase 5D waveform: $ROOT_DIR/$NES_APU_TRIANGLE_PHASE5D_WAVEFORM"
 echo "NES APU Noise Phase 5E waveform: $ROOT_DIR/$NES_APU_NOISE_PHASE5E_WAVEFORM"
+echo "NES APU DMC Phase 5F waveform: $ROOT_DIR/$NES_APU_DMC_PHASE5F_WAVEFORM"
+echo "NES DMC DMA Phase 5F waveform: $ROOT_DIR/$NES_DMC_DMA_PHASE5F_WAVEFORM"
+echo "NES DMC system Phase 5F waveform: $ROOT_DIR/$NES_DMC_SYSTEM_PHASE5F_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

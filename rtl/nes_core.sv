@@ -22,6 +22,11 @@ module nes_core (
     output logic [7:0]  apu_cpu_write_data,
     input  logic [7:0]  apu_cpu_read_data,
 
+    input  logic        dmc_mem_request,
+    input  logic [15:0] dmc_mem_address,
+    output logic        dmc_mem_acknowledge,
+    output logic [7:0]  dmc_mem_read_data,
+
     output logic        controller_port,
     output logic        controller_cpu_read,
     output logic        controller_cpu_write,
@@ -85,6 +90,16 @@ module nes_core (
     output nes_system_pkg::nes_cpu_target_t dma_source_target,
     output nes_system_pkg::nes_bus_master_t internal_bus_owner,
 
+    output logic        dmc_dma_active,
+    output logic        dmc_dma_cpu_stall,
+    output logic [2:0]  dmc_dma_phase,
+    output logic        dmc_dma_started_odd,
+    output logic [2:0]  dmc_dma_elapsed_cycles,
+    output logic        dmc_dma_read_event,
+    output logic        dmc_dma_start_event,
+    output logic        dmc_dma_complete_event,
+    output nes_system_pkg::nes_cpu_target_t dmc_source_target,
+
     output logic [8:0]  ppu_dot,
     output logic [8:0]  ppu_scanline,
     output logic        ppu_frame_odd,
@@ -115,6 +130,10 @@ module nes_core (
     logic cpu_cycle_parity;
     logic dma_engine_active;
     logic dma_source_read_request;
+    logic dmc_dma_engine_active;
+    logic dmc_dma_source_read_request;
+    logic [15:0] dmc_dma_source_address;
+    logic dmc_halt_allowed;
     logic [10:0] shared_ram_read_address;
     logic [7:0] cpu_ram_read_data;
 
@@ -146,7 +165,8 @@ module nes_core (
 
     assign ppu_enable = !reset && nes_enable;
     assign cpu_cycle_slot = ppu_enable && scheduler_phase == 2'd2;
-    assign cpu_enable = cpu_cycle_slot && !dma_cpu_stall;
+    assign cpu_enable = cpu_cycle_slot && !dma_cpu_stall &&
+                        !dmc_dma_cpu_stall;
     assign cpu_read_enable = !reset && cpu_bus_valid && !cpu_write_enable;
 
     assign dma_trigger = bus_dma_write;
@@ -154,6 +174,30 @@ module nes_core (
     // active flag while reset is asserted so the combinational arbiter moves
     // to NES_BUS_MASTER_NONE immediately at a runtime-activation boundary.
     assign dma_active = !reset && dma_engine_active;
+    assign dmc_dma_active = !reset && dmc_dma_engine_active;
+    assign dmc_halt_allowed = dma_active || !cpu_bus_valid ||
+                              !cpu_write_enable;
+
+    nes_dmc_dma dmc_dma (
+        .clk(clk),
+        .reset(reset),
+        .cpu_cycle_slot(cpu_cycle_slot),
+        .cpu_cycle_odd(cpu_cycle_parity),
+        .halt_allowed(dmc_halt_allowed),
+        .request(dmc_mem_request),
+        .request_address(dmc_mem_address),
+        .acknowledge(dmc_mem_acknowledge),
+        .read_request(dmc_dma_source_read_request),
+        .read_event(dmc_dma_read_event),
+        .read_address(dmc_dma_source_address),
+        .active(dmc_dma_engine_active),
+        .cpu_stall(dmc_dma_cpu_stall),
+        .phase(dmc_dma_phase),
+        .started_odd(dmc_dma_started_odd),
+        .elapsed_cpu_cycles(dmc_dma_elapsed_cycles),
+        .start_event(dmc_dma_start_event),
+        .complete_event(dmc_dma_complete_event)
+    );
 
     nes_cpu_ram internal_cpu_ram (
         .clk          (clk),
@@ -212,6 +256,7 @@ module nes_core (
         .reset              (reset),
         .cpu_cycle_slot     (cpu_cycle_slot),
         .cpu_cycle_odd      (cpu_cycle_parity),
+        .hold               (dmc_dma_cpu_stall),
         .trigger            (dma_trigger),
         .trigger_page       (bus_dma_write_data),
         .source_read_data   (dma_source_data),
@@ -254,13 +299,19 @@ module nes_core (
         .dma_oam_write_event     (dma_write_event),
         .dma_source_address      (dma_source_address),
         .dma_oam_write_data      (dma_data),
+        .dmc_active              (dmc_dma_active),
+        .dmc_source_read_request (dmc_dma_source_read_request),
+        .dmc_source_read_event   (dmc_dma_read_event),
+        .dmc_source_address      (dmc_dma_source_address),
         .ram_read_data           (cpu_ram_read_data),
         .ppu_read_data           (ppu_cpu_read_data),
         .cart_read_data          (cart_cpu_read_data),
         .bus_owner               (internal_bus_owner),
         .dma_source_target       (dma_source_target),
+        .dmc_source_target       (dmc_source_target),
         .shared_ram_read_address (shared_ram_read_address),
         .dma_source_read_data    (dma_source_data),
+        .dmc_source_read_data    (dmc_mem_read_data),
         .ppu_enable              (ppu_cpu_enable),
         .ppu_valid               (ppu_cpu_valid),
         .ppu_write               (ppu_cpu_write),
@@ -373,12 +424,15 @@ module nes_core (
                      (previous_scheduler_phase == 2'd2 ? 2'd0 :
                       previous_scheduler_phase + 2'd1) :
                      previous_scheduler_phase));
-            assert (!(cpu_enable && dma_active));
+            assert (!(cpu_enable && (dma_active || dmc_dma_cpu_stall)));
             assert (internal_bus_owner ==
-                    (dma_active ? NES_BUS_MASTER_DMA : NES_BUS_MASTER_CPU));
+                    (dmc_dma_active ? NES_BUS_MASTER_DMC :
+                     dma_active ? NES_BUS_MASTER_DMA : NES_BUS_MASTER_CPU));
             assert (!(cart_cpu_read && cart_cpu_write));
             assert (!(cpu_ram_read && cpu_ram_write));
             assert (!(dma_read_event && dma_write_event));
+            assert (!(dmc_dma_read_event &&
+                     (dma_read_event || dma_write_event)));
             assert (dma_phase <= NES_DMA_WRITE);
             if (dma_write_event)
                 assert (ppu_cpu_enable && ppu_cpu_valid && ppu_cpu_write &&

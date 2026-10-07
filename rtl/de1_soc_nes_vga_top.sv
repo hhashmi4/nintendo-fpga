@@ -214,6 +214,10 @@ module de1_soc_nes_vga_top #(
     logic apu_cpu_write;
     logic [7:0] apu_cpu_write_data;
     logic [7:0] apu_cpu_read_data;
+    logic dmc_mem_request;
+    logic [15:0] dmc_mem_address;
+    logic dmc_mem_acknowledge;
+    logic [7:0] dmc_mem_read_data;
     logic apu_irq;
     logic apu_quarter_frame_tick;
     logic apu_half_frame_tick;
@@ -221,6 +225,7 @@ module de1_soc_nes_vga_top #(
     logic [3:0] apu_pulse2_output;
     logic [3:0] apu_triangle_output;
     logic [3:0] apu_noise_output;
+    logic [6:0] apu_dmc_output;
     nes_apu_pkg::nes_apu_channel_mask_t apu_channel_enable;
     logic dma_complete_event;
     logic dma_start_event;
@@ -752,6 +757,10 @@ module de1_soc_nes_vga_top #(
         .apu_cpu_write(apu_cpu_write),
         .apu_cpu_write_data(apu_cpu_write_data),
         .apu_cpu_read_data(apu_cpu_read_data),
+        .dmc_mem_request(dmc_mem_request),
+        .dmc_mem_address(dmc_mem_address),
+        .dmc_mem_acknowledge(dmc_mem_acknowledge),
+        .dmc_mem_read_data(dmc_mem_read_data),
         .controller_port(controller_port),
         .controller_cpu_read(controller_cpu_read),
         .controller_cpu_write(controller_cpu_write),
@@ -850,6 +859,10 @@ module de1_soc_nes_vga_top #(
         .cpu_address(apu_cpu_address),
         .cpu_write_data(apu_cpu_write_data),
         .cpu_read_data(apu_cpu_read_data),
+        .dmc_mem_request(dmc_mem_request),
+        .dmc_mem_address(dmc_mem_address),
+        .dmc_mem_acknowledge(dmc_mem_acknowledge),
+        .dmc_mem_read_data(dmc_mem_read_data),
         .channel_active('0),
         .dmc_irq_flag(1'b0),
         .channel_enable(apu_channel_enable),
@@ -864,6 +877,7 @@ module de1_soc_nes_vga_top #(
         .pulse2_output(apu_pulse2_output),
         .triangle_output(apu_triangle_output),
         .noise_output(apu_noise_output),
+        .dmc_output(apu_dmc_output),
         .frame_mode(),
         .frame_irq_inhibit(),
         .frame_irq_flag(),
@@ -1246,6 +1260,9 @@ module de1_soc_nes_vga_top #(
                            apu_half_frame_tick || ^apu_channel_enable ||
                            ^apu_pulse1_output || ^apu_pulse2_output ||
                            ^apu_triangle_output || ^apu_noise_output ||
+                           ^apu_dmc_output || dmc_mem_request ||
+                           ^dmc_mem_address || dmc_mem_acknowledge ||
+                           ^dmc_mem_read_data ||
                            cartridge_debug_prg_read ||
                            cartridge_debug_prg_write ||
                            cartridge_debug_prg_ram_read ||

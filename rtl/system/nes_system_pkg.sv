@@ -14,7 +14,8 @@ package nes_system_pkg;
     typedef enum logic [1:0] {
         NES_BUS_MASTER_NONE = 2'd0,
         NES_BUS_MASTER_CPU  = 2'd1,
-        NES_BUS_MASTER_DMA  = 2'd2
+        NES_BUS_MASTER_DMA  = 2'd2,
+        NES_BUS_MASTER_DMC  = 2'd3
     } nes_bus_master_t;
 
     typedef enum logic [2:0] {

@@ -76,6 +76,8 @@ module nes_phase3j_tb;
         .cart_cpu_read          (cart_cpu_read),
         .cart_cpu_read_data     (cart_cpu_read_data),
         .apu_cpu_read_data      (8'h00),
+        .dmc_mem_request        (1'b0),
+        .dmc_mem_address        (16'h0000),
         .controller_cpu_read_data(8'h00),
         .chr_addr               (chr_addr),
         .chr_read_data          (chr_read_data),

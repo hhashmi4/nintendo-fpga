@@ -42,6 +42,16 @@ package nes_apu_pkg;
         12'd762,  12'd1016, 12'd2034, 12'd4068
     };
 
+    // NTSC 2A03 DMC output-bit periods in CPU cycles. These values are
+    // deliberately kept beside the other APU timing tables so a PAL table
+    // cannot be selected accidentally by an individual channel module.
+    localparam logic [8:0] APU_DMC_RATE_TABLE [0:15] = '{
+        9'd428, 9'd380, 9'd340, 9'd320,
+        9'd286, 9'd254, 9'd226, 9'd214,
+        9'd190, 9'd160, 9'd142, 9'd128,
+        9'd106, 9'd85,  9'd72,  9'd54
+    };
+
     localparam logic [7:0] APU_PULSE_DUTY_TABLE [0:3] = '{
         8'b1000_0000,
         8'b1100_0000,

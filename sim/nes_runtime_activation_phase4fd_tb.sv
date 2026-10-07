@@ -94,6 +94,7 @@ module nes_runtime_activation_phase4fd_tb;
         .cart_cpu_write_data(cart_cpu_write_data),
         .cart_cpu_read_data(cart_cpu_read_data),
         .apu_cpu_read_data(8'h00),
+        .dmc_mem_request(1'b0), .dmc_mem_address(16'h0000),
         .controller_cpu_read_data(8'h00),
         .chr_addr(core_chr_address),
         .chr_read(core_chr_read),
