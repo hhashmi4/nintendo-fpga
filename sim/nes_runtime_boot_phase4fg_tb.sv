@@ -308,6 +308,8 @@ module nes_runtime_boot_phase4fg_tb;
         .cart_cpu_read(cart_cpu_read), .cart_cpu_write(cart_cpu_write),
         .cart_cpu_write_data(cart_cpu_write_data),
         .cart_cpu_read_data(cart_cpu_read_data), .apu_cpu_read_data(8'h00),
+        .dmc_mem_request(1'b0), .dmc_mem_address(16'h0000),
+        .dmc_mem_acknowledge(), .dmc_mem_read_data(),
         .controller_port(controller_port),
         .controller_cpu_read(controller_cpu_read),
         .controller_cpu_write(controller_cpu_write),

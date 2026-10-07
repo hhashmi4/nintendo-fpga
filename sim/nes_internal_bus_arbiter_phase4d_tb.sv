@@ -21,13 +21,19 @@ module nes_internal_bus_arbiter_phase4d_tb;
     logic dma_oam_write_event = 1'b0;
     logic [15:0] dma_source_address = 16'h0000;
     logic [7:0] dma_oam_write_data = 8'h00;
+    logic dmc_active = 1'b0;
+    logic dmc_source_read_request = 1'b0;
+    logic dmc_source_read_event = 1'b0;
+    logic [15:0] dmc_source_address = 16'h0000;
     logic [7:0] ram_read_data = 8'h5a;
     logic [7:0] ppu_read_data = 8'ha5;
     logic [7:0] cart_read_data = 8'hc3;
     nes_bus_master_t bus_owner;
     nes_cpu_target_t dma_source_target;
+    nes_cpu_target_t dmc_source_target;
     logic [10:0] shared_ram_read_address;
     logic [7:0] dma_source_read_data;
+    logic [7:0] dmc_source_read_data;
     logic ppu_enable;
     logic ppu_valid;
     logic ppu_write;
@@ -137,6 +143,41 @@ module nes_internal_bus_arbiter_phase4d_tb;
         assert (ppu_valid && ppu_write && ppu_address == 16'h2004);
         assert (ppu_write_data == 8'h6d);
         assert (!(cart_read || cart_write));
+
+        // Phase 5F DMC reads share the same decoder and take deterministic
+        // priority without inheriting either CPU or OAM strobes.
+        dmc_active = 1'b1;
+        dmc_source_read_request = 1'b1;
+        dmc_source_read_event = 1'b1;
+        dmc_source_address = 16'h1855;
+        #1;
+        assert (bus_owner == NES_BUS_MASTER_DMC);
+        assert (dmc_source_target == NES_CPU_TARGET_RAM);
+        assert (shared_ram_read_address == 11'h055);
+        assert (dmc_source_read_data == ram_read_data);
+        assert (!(ppu_valid || cart_read || cart_write));
+
+        dmc_source_address = 16'h3fff;
+        #1;
+        assert (dmc_source_target == NES_CPU_TARGET_PPU);
+        assert (ppu_valid && !ppu_write && ppu_address == 16'h2007);
+        assert (dmc_source_read_data == ppu_read_data);
+
+        dmc_source_address = 16'hc123;
+        #1;
+        assert (dmc_source_target == NES_CPU_TARGET_CARTRIDGE);
+        assert (cart_read && !cart_write && cart_address == 16'hc123);
+        assert (dmc_source_read_data == cart_read_data);
+
+        dmc_source_address = 16'h4016;
+        #1;
+        assert (dmc_source_target == NES_CPU_TARGET_CONTROLLER);
+        assert (!(ppu_valid || cart_read || cart_write));
+        assert (dmc_source_read_data == 8'h00);
+
+        dmc_active = 1'b0;
+        dmc_source_read_request = 1'b0;
+        dmc_source_read_event = 1'b0;
 
         dma_active = 1'b0;
         dma_oam_write_event = 1'b0;

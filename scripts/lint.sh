@@ -109,6 +109,7 @@ APU_RTL_FILES=(
     rtl/apu/nes_apu_pulse.sv
     rtl/apu/nes_apu_triangle.sv
     rtl/apu/nes_apu_noise.sv
+    rtl/apu/nes_apu_dmc.sv
     rtl/apu/nes_apu.sv
 )
 
@@ -130,6 +131,11 @@ verilator --lint-only --Wall \
     --top-module nes_oam_dma \
     rtl/system/nes_system_pkg.sv \
     rtl/dma/nes_oam_dma.sv
+
+verilator --lint-only --Wall \
+    --top-module nes_dmc_dma \
+    rtl/system/nes_system_pkg.sv \
+    rtl/dma/nes_dmc_dma.sv
 
 verilator --lint-only --Wall \
     --top-module nes_internal_bus_arbiter \
@@ -159,6 +165,7 @@ NES_RTL_FILES=(
     "${SYSTEM_BUS_RTL_FILES[@]}"
     rtl/system/nes_cpu_ram.sv
     rtl/dma/nes_oam_dma.sv
+    rtl/dma/nes_dmc_dma.sv
     rtl/system/nes_internal_bus_arbiter.sv
     rtl/ppu/ppu_timing.sv
     rtl/ppu/ppu_scroll.sv

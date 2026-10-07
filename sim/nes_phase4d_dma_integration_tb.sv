@@ -99,6 +99,7 @@ module nes_phase4d_dma_integration_tb;
         .apu_cpu_read(apu_cpu_read),
         .apu_cpu_write(apu_cpu_write),
         .apu_cpu_read_data(8'h00),
+        .dmc_mem_request(1'b0), .dmc_mem_address(16'h0000),
         .controller_port(controller_port),
         .controller_cpu_read(controller_cpu_read),
         .controller_cpu_write(controller_cpu_write),

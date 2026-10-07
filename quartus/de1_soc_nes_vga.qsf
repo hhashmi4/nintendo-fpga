@@ -10,6 +10,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_pulse.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_triangle.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_noise.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_dmc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot.sv
@@ -27,6 +28,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_address_dec
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_ram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/dma/nes_oam_dma.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/dma/nes_dmc_dma.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/system/nes_internal_bus_arbiter.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/controller/controller_input_sync.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/controller/nes_controller.sv

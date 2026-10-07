@@ -71,8 +71,9 @@ def test_channel_write_decode_and_status_enable_are_distinct_from_active() -> No
     outputs, _ = cycle(
         model, cpu_read=True, cpu_address=APU_STATUS, channel_active=0x0A
     )
-    # Noise now owns status bit 3; an external placeholder cannot assert it.
-    assert outputs.cpu_read_data == 0x00
+    # DMC now owns status bit 4 from bytes remaining; Noise owns bit 3 and an
+    # external placeholder cannot assert it.
+    assert outputs.cpu_read_data == 0x10
 
 
 def test_unaccepted_bus_levels_do_not_repeat_writes_or_advance_time() -> None:

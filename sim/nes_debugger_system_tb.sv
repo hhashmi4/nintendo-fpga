@@ -46,6 +46,7 @@ module nes_debugger_system_tb;
         .clk(clk), .reset(reset), .nes_enable(authorized), .irq(1'b0),
         .mirroring_mode(2'd0), .cart_cpu_address(cart_address),
         .cart_cpu_read_data(rom[cart_address]), .apu_cpu_read_data(8'd0),
+        .dmc_mem_request(1'b0), .dmc_mem_address(16'h0000),
         .controller_cpu_read_data(8'd0), .chr_read_data(8'd0),
         .cpu_enable(cpu_enable), .ppu_enable(ppu_enable),
         .cpu_debug_execution_state(execution_state), .cpu_debug_pc(pc),

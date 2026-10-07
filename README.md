@@ -88,8 +88,11 @@ counters, held-DAC semantics, `$4008/$400A/$400B`, and `$4015` bit 2 while
 preserving both pulse channels. Phase 5E adds the Noise envelope/length unit,
 all 16 NTSC timer periods, deterministic 15-bit long/short-mode LFSR,
 `$400C/$400E/$400F`, harmless `$400D`, raw 0..15 output, and `$4015` bit 3.
-Final mixing, CPU IRQ consumption, DMC DMA, resampling, and codec output remain
-later Phase 5 work.
+Phase 5F adds the DMC reader/buffer/output unit, all 16 NTSC rates, raw 0..127
+delta DAC, looping and terminal IRQ, `$4010-$4013` plus `$4015` bit 4/bit 7,
+and an acknowledged 3/4-slot CPU-space fetch master integrated with CPU and
+OAM-DMA arbitration through the runtime Mapper-0 path. Final nonlinear mixing,
+CPU IRQ consumption, resampling, and codec output remain later Phase 5 work.
 
 ## Phase 1 foundation
 
@@ -859,6 +862,28 @@ Architecture, period/LFSR semantics, deterministic sequences, verification,
 synthesis results, and limitations are documented in
 [`docs/apu-phase5e-noise.md`](docs/apu-phase5e-noise.md).
 
+## Phase 5F — APU DMC
+
+- Authentic `$4010-$4013` reader/output semantics and `$4015` start, stop,
+  active-status, and IRQ-clear behavior
+- Centralized 16-entry NTSC rate table, one-byte sample buffer, LSB-first
+  output shifter, silence state, and saturating seven-bit delta DAC
+- Exact programmed address/length expansion, one decrement per acknowledged
+  byte, looping/terminal IRQ, and explicit `$FFFF->$8000` sample wrap
+- Held request/stable address/one-ack memory protocol through the existing CPU
+  address decoder and production runtime Mapper-0 PRG path
+- Write-safe parity-based 3/4-slot CPU stall with deterministic DMC-over-OAM
+  arbitration; OAM resumes without data loss or altered 513/514 internal count
+- Pause, single-step, reset-during-request, controller non-duplication, active
+  runtime-game replacement, and generated cartridge-sample coverage
+- Independent Python channel/DMA models and a 143,324-cycle DMC RTL/model
+  comparison with 155 acknowledged bytes and zero mismatches
+- Raw 0..127 output only; no mixer, resampler, WAV, I2S, or codec path
+
+Architecture, timing accuracy boundary, bus arbitration, runtime integration,
+verification, synthesis results, and limitations are documented in
+[`docs/apu-phase5f-dmc.md`](docs/apu-phase5f-dmc.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -898,8 +923,8 @@ caching, concurrency, and timeout are documented in
 [`docs/ci-verification.md`](docs/ci-verification.md).
 
 This runs pytest, synthesizable RTL lint, the Phase 5A APU foundation, Phase 5B
-Pulse 1, Phase 5C dual-pulse, Phase 5D three-channel Triangle, and Phase 5E
-four-channel Noise oracle/RTL comparisons,
+Pulse 1, Phase 5C dual-pulse, Phase 5D three-channel Triangle, Phase 5E
+four-channel Noise, and Phase 5F DMC oracle/RTL and DMA/system comparisons,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -1093,9 +1118,9 @@ before use.
 - `rtl/system` — NES CPU address decoder, system bus, and internal CPU RAM
 - `rtl/cartridge` — build-time and runtime Mapper 0/NROM cartridge storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
-- `rtl/dma` — standalone OAM DMA bus master
-- `rtl/apu` — APU frame/status logic plus Pulse 1, Pulse 2, Triangle, and Noise
-  channels
+- `rtl/dma` — coordinated standalone OAM and DMC DMA timing engines
+- `rtl/apu` — APU frame/status logic plus Pulse 1, Pulse 2, Triangle, Noise,
+  and DMC channels
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
 - `rtl/loader` — runtime-loader protocol, manifest, and transfer validation
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion

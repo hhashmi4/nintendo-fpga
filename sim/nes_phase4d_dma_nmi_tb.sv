@@ -91,6 +91,7 @@ module nes_phase4d_dma_nmi_tb;
         .reset(reset),
         .cpu_cycle_slot(!reset),
         .cpu_cycle_odd(cpu_cycle_parity),
+        .hold(1'b0),
         .trigger(dma_trigger),
         .trigger_page(dma_trigger_page),
         .source_read_data(dma_source_address[7:0]),

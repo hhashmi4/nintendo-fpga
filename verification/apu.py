@@ -1,4 +1,4 @@
-"""Independent NTSC NES APU model for frame, pulse, triangle, and Noise."""
+"""Independent NTSC NES APU model for all five sound channels."""
 
 from dataclasses import dataclass
 
@@ -44,6 +44,27 @@ NOISE_PERIOD_TABLE = (
     4, 8, 16, 32, 64, 96, 128, 160,
     202, 254, 380, 508, 762, 1016, 2034, 4068,
 )
+
+DMC_RATE_TABLE = (
+    428, 380, 340, 320, 286, 254, 226, 214,
+    190, 160, 142, 128, 106, 85, 72, 54,
+)
+
+
+def dmc_sample_address(register: int) -> int:
+    """Expand $4012 into its $C000-$FFC0 CPU sample address."""
+
+    if not 0 <= register <= 0xFF:
+        raise ValueError("sample address register must be 8 bits")
+    return 0xC000 | (register << 6)
+
+
+def dmc_sample_length(register: int) -> int:
+    """Expand $4013 into its 1-4081 byte sample length."""
+
+    if not 0 <= register <= 0xFF:
+        raise ValueError("sample length register must be 8 bits")
+    return (register << 4) | 1
 
 
 def pulse_sequence_cpu_cycles(timer_period: int) -> int:
@@ -604,6 +625,234 @@ class NoiseModel:
 
 
 @dataclass(frozen=True)
+class DmcInputs:
+    reset: bool = False
+    cpu_cycle_enable: bool = False
+    enable: bool = False
+    status_write: bool = False
+    write: bool = False
+    write_register: int = 0
+    write_data: int = 0
+    mem_acknowledge: bool = False
+    mem_read_data: int = 0
+
+
+@dataclass(frozen=True)
+class DmcOutputs:
+    active: bool
+    irq_flag: bool
+    raw_output: int
+    mem_request: bool
+    mem_address: int
+
+
+@dataclass(frozen=True)
+class DmcState:
+    irq_enable: bool
+    loop: bool
+    rate_index: int
+    sample_address_register: int
+    sample_length_register: int
+    current_address: int
+    bytes_remaining: int
+    sample_buffer: int
+    sample_buffer_empty: bool
+    shift_register: int
+    bits_remaining: int
+    silence: bool
+    output_level: int
+    timer_counter: int
+    mem_request: bool
+    mem_address: int
+
+
+class DmcModel:
+    """Behavioral DMC reader/output unit with a held request/ack interface."""
+
+    def __init__(self) -> None:
+        self.reset_state()
+
+    def reset_state(self) -> None:
+        self.irq_enable = False
+        self.loop = False
+        self.rate_index = 0
+        self.sample_address_register = 0
+        self.sample_length_register = 0
+        self.current_address = 0
+        self.bytes_remaining = 0
+        self.sample_buffer = 0
+        self.sample_buffer_empty = True
+        self.shift_register = 0
+        self.bits_remaining = 8
+        self.silence = True
+        self.output_level = 0
+        self.timer_counter = 0
+        self.mem_request = False
+        self.mem_address = 0
+        self.irq_flag = False
+
+    @property
+    def timer_period(self) -> int:
+        return DMC_RATE_TABLE[self.rate_index]
+
+    def state(self) -> DmcState:
+        return DmcState(
+            irq_enable=self.irq_enable,
+            loop=self.loop,
+            rate_index=self.rate_index,
+            sample_address_register=self.sample_address_register,
+            sample_length_register=self.sample_length_register,
+            current_address=self.current_address,
+            bytes_remaining=self.bytes_remaining,
+            sample_buffer=self.sample_buffer,
+            sample_buffer_empty=self.sample_buffer_empty,
+            shift_register=self.shift_register,
+            bits_remaining=self.bits_remaining,
+            silence=self.silence,
+            output_level=self.output_level,
+            timer_counter=self.timer_counter,
+            mem_request=self.mem_request,
+            mem_address=self.mem_address,
+        )
+
+    def evaluate(self, inputs: DmcInputs | None = None) -> DmcOutputs:
+        reset = inputs.reset if inputs is not None else False
+        return DmcOutputs(
+            active=not reset and self.bytes_remaining != 0,
+            irq_flag=not reset and self.irq_flag,
+            raw_output=0 if reset else self.output_level,
+            mem_request=not reset and self.mem_request,
+            mem_address=self.mem_address,
+        )
+
+    @staticmethod
+    def _validate(inputs: DmcInputs) -> None:
+        if not 0 <= inputs.write_register <= 3:
+            raise ValueError("write_register must be 2 bits")
+        if not 0 <= inputs.write_data <= 0xFF:
+            raise ValueError("write_data must be 8 bits")
+        if not 0 <= inputs.mem_read_data <= 0xFF:
+            raise ValueError("mem_read_data must be 8 bits")
+
+    def clock(self, inputs: DmcInputs) -> tuple[DmcOutputs, DmcState]:
+        self._validate(inputs)
+        outputs = self.evaluate(inputs)
+        if inputs.reset:
+            self.reset_state()
+            return outputs, self.state()
+        if not inputs.cpu_cycle_enable:
+            return outputs, self.state()
+        if inputs.mem_acknowledge and not self.mem_request:
+            raise AssertionError("DMC acknowledge without a held request")
+
+        old_counter = self.timer_counter
+        old_bits = self.bits_remaining
+        old_silence = self.silence
+        old_shift = self.shift_register
+        old_empty = self.sample_buffer_empty
+        old_buffer = self.sample_buffer
+        old_request = self.mem_request
+        old_remaining = self.bytes_remaining
+        old_address = self.current_address
+        output_reload = old_counter == 0 and old_bits == 1
+        acknowledge_bypass = (
+            inputs.mem_acknowledge and output_reload and old_empty
+        )
+
+        if old_counter == 0:
+            self.timer_counter = self.timer_period - 1
+            if not old_silence:
+                if old_shift & 1 and self.output_level <= 125:
+                    self.output_level += 2
+                elif not (old_shift & 1) and self.output_level >= 2:
+                    self.output_level -= 2
+
+            if old_bits == 1:
+                self.bits_remaining = 8
+                if not old_empty:
+                    self.shift_register = old_buffer
+                    self.sample_buffer_empty = True
+                    self.silence = False
+                else:
+                    self.shift_register = 0
+                    self.silence = True
+            else:
+                self.bits_remaining = old_bits - 1
+                self.shift_register = old_shift >> 1
+        else:
+            self.timer_counter = old_counter - 1
+
+        if inputs.mem_acknowledge:
+            self.mem_request = False
+            self.current_address = 0x8000 if old_address == 0xFFFF else (
+                old_address + 1
+            )
+            if acknowledge_bypass:
+                self.shift_register = inputs.mem_read_data
+                self.bits_remaining = 8
+                self.silence = False
+                self.sample_buffer_empty = True
+            else:
+                self.sample_buffer = inputs.mem_read_data
+                self.sample_buffer_empty = False
+
+            if old_remaining == 1:
+                if self.loop:
+                    self.current_address = dmc_sample_address(
+                        self.sample_address_register
+                    )
+                    self.bytes_remaining = dmc_sample_length(
+                        self.sample_length_register
+                    )
+                else:
+                    self.bytes_remaining = 0
+                    if self.irq_enable:
+                        self.irq_flag = True
+            elif old_remaining:
+                self.bytes_remaining = old_remaining - 1
+        elif not old_request and old_empty and old_remaining:
+            self.mem_request = True
+            self.mem_address = old_address
+
+        if inputs.status_write:
+            self.irq_flag = False
+            if not inputs.enable:
+                self.bytes_remaining = 0
+                self.mem_request = False
+            elif old_remaining == 0:
+                self.current_address = dmc_sample_address(
+                    self.sample_address_register
+                )
+                self.bytes_remaining = dmc_sample_length(
+                    self.sample_length_register
+                )
+                if old_empty and not old_request:
+                    self.mem_request = True
+                    self.mem_address = dmc_sample_address(
+                        self.sample_address_register
+                    )
+
+        if inputs.write:
+            if inputs.write_register == 0:
+                self.irq_enable = bool(inputs.write_data & 0x80)
+                self.loop = bool(inputs.write_data & 0x40)
+                self.rate_index = inputs.write_data & 0x0F
+                if not inputs.write_data & 0x80:
+                    self.irq_flag = False
+            elif inputs.write_register == 1:
+                self.output_level = inputs.write_data & 0x7F
+            elif inputs.write_register == 2:
+                self.sample_address_register = inputs.write_data
+            else:
+                self.sample_length_register = inputs.write_data
+
+        assert 0 <= self.output_level <= 127
+        assert 1 <= self.bits_remaining <= 8
+        assert 0 <= self.bytes_remaining <= 4081
+        return outputs, self.state()
+
+
+@dataclass(frozen=True)
 class ApuInputs:
     """Signals presented for one fabric cycle.
 
@@ -619,6 +868,8 @@ class ApuInputs:
     cpu_write_data: int = 0
     channel_active: int = 0
     dmc_irq_flag: bool = False
+    dmc_mem_acknowledge: bool = False
+    dmc_mem_read_data: int = 0
 
 
 @dataclass(frozen=True)
@@ -635,6 +886,9 @@ class ApuOutputs:
     channel_write_register: int
     channel_write_data: int
     dmc_irq_clear: bool
+    dmc_output: int
+    dmc_mem_request: bool
+    dmc_mem_address: int
 
 
 @dataclass(frozen=True)
@@ -658,6 +912,7 @@ class ApuFoundationModel:
         self.pulse2 = Pulse2Model()
         self.triangle = TriangleModel()
         self.noise = NoiseModel()
+        self.dmc = DmcModel()
         self.reset_state()
 
     def reset_state(self) -> None:
@@ -665,6 +920,7 @@ class ApuFoundationModel:
         self.pulse2.reset_state()
         self.triangle.reset_state()
         self.noise.reset_state()
+        self.dmc.reset_state()
         self.channel_enable = 0
         self.mode_5_step = False
         self.irq_inhibit = False
@@ -697,6 +953,8 @@ class ApuFoundationModel:
             raise ValueError("cpu_write_data must be 8 bits")
         if not 0 <= inputs.channel_active <= 0x1F:
             raise ValueError("channel_active must be 5 bits")
+        if not 0 <= inputs.dmc_mem_read_data <= 0xFF:
+            raise ValueError("dmc_mem_read_data must be 8 bits")
 
     def evaluate(self, inputs: ApuInputs) -> ApuOutputs:
         """Evaluate event outputs from the state immediately before the edge."""
@@ -763,6 +1021,7 @@ class ApuFoundationModel:
             and next_cycle in (FOUR_STEP_IRQ_1, FOUR_STEP_HALF, FOUR_STEP_END)
         )
 
+        dmc_outputs = self.dmc.evaluate(DmcInputs(reset=inputs.reset))
         read_data = 0
         if status_read:
             pulse1_active = int(self.pulse1.evaluate(bool(self.channel_enable & 1)).active)
@@ -770,14 +1029,14 @@ class ApuFoundationModel:
             triangle_active = int(self.triangle.evaluate().active)
             noise_active = int(self.noise.evaluate(bool(self.channel_enable & 8)).active)
             read_data = (
-                (inputs.channel_active & 0x10)
+                ((int(dmc_outputs.active) | ((inputs.channel_active >> 4) & 1)) << 4)
                 | (noise_active << 3)
                 | (triangle_active << 2)
                 | (pulse2_active << 1)
                 | pulse1_active
             )
             read_data |= int(self.frame_irq_flag or irq_set) << 6
-            read_data |= int(inputs.dmc_irq_flag) << 7
+            read_data |= int(inputs.dmc_irq_flag or dmc_outputs.irq_flag) << 7
 
         effective_pulse1_enable = (
             bool(inputs.cpu_write_data & 0x01)
@@ -796,7 +1055,10 @@ class ApuFoundationModel:
         )
         return ApuOutputs(
             cpu_read_data=read_data,
-            irq=not inputs.reset and (self.frame_irq_flag or irq_set),
+            irq=(
+                not inputs.reset
+                and (self.frame_irq_flag or irq_set or dmc_outputs.irq_flag)
+            ),
             pulse1_output=self.pulse1.evaluate(effective_pulse1_enable).raw_output,
             pulse2_output=self.pulse2.evaluate(effective_pulse2_enable).raw_output,
             triangle_output=self.triangle.evaluate().raw_output,
@@ -807,6 +1069,9 @@ class ApuFoundationModel:
             channel_write_register=inputs.cpu_address & 0x1F,
             channel_write_data=inputs.cpu_write_data,
             dmc_irq_clear=status_write,
+            dmc_output=dmc_outputs.raw_output,
+            dmc_mem_request=dmc_outputs.mem_request,
+            dmc_mem_address=dmc_outputs.mem_address,
         )
 
     def clock(self, inputs: ApuInputs) -> tuple[ApuOutputs, ApuState]:
@@ -838,6 +1103,11 @@ class ApuFoundationModel:
             bool(inputs.cpu_write_data & 0x08)
             if status_write
             else bool(self.channel_enable & 0x08)
+        )
+        effective_dmc_enable = (
+            bool(inputs.cpu_write_data & 0x10)
+            if status_write
+            else bool(self.channel_enable & 0x10)
         )
         self.pulse1.clock(
             PulseInputs(
@@ -906,6 +1176,22 @@ class ApuFoundationModel:
                 write_data=outputs.channel_write_data,
                 quarter_frame_tick=outputs.quarter_frame_tick,
                 half_frame_tick=outputs.half_frame_tick,
+            )
+        )
+        self.dmc.clock(
+            DmcInputs(
+                reset=inputs.reset,
+                cpu_cycle_enable=inputs.cpu_cycle_enable,
+                enable=effective_dmc_enable,
+                status_write=status_write,
+                write=(
+                    outputs.channel_write
+                    and 0x10 <= outputs.channel_write_register <= 0x13
+                ),
+                write_register=outputs.channel_write_register & 0x03,
+                write_data=outputs.channel_write_data,
+                mem_acknowledge=inputs.dmc_mem_acknowledge,
+                mem_read_data=inputs.dmc_mem_read_data,
             )
         )
         if inputs.reset:
