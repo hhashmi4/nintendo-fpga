@@ -41,6 +41,7 @@ mkdir -p \
     build/verilator/nes_phase4d_dma_nmi \
     build/verilator/nes_phase4db_playable \
     build/verilator/nes_apu_mixer_phase5h \
+    build/verilator/nes_audio_phase5k \
     build/verilator/nes_runtime_loader_phase4fa \
     build/verilator/nes_runtime_cartridge_phase4fb \
     build/verilator/nes_runtime_image_phase4fc \
@@ -1204,6 +1205,22 @@ fi
 # its bounded captures and playable WAV files in ignored build output.
 scripts/run_apu_audio_phase5j.sh --full
 
+verilator --binary --timing --Wall -Wno-fatal \
+    -Wno-BLKSEQ -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
+    -Wno-PINCONNECTEMPTY --assert \
+    --Mdir build/verilator/nes_audio_phase5k \
+    --top-module nes_audio_phase5k_tb \
+    -o nes_audio_phase5k_tb \
+    rtl/audio/nes_audio_fir_coeff_pkg.sv \
+    rtl/audio/nes_audio_resampler.sv \
+    rtl/audio/nes_audio_conditioner.sv \
+    rtl/audio/audio_async_fifo.sv \
+    rtl/audio/wm8731_i2c_init.sv \
+    rtl/audio/wm8731_i2s_tx.sv \
+    sim/nes_audio_phase5k_tb.sv
+
+build/verilator/nes_audio_phase5k/nes_audio_phase5k_tb
+
 verilator --binary --timing --trace-fst --Wall \
     -Wno-UNUSEDPARAM -Wno-BLKSEQ \
     --assert \
@@ -1829,6 +1846,14 @@ PHASE4EC_TOP_RTL_FILES=(
     rtl/debug/nes_debugger_pkg.sv
     rtl/debug/nes_debug_command_cdc.sv
     rtl/debug/nes_debugger.sv
+    rtl/audio/nes_audio_fir_coeff_pkg.sv
+    rtl/audio/nes_audio_resampler.sv
+    rtl/audio/nes_audio_conditioner.sv
+    rtl/audio/audio_async_fifo.sv
+    rtl/audio/wm8731_i2c_init.sv
+    rtl/audio/wm8731_i2s_tx.sv
+    rtl/audio/audio_pll.sv
+    rtl/audio/nes_audio_output.sv
     rtl/de1_soc_nes_vga_top.sv
 )
 
@@ -1913,6 +1938,7 @@ echo "NES CPU/APU Phase 5I waveform: $ROOT_DIR/$NES_APU_CPU_PHASE5I_WAVEFORM"
 echo "NES CPU/APU Phase 5I ROMs: $ROOT_DIR/$NES_APU_CPU_PHASE5I_GAME_A_ROM $ROOT_DIR/$NES_APU_CPU_PHASE5I_GAME_B_ROM"
 echo "NES APU Phase 5J metrics: $ROOT_DIR/build/audio/phase5j_metrics.json"
 echo "NES APU Phase 5J original demo WAV: $ROOT_DIR/build/audio/phase5j_melody.wav"
+echo "NES real-time audio Phase 5K: directed and long-run checks passed"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

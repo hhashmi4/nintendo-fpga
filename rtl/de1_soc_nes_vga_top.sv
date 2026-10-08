@@ -37,7 +37,13 @@ module de1_soc_nes_vga_top #(
     output logic       VGA_VS,
     output logic       VGA_CLK,
     output logic       VGA_BLANK_N,
-    output logic       VGA_SYNC_N
+    output logic       VGA_SYNC_N,
+    output logic       AUD_XCK,
+    output logic       AUD_BCLK,
+    output logic       AUD_DACLRCK,
+    output logic       AUD_DACDAT,
+    inout  wire        FPGA_I2C_SCLK,
+    inout  wire        FPGA_I2C_SDAT
 `ifdef ALTERA_SYNTHESIS
     ,
     output wire [14:0] HPS_DDR3_ADDR,
@@ -231,6 +237,25 @@ module de1_soc_nes_vga_top #(
     // synthesis/timing qualification covers the mixer before any codec exists.
     (* preserve, noprune *) logic [19:0] apu_mixed_audio_retention;
     nes_apu_pkg::nes_apu_channel_mask_t apu_channel_enable;
+    logic audio_i2c_scl_drive_low;
+    logic audio_i2c_sda_drive_low;
+    (* preserve, noprune *) logic audio_pll_locked;
+    (* preserve, noprune *) logic codec_init_busy;
+    (* preserve, noprune *) logic codec_init_done;
+    (* preserve, noprune *) logic codec_init_error;
+    (* preserve, noprune *) logic [31:0] audio_diag_i2c_ack_count;
+    (* preserve, noprune *) logic [31:0] audio_diag_i2c_nack_count;
+    (* preserve, noprune *) logic [31:0] audio_diag_init_retry_count;
+    (* preserve, noprune *) logic [31:0] audio_diag_i2c_timeout_count;
+    (* preserve, noprune *) logic [31:0] audio_diag_samples_generated;
+    (* preserve, noprune *) logic [31:0] audio_diag_samples_transmitted;
+    (* preserve, noprune *) logic [31:0] audio_diag_fifo_underruns;
+    (* preserve, noprune *) logic [31:0] audio_diag_fifo_overruns;
+    (* preserve, noprune *) logic [31:0] audio_diag_saturation_count;
+    (* preserve, noprune *) logic [15:0] audio_diag_fifo_occupancy;
+    (* preserve, noprune *) logic [31:0] audio_diag_sample_rate;
+    (* preserve, noprune *) logic audio_diag_muted;
+    (* preserve, noprune *) logic [7:0] audio_diag_last_fault;
     logic dma_complete_event;
     logic dma_start_event;
     logic dma_read_event;
@@ -420,6 +445,47 @@ module de1_soc_nes_vga_top #(
                 debug_capture_pending <= 1'b1;
         end
     end
+
+    // SW0 remains the established video test-pattern control and also selects
+    // a separate 1 kHz audio diagnostic source for ROM-independent bring-up.
+    // Normal gameplay always consumes the proven nonlinear APU mixer output.
+    assign FPGA_I2C_SCLK = audio_i2c_scl_drive_low ? 1'b0 : 1'bz;
+    assign FPGA_I2C_SDAT = audio_i2c_sda_drive_low ? 1'b0 : 1'bz;
+
+    nes_audio_output audio_output (
+        .clk(CLOCK_50),
+        .reset(system_reset),
+        .source_reset(nes_functional_reset),
+        .input_tick(unused_apu_ce),
+        .mixed_audio(apu_mixed_audio),
+        .test_tone_enable(test_pattern_sys),
+        .codec_retry_request(1'b0),
+        .i2c_scl_in(FPGA_I2C_SCLK),
+        .i2c_sda_in(FPGA_I2C_SDAT),
+        .i2c_scl_drive_low(audio_i2c_scl_drive_low),
+        .i2c_sda_drive_low(audio_i2c_sda_drive_low),
+        .aud_xck(AUD_XCK),
+        .aud_bclk(AUD_BCLK),
+        .aud_daclrck(AUD_DACLRCK),
+        .aud_dacdat(AUD_DACDAT),
+        .audio_pll_locked(audio_pll_locked),
+        .codec_init_busy(codec_init_busy),
+        .codec_init_done(codec_init_done),
+        .codec_init_error(codec_init_error),
+        .diag_i2c_ack_count(audio_diag_i2c_ack_count),
+        .diag_i2c_nack_count(audio_diag_i2c_nack_count),
+        .diag_init_retry_count(audio_diag_init_retry_count),
+        .diag_i2c_timeout_count(audio_diag_i2c_timeout_count),
+        .diag_samples_generated(audio_diag_samples_generated),
+        .diag_samples_transmitted(audio_diag_samples_transmitted),
+        .diag_fifo_underruns(audio_diag_fifo_underruns),
+        .diag_fifo_overruns(audio_diag_fifo_overruns),
+        .diag_saturation_count(audio_diag_saturation_count),
+        .diag_fifo_occupancy(audio_diag_fifo_occupancy),
+        .diag_sample_rate(audio_diag_sample_rate),
+        .diag_muted(audio_diag_muted),
+        .diag_last_fault(audio_diag_last_fault)
+    );
 
 
     video_pll pixel_clock_source (

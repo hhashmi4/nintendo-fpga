@@ -32,6 +32,20 @@ module nes_debugger_playable_tb;
     logic vga_clk;
     logic vga_blank_n;
     logic vga_sync_n;
+    logic aud_xck;
+    logic aud_bclk;
+    logic aud_daclrck;
+    logic aud_dacdat;
+    /* verilator lint_off SYNCASYNCNET */
+    tri1 fpga_i2c_sclk;
+    tri1 fpga_i2c_sdat;
+    /* verilator lint_on SYNCASYNCNET */
+    logic audio_codec_ack_low = 1'b0;
+    logic audio_i2c_transaction = 1'b0;
+    logic audio_i2c_scl_previous = 1'b1;
+    logic audio_i2c_sda_previous = 1'b1;
+    integer audio_i2c_clock = 0;
+    assign fpga_i2c_sdat = audio_codec_ack_low ? 1'b0 : 1'bz;
 
     logic [8:0] shadow0 [0:61439];
     logic [8:0] shadow1 [0:61439];
@@ -161,6 +175,33 @@ module nes_debugger_playable_tb;
 
     always #10 clock_50 = !clock_50;
 
+    // ACK all three control bytes so the production audio path is active
+    // while debugger run/pause behavior is exercised.
+    always @(fpga_i2c_sclk or fpga_i2c_sdat) begin
+        if (audio_i2c_sda_previous && !fpga_i2c_sdat &&
+            audio_i2c_scl_previous && fpga_i2c_sclk &&
+            !audio_i2c_transaction) begin
+            audio_i2c_transaction = 1'b1;
+            audio_i2c_clock = 0;
+            audio_codec_ack_low = 1'b0;
+        end else if (!audio_i2c_sda_previous && fpga_i2c_sdat &&
+                     audio_i2c_scl_previous && fpga_i2c_sclk &&
+                     audio_i2c_transaction) begin
+            audio_i2c_transaction = 1'b0;
+            audio_codec_ack_low = 1'b0;
+        end else if (audio_i2c_scl_previous && !fpga_i2c_sclk &&
+                     audio_i2c_transaction) begin
+            audio_codec_ack_low = (audio_i2c_clock == 8) ||
+                                  (audio_i2c_clock == 17) ||
+                                  (audio_i2c_clock == 26);
+        end else if (!audio_i2c_scl_previous && fpga_i2c_sclk &&
+                     audio_i2c_transaction) begin
+            audio_i2c_clock = audio_i2c_clock + 1;
+        end
+        audio_i2c_scl_previous = fpga_i2c_sclk;
+        audio_i2c_sda_previous = fpga_i2c_sdat;
+    end
+
     de1_soc_nes_vga_top #(
         .DEVELOPER_MODE_DEFAULT(1'b1),
         .PRG_INIT_FILE("build/cartridge/phase4db_playable_nrom128.prg.hex"),
@@ -174,7 +215,10 @@ module nes_debugger_playable_tb;
         .HEX3(hex3), .HEX4(hex4), .HEX5(hex5),
         .VGA_R(vga_r), .VGA_G(vga_g), .VGA_B(vga_b),
         .VGA_HS(vga_hs), .VGA_VS(vga_vs), .VGA_CLK(vga_clk),
-        .VGA_BLANK_N(vga_blank_n), .VGA_SYNC_N(vga_sync_n)
+        .VGA_BLANK_N(vga_blank_n), .VGA_SYNC_N(vga_sync_n),
+        .AUD_XCK(aud_xck), .AUD_BCLK(aud_bclk),
+        .AUD_DACLRCK(aud_daclrck), .AUD_DACDAT(aud_dacdat),
+        .FPGA_I2C_SCLK(fpga_i2c_sclk), .FPGA_I2C_SDAT(fpga_i2c_sdat)
     );
 
     task automatic set_buttons(input logic [7:0] buttons);
@@ -363,6 +407,7 @@ module nes_debugger_playable_tb;
     initial begin
         integer game_x, baseline_frames, baseline_polls, baseline_dmas, baseline_nmi;
         integer displayed_x, old_displayed_x;
+        integer paused_audio_start;
         logic [15:0] frozen_pc;
         logic [17:0] frozen_ppu;
         logic [20:0] frozen_apu;
@@ -383,6 +428,7 @@ module nes_debugger_playable_tb;
                     dut.apu.frame_reset_pending, dut.apu.frame_reset_delay};
         baseline_frames=source_frames; baseline_polls=controller_polls;
         baseline_dmas=dma_completions; baseline_nmi=nmi_events;
+        paused_audio_start=32'(dut.audio_diag_samples_generated);
         // Ten whole VGA frames while NES is paused: page selection, coherent
         // heartbeat snapshots, scanout, and health must all stay live.
         for(integer p=0;p<10;p++) begin
@@ -397,6 +443,8 @@ module nes_debugger_playable_tb;
             assert(!dut.debug_snapshot_stale);
             if(p>1) assert(dut.debug_destination_snapshot.debugger.state==DBG_PAUSED);
         end
+        assert(32'(dut.audio_diag_samples_generated) >
+               paused_audio_start + 1000);
         frozen_bank=dut.framebuffer_read_bank;
         capture_real_combined_frame();
         assert(dut.framebuffer_read_bank==frozen_bank);
@@ -465,6 +513,10 @@ module nes_debugger_playable_tb;
         assert(dma_reads==dma_completions*256 && dma_writes==dma_completions*256);
         assert(apu_dma_advances>dma_completions*500);
         assert(!dut.debug_snapshot_stale && !dut.write_sequence_error && !dut.write_range_error);
+        assert(dut.codec_init_done && !dut.codec_init_error);
+        assert(dut.audio_diag_samples_transmitted > 32'd1000);
+        assert(dut.audio_diag_fifo_overruns == 0);
+        assert(dut.audio_diag_fifo_underruns == 0);
         $display("PASS: playable debugger mixed long run frames=%0d commands=%0d acknowledgements=%0d I=%0d F=%0d NMI=%0d entries=%0d DMA=%0d polls=%0d pages=%0d snapshots=%0d deferred_frames=%0d",source_frames,commands,acknowledgements,dut.debugger_status.instruction_steps,dut.debugger_status.frame_steps,nmi_events,irq_entries,dma_completions,controller_polls,page_changes,snapshot_updates,deferred_frames);
         // Shared KEY0 reset restores RUNNING, sequence/counters zero, no token.
         force dut.debugger_request_valid=1'b0;

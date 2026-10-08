@@ -3,9 +3,19 @@ create_clock -name CLOCK_50 -period 20.000 [get_ports {CLOCK_50}]
 derive_pll_clocks
 
 set vga_domain_clocks [get_clocks {*pixel_clock_pll*}]
-set vga_pixel_clock [get_clocks {*PLL_OUTPUT_COUNTER|divclk}]
+set vga_pixel_clock [get_clocks {
+    *pixel_clock_source*PLL_OUTPUT_COUNTER|divclk
+}]
 if {[get_collection_size $vga_pixel_clock] != 1} {
     post_message -type error "Phase 3K VGA PLL clock was not discovered"
+}
+
+set audio_domain_clocks [get_clocks {*audio_clock_source*}]
+set audio_master_clock [get_clocks {
+    *audio_clock_source*PLL_OUTPUT_COUNTER|divclk
+}]
+if {[get_collection_size $audio_master_clock] != 1} {
+    post_message -type error "Phase 5K 12.000 MHz audio PLL clock was not discovered"
 }
 
 # The frame memory is an intentional dual-clock CDC. Toggle handshakes and
@@ -13,6 +23,12 @@ if {[get_collection_size $vga_pixel_clock] != 1} {
 set_clock_groups -asynchronous \
     -group [get_clocks {CLOCK_50}] \
     -group $vga_domain_clocks
+set_clock_groups -asynchronous \
+    -group [get_clocks {CLOCK_50}] \
+    -group $audio_domain_clocks
+set_clock_groups -asynchronous \
+    -group $vga_domain_clocks \
+    -group $audio_domain_clocks
 
 # Platform Designer constrains the HPS-generated loader/MMIO clock at its hard
 # HPS source pin. It is asynchronous to both board oscillators. HPS-to-loader
@@ -25,6 +41,9 @@ if {[get_collection_size $hps_loader_clocks] != 1} {
 set_clock_groups -asynchronous \
     -group $hps_loader_clocks \
     -group $vga_domain_clocks
+set_clock_groups -asynchronous \
+    -group $hps_loader_clocks \
+    -group $audio_domain_clocks
 
 # The HPS peripheral pins terminate in Cyclone V hard-HPS I/O rather than FPGA
 # fabric. Platform Designer emits these false paths for its generated wrapper
@@ -99,6 +118,23 @@ set_max_delay 20.000 \
 # KEY0 asserts reset asynchronously; every slide switch enters a two-flop
 # synchronizer before its value is used in the corresponding clock domain.
 set_false_path -from [get_ports {KEY0 SW0 SW1 SW2 SW3 SW4 SW5 SW6 SW7 SW8 SW9}]
+
+# WM8731 slave-mode signals are generated from audio_clk with clock enables:
+# XCK=12 MHz. A 64/125 half-edge accumulator gives BCLK=3.072 MHz and
+# LRCK=BCLK/64=48 kHz exactly in the codec's 250fs USB mode. The datasheet
+# requires data/LRCK changes on falling BCLK and samples on rising BCLK;
+# ten nanoseconds is a conservative board-level output budget.
+set_output_delay -clock $audio_master_clock -max 10.000 \
+    [get_ports {AUD_BCLK AUD_DACLRCK AUD_DACDAT}]
+set_output_delay -clock $audio_master_clock -min -2.000 \
+    [get_ports {AUD_BCLK AUD_DACLRCK AUD_DACDAT}]
+set_false_path -to [get_ports {AUD_XCK}]
+
+# The 100 kHz open-drain control bus is sampled near the middle of each
+# half-cycle, thousands of fabric cycles after codec transitions.  It is an
+# explicitly asynchronous external control interface, not an audio clock.
+set_false_path -from [get_ports {FPGA_I2C_SCLK FPGA_I2C_SDAT}]
+set_false_path -to [get_ports {FPGA_I2C_SCLK FPGA_I2C_SDAT}]
 
 # Give the external ADV7123 RGB/sync inputs a conservative eight-nanosecond
 # setup budget. VGA_CLK is the inverted pixel clock, providing a half-cycle of

@@ -14,6 +14,14 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_dmc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_mixer_lut_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_mixer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/nes_audio_fir_coeff_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/nes_audio_resampler.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/nes_audio_conditioner.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/audio_async_fifo.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/wm8731_i2c_init.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/wm8731_i2s_tx.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/audio_pll.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/nes_audio_output.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_page_select.sv
@@ -107,6 +115,22 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW6
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW7
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW8
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW9
+
+# Terasic DE1-SoC rev. F/G WM8731 and FPGA-side I2C assignments.  These are
+# copied from the official System CD DE1_SoC_Audio.qsf and User Manual tables
+# 3-12/3-13; the codec is an FPGA-clocked slave in this design.
+set_location_assignment PIN_G7  -to AUD_XCK
+set_location_assignment PIN_H7  -to AUD_BCLK
+set_location_assignment PIN_H8  -to AUD_DACLRCK
+set_location_assignment PIN_J7  -to AUD_DACDAT
+set_location_assignment PIN_J12 -to FPGA_I2C_SCLK
+set_location_assignment PIN_K12 -to FPGA_I2C_SDAT
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUD_XCK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUD_BCLK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUD_DACLRCK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUD_DACDAT
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_I2C_SCLK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to FPGA_I2C_SDAT
 
 set_location_assignment PIN_A13 -to VGA_R[0]
 set_location_assignment PIN_C13 -to VGA_R[1]

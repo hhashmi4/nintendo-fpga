@@ -30,6 +30,20 @@ module nes_vga_phase4ec_tb;
     logic vga_clk;
     logic vga_blank_n;
     logic vga_sync_n;
+    logic aud_xck;
+    logic aud_bclk;
+    logic aud_daclrck;
+    logic aud_dacdat;
+    /* verilator lint_off SYNCASYNCNET */
+    tri1 fpga_i2c_sclk;
+    tri1 fpga_i2c_sdat;
+    /* verilator lint_on SYNCASYNCNET */
+    logic audio_codec_ack_low = 1'b0;
+    logic audio_i2c_transaction = 1'b0;
+    logic audio_i2c_scl_previous = 1'b1;
+    logic audio_i2c_sda_previous = 1'b1;
+    integer audio_i2c_clock = 0;
+    assign fpga_i2c_sdat = audio_codec_ack_low ? 1'b0 : 1'bz;
 
     logic [8:0] shadow0 [0:61439];
     logic [8:0] shadow1 [0:61439];
@@ -51,6 +65,34 @@ module nes_vga_phase4ec_tb;
 
     always #10 clock_50 = !clock_50;
 
+    // Minimal WM8731 control-bus responder.  The directed Phase 5K testbench
+    // checks every register byte; this retained production-top test supplies
+    // the three ACK slots so the complete live audio path can leave mute.
+    always @(fpga_i2c_sclk or fpga_i2c_sdat) begin
+        if (audio_i2c_sda_previous && !fpga_i2c_sdat &&
+            audio_i2c_scl_previous && fpga_i2c_sclk &&
+            !audio_i2c_transaction) begin
+            audio_i2c_transaction = 1'b1;
+            audio_i2c_clock = 0;
+            audio_codec_ack_low = 1'b0;
+        end else if (!audio_i2c_sda_previous && fpga_i2c_sdat &&
+                     audio_i2c_scl_previous && fpga_i2c_sclk &&
+                     audio_i2c_transaction) begin
+            audio_i2c_transaction = 1'b0;
+            audio_codec_ack_low = 1'b0;
+        end else if (audio_i2c_scl_previous && !fpga_i2c_sclk &&
+                     audio_i2c_transaction) begin
+            audio_codec_ack_low = (audio_i2c_clock == 8) ||
+                                  (audio_i2c_clock == 17) ||
+                                  (audio_i2c_clock == 26);
+        end else if (!audio_i2c_scl_previous && fpga_i2c_sclk &&
+                     audio_i2c_transaction) begin
+            audio_i2c_clock = audio_i2c_clock + 1;
+        end
+        audio_i2c_scl_previous = fpga_i2c_sclk;
+        audio_i2c_sda_previous = fpga_i2c_sdat;
+    end
+
     de1_soc_nes_vga_top #(
         .DEVELOPER_MODE_DEFAULT(1'b1),
         .PRG_INIT_FILE("build/cartridge/phase4db_playable_nrom128.prg.hex"),
@@ -64,7 +106,10 @@ module nes_vga_phase4ec_tb;
         .HEX3(hex3), .HEX4(hex4), .HEX5(hex5),
         .VGA_R(vga_r), .VGA_G(vga_g), .VGA_B(vga_b),
         .VGA_HS(vga_hs), .VGA_VS(vga_vs), .VGA_CLK(vga_clk),
-        .VGA_BLANK_N(vga_blank_n), .VGA_SYNC_N(vga_sync_n)
+        .VGA_BLANK_N(vga_blank_n), .VGA_SYNC_N(vga_sync_n),
+        .AUD_XCK(aud_xck), .AUD_BCLK(aud_bclk),
+        .AUD_DACLRCK(aud_daclrck), .AUD_DACDAT(aud_dacdat),
+        .FPGA_I2C_SCLK(fpga_i2c_sclk), .FPGA_I2C_SDAT(fpga_i2c_sdat)
     );
 
     task automatic set_buttons(input logic [7:0] buttons);
@@ -357,14 +402,22 @@ module nes_vga_phase4ec_tb;
         assert (controller_polls > starting_poll);
         assert (snapshot_updates >= 60);
         assert (cpu_state_changes > 0);
+        assert (dut.codec_init_done && !dut.codec_init_error);
+        assert (dut.audio_diag_i2c_ack_count == 32'd30);
+        assert (dut.audio_diag_samples_generated > 32'd1000);
+        assert (dut.audio_diag_samples_transmitted > 32'd1000);
+        assert (dut.audio_diag_fifo_overruns == 0);
+        assert (dut.audio_diag_fifo_underruns == 0);
 
         $display("PASS: Phase 4E-C/D playable ROM + coherent multi-page side panel integration");
-        $display("system=%0d ppu=%0d frames=%0d snapshots=%0d nmi=%0d dma=%0d polls=%0d cpu_state_changes=%0d page_changes=%0d pixels=%0d sprite=%0d->%0d",
+        $display("system=%0d ppu=%0d frames=%0d snapshots=%0d nmi=%0d dma=%0d polls=%0d cpu_state_changes=%0d page_changes=%0d pixels=%0d sprite=%0d->%0d audio_generated=%0d audio_transmitted=%0d",
                  system_cycles, ppu_ticks,
                  dut.debug_destination_snapshot.system.source_frame_number,
                  snapshot_updates, nmi_events, dma_completions,
                  controller_polls, cpu_state_changes, page_changes, combined_pixels,
-                 first_sprite_x, second_sprite_x);
+                 first_sprite_x, second_sprite_x,
+                 dut.audio_diag_samples_generated,
+                 dut.audio_diag_samples_transmitted);
         $finish;
     end
 
