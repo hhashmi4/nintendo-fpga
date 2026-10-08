@@ -43,6 +43,7 @@ module nes_apu (
     output logic [3:0]  triangle_output,
     output logic [3:0]  noise_output,
     output logic [6:0]  dmc_output,
+    output logic [19:0] mixed_audio,
 
     // Architectural/debug state used by verification and future snapshots.
     output nes_apu_pkg::nes_apu_frame_mode_t frame_mode,
@@ -362,6 +363,17 @@ module nes_apu (
         .timer_counter()
     );
     /* verilator lint_on PINCONNECTEMPTY */
+
+    nes_apu_mixer mixer (
+        .clk(clk),
+        .reset(reset),
+        .pulse1_output(pulse1_output),
+        .pulse2_output(pulse2_output),
+        .triangle_output(triangle_output),
+        .noise_output(noise_output),
+        .dmc_output(dmc_output),
+        .mixed_audio(mixed_audio)
+    );
 
     always_ff @(posedge clk) begin
         if (reset) begin

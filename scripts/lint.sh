@@ -110,6 +110,8 @@ APU_RTL_FILES=(
     rtl/apu/nes_apu_triangle.sv
     rtl/apu/nes_apu_noise.sv
     rtl/apu/nes_apu_dmc.sv
+    rtl/apu/nes_apu_mixer_lut_pkg.sv
+    rtl/apu/nes_apu_mixer.sv
     rtl/apu/nes_apu.sv
 )
 

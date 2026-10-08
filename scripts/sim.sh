@@ -40,6 +40,7 @@ mkdir -p \
     build/verilator/nes_phase4d_dma_integration \
     build/verilator/nes_phase4d_dma_nmi \
     build/verilator/nes_phase4db_playable \
+    build/verilator/nes_apu_mixer_phase5h \
     build/verilator/nes_runtime_loader_phase4fa \
     build/verilator/nes_runtime_cartridge_phase4fb \
     build/verilator/nes_runtime_image_phase4fc \
@@ -179,6 +180,8 @@ NES_APU_DMC_PHASE5F_WAVEFORM="build/sim/nes_apu_dmc_phase5f.fst"
 NES_APU_DMC_PHASE5F_REFERENCE="build/sim/nes_apu_dmc_phase5f_reference.txt"
 NES_APU_COMPLETE_PHASE5G_WAVEFORM="build/sim/nes_apu_complete_phase5g.fst"
 NES_APU_COMPLETE_PHASE5G_REFERENCE="build/sim/nes_apu_complete_phase5g_reference.txt"
+NES_APU_MIXER_PHASE5H_WAVEFORM="build/sim/nes_apu_mixer_phase5h.fst"
+NES_APU_MIXER_PHASE5H_REFERENCE="build/sim/nes_apu_mixer_phase5h_reference.txt"
 NES_DMC_DMA_PHASE5F_WAVEFORM="build/sim/nes_dmc_dma_phase5f.fst"
 NES_DMC_SYSTEM_PHASE5F_WAVEFORM="build/sim/nes_dmc_system_phase5f.fst"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
@@ -293,6 +296,8 @@ rm -f \
     "$NES_APU_DMC_PHASE5F_REFERENCE" \
     "$NES_APU_COMPLETE_PHASE5G_WAVEFORM" \
     "$NES_APU_COMPLETE_PHASE5G_REFERENCE" \
+    "$NES_APU_MIXER_PHASE5H_WAVEFORM" \
+    "$NES_APU_MIXER_PHASE5H_REFERENCE" \
     "$NES_DMC_DMA_PHASE5F_WAVEFORM" \
     "$NES_DMC_SYSTEM_PHASE5F_WAVEFORM" \
     "$CPU_WAVEFORM" \
@@ -344,6 +349,8 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
     rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu_mixer_lut_pkg.sv \
+    rtl/apu/nes_apu_mixer.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_phase5a_tb.sv
 
@@ -386,6 +393,8 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
     rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu_mixer_lut_pkg.sv \
+    rtl/apu/nes_apu_mixer.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_pulse2_phase5c_tb.sv
 
@@ -409,6 +418,8 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
     rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu_mixer_lut_pkg.sv \
+    rtl/apu/nes_apu_mixer.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_triangle_phase5d_tb.sv
 
@@ -432,6 +443,8 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
     rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu_mixer_lut_pkg.sv \
+    rtl/apu/nes_apu_mixer.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_noise_phase5e_tb.sv
 
@@ -474,6 +487,8 @@ verilator --binary --timing --trace-fst --Wall -Wno-UNUSEDPARAM \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
     rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu_mixer_lut_pkg.sv \
+    rtl/apu/nes_apu_mixer.sv \
     rtl/apu/nes_apu.sv \
     sim/nes_apu_complete_phase5g_tb.sv
 
@@ -481,6 +496,26 @@ build/verilator/nes_apu_complete_phase5g/nes_apu_complete_phase5g_tb
 
 if [[ ! -s "$NES_APU_COMPLETE_PHASE5G_WAVEFORM" ]]; then
     echo "ERROR: Phase 5G complete APU waveform is missing" >&2
+    exit 1
+fi
+
+python3 scripts/generate_apu_mixer_luts.py --check
+python3 scripts/generate_apu_mixer_phase5h_vectors.py \
+    "$NES_APU_MIXER_PHASE5H_REFERENCE"
+
+verilator --binary --timing --trace-fst --Wall \
+    --assert \
+    --Mdir build/verilator/nes_apu_mixer_phase5h \
+    --top-module nes_apu_mixer_phase5h_tb \
+    -o nes_apu_mixer_phase5h_tb \
+    rtl/apu/nes_apu_mixer_lut_pkg.sv \
+    rtl/apu/nes_apu_mixer.sv \
+    sim/nes_apu_mixer_phase5h_tb.sv
+
+build/verilator/nes_apu_mixer_phase5h/nes_apu_mixer_phase5h_tb
+
+if [[ ! -s "$NES_APU_MIXER_PHASE5H_WAVEFORM" ]]; then
+    echo "ERROR: Phase 5H mixer waveform is missing" >&2
     exit 1
 fi
 
@@ -1099,6 +1134,8 @@ verilator --binary --timing --trace-fst --Wall -Wno-fatal \
     rtl/apu/nes_apu_triangle.sv \
     rtl/apu/nes_apu_noise.sv \
     rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu_mixer_lut_pkg.sv \
+    rtl/apu/nes_apu_mixer.sv \
     rtl/apu/nes_apu.sv \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader.sv \
@@ -1708,6 +1745,8 @@ PHASE4EC_TOP_RTL_FILES=(
     rtl/apu/nes_apu_triangle.sv
     rtl/apu/nes_apu_noise.sv
     rtl/apu/nes_apu_dmc.sv
+    rtl/apu/nes_apu_mixer_lut_pkg.sv
+    rtl/apu/nes_apu_mixer.sv
     rtl/apu/nes_apu.sv
     rtl/platform/platform_config_pkg.sv
     rtl/platform/reset_sync.sv
@@ -1816,6 +1855,7 @@ echo "NES APU Triangle Phase 5D waveform: $ROOT_DIR/$NES_APU_TRIANGLE_PHASE5D_WA
 echo "NES APU Noise Phase 5E waveform: $ROOT_DIR/$NES_APU_NOISE_PHASE5E_WAVEFORM"
 echo "NES APU DMC Phase 5F waveform: $ROOT_DIR/$NES_APU_DMC_PHASE5F_WAVEFORM"
 echo "NES complete APU Phase 5G waveform: $ROOT_DIR/$NES_APU_COMPLETE_PHASE5G_WAVEFORM"
+echo "NES nonlinear mixer Phase 5H waveform: $ROOT_DIR/$NES_APU_MIXER_PHASE5H_WAVEFORM"
 echo "NES DMC DMA Phase 5F waveform: $ROOT_DIR/$NES_DMC_DMA_PHASE5F_WAVEFORM"
 echo "NES DMC system Phase 5F waveform: $ROOT_DIR/$NES_DMC_SYSTEM_PHASE5F_WAVEFORM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"

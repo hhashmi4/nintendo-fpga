@@ -95,8 +95,11 @@ OAM-DMA arbitration through the runtime Mapper-0 path. Phase 5G closes the
 complete raw APU with all-five-channel full-state comparison, exhaustive
 `$4015` composition, frame/DMC IRQ interaction, frame-event collisions,
 debugger/reset behavior, systematic DMC/OAM/controller stress, and runtime
-NROM-128/NROM-256 replacement coverage. Final nonlinear mixing, CPU IRQ
-consumption, resampling, and codec output remain later Phase 5 work.
+NROM-128/NROM-256 replacement coverage. Phase 5H adds the nonlinear pulse and
+Triangle/Noise/DMC mixer, an unsigned Q0.20 output, reproducible lookup tables,
+exhaustive separated-domain verification, and cycle-by-cycle complete-APU
+comparison. CPU IRQ consumption, resampling, and codec output remain later
+Phase 5 work.
 
 ## Phase 1 foundation
 
@@ -909,6 +912,25 @@ Architecture audit, deferred-issue inventory, event ordering, integration
 coverage, baseline, and qualification results are documented in
 [`docs/apu-phase5g-completion.md`](docs/apu-phase5g-completion.md).
 
+## Phase 5H — nonlinear APU mixer
+
+- Documented NES nonlinear pulse and TND equations, cross-checked against
+  NESdev and Mesen
+- Unsigned Q0.20 output with exact zero silence, deterministic rounding,
+  explicit full-scale saturation, and no DC centering
+- Exact 31-entry pulse LUT plus a Q12 weighted TND drive and 393-segment
+  half-unit interpolated LUT; deterministic one-cycle lookup pipeline
+- Exhaustive 256-pair pulse and 32,768-point TND RTL comparison, complete
+  monotonicity/symmetry/range checks, and all-domain numerical error analysis
+- Preserved raw channel outputs and a complete-APU comparison that checks the
+  one-cycle-aligned mixed result at every pre- and post-edge observation
+- Mixer only; no IRQ consumption, PCM/resampling, WAV, I2S, HDMI audio, or
+  board codec integration
+
+The numerical model, implementation tradeoffs, proof strategy, error budget,
+and qualification results are documented in
+[`docs/apu-phase5h-mixer.md`](docs/apu-phase5h-mixer.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -950,7 +972,8 @@ caching, concurrency, and timeout are documented in
 This runs pytest, synthesizable RTL lint, the Phase 5A APU foundation, Phase 5B
 Pulse 1, Phase 5C dual-pulse, Phase 5D three-channel Triangle, Phase 5E
 four-channel Noise, Phase 5F DMC oracle/RTL and DMA/system comparisons, and the
-Phase 5G complete-APU full-state comparison and interaction closure,
+Phase 5G complete-APU full-state comparison and interaction closure, plus the
+Phase 5H exhaustive nonlinear mixer and mixed-output integration comparisons,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -1149,8 +1172,7 @@ before use.
 - `rtl/cartridge` — build-time and runtime Mapper 0/NROM cartridge storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — coordinated standalone OAM and DMC DMA timing engines
-- `rtl/apu` — APU frame/status logic plus Pulse 1, Pulse 2, Triangle, Noise,
-  and DMC channels
+- `rtl/apu` — APU frame/status logic, five channels, and nonlinear mixer
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
 - `rtl/loader` — runtime-loader protocol, manifest, and transfer validation
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion

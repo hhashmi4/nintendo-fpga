@@ -11,6 +11,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_pulse.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_triangle.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_noise.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_dmc.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_mixer_lut_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu_mixer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/apu/nes_apu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_snapshot.sv
