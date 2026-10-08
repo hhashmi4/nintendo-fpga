@@ -98,7 +98,10 @@ debugger/reset behavior, systematic DMC/OAM/controller stress, and runtime
 NROM-128/NROM-256 replacement coverage. Phase 5H adds the nonlinear pulse and
 Triangle/Noise/DMC mixer, an unsigned Q0.20 output, reproducible lookup tables,
 exhaustive separated-domain verification, and cycle-by-cycle complete-APU
-comparison. CPU IRQ consumption, resampling, and codec output remain later
+comparison. Phase 5I connects the combined frame/DMC APU IRQ to the real CPU,
+proves hardware interrupt entry and RTI with legal runtime-loaded test ROMs,
+and closes IRQ/NMI/BRK, DMA/controller, debugger, replacement-reset, and
+five-channel mixed-audio integration. Resampling and codec output remain later
 Phase 5 work.
 
 ## Phase 1 foundation
@@ -931,6 +934,27 @@ The numerical model, implementation tradeoffs, proof strategy, error budget,
 and qualification results are documented in
 [`docs/apu-phase5h-mixer.md`](docs/apu-phase5h-mixer.md).
 
+## Phase 5I — CPU/APU system integration
+
+- Production `apu_irq` connection to the CPU's synchronized, level-sensitive
+  IRQ input with independent frame/DMC acknowledgement behavior
+- Actual CPU instruction-boundary masking, `$FFFE/$FFFF` vector fetch, stack
+  pushes, handler execution, RTI, level re-entry, and resumed foreground code
+- Actual PPU NMI priority over pending APU IRQ plus preserved BRK B-flag,
+  PC+2, shared-vector, and RTI semantics
+- Exactly-once `$4000-$4013/$4015/$4017` accesses while preserving `$4014`,
+  `$4016`, and direction-split `$4017`
+- Generated legal runtime-loaded NROM-128 games covering frame-only, DMC-only,
+  both-source clear orders, masked pending IRQ, DMC/OAM collisions, debugger
+  pause/step/frame-step, and reset-clean Game A to Game B replacement
+- Real five-channel CPU-programmed operation with the retained Q0.20 mixer
+  oracle, 1,900 Python tests, and a 685,592-cycle system run with zero mismatches
+- No PCM resampling, WAV, I2S/HDMI, or board-codec work in this phase
+
+Architecture, interrupt traces, DMA/debugger/runtime behavior, verification,
+production timing/resources, and remaining accuracy limits are documented in
+[`docs/apu-phase5i-cpu-integration.md`](docs/apu-phase5i-cpu-integration.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -974,6 +998,7 @@ Pulse 1, Phase 5C dual-pulse, Phase 5D three-channel Triangle, Phase 5E
 four-channel Noise, Phase 5F DMC oracle/RTL and DMA/system comparisons, and the
 Phase 5G complete-APU full-state comparison and interaction closure, plus the
 Phase 5H exhaustive nonlinear mixer and mixed-output integration comparisons,
+the Phase 5I CPU/APU/runtime interrupt integration ROM,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
