@@ -67,6 +67,7 @@ mkdir -p \
     build/verilator/nes_apu_complete_phase5g \
     build/verilator/nes_dmc_dma_phase5f \
     build/verilator/nes_dmc_system_phase5f \
+    build/verilator/nes_apu_cpu_phase5i \
     build/verilator/cpu \
     build/verilator/alu \
     build/verilator/address \
@@ -184,6 +185,12 @@ NES_APU_MIXER_PHASE5H_WAVEFORM="build/sim/nes_apu_mixer_phase5h.fst"
 NES_APU_MIXER_PHASE5H_REFERENCE="build/sim/nes_apu_mixer_phase5h_reference.txt"
 NES_DMC_DMA_PHASE5F_WAVEFORM="build/sim/nes_dmc_dma_phase5f.fst"
 NES_DMC_SYSTEM_PHASE5F_WAVEFORM="build/sim/nes_dmc_system_phase5f.fst"
+NES_APU_CPU_PHASE5I_WAVEFORM="build/sim/nes_apu_cpu_phase5i.fst"
+NES_APU_CPU_PHASE5I_GAME_A_HEX="build/sim/phase5i_game_a.prg.hex"
+NES_APU_CPU_PHASE5I_GAME_B_HEX="build/sim/phase5i_game_b.prg.hex"
+NES_APU_CPU_PHASE5I_GAME_A_ROM="build/sim/phase5i_game_a.nes"
+NES_APU_CPU_PHASE5I_GAME_B_ROM="build/sim/phase5i_game_b.nes"
+NES_APU_CPU_PHASE5I_REFERENCE="build/sim/phase5i_rom_reference.txt"
 CPU_WAVEFORM="build/sim/cpu_phase2a.fst"
 ALU_WAVEFORM="build/sim/cpu_alu.fst"
 ADDRESS_WAVEFORM="build/sim/cpu_address_gen.fst"
@@ -300,6 +307,12 @@ rm -f \
     "$NES_APU_MIXER_PHASE5H_REFERENCE" \
     "$NES_DMC_DMA_PHASE5F_WAVEFORM" \
     "$NES_DMC_SYSTEM_PHASE5F_WAVEFORM" \
+    "$NES_APU_CPU_PHASE5I_WAVEFORM" \
+    "$NES_APU_CPU_PHASE5I_GAME_A_HEX" \
+    "$NES_APU_CPU_PHASE5I_GAME_B_HEX" \
+    "$NES_APU_CPU_PHASE5I_GAME_A_ROM" \
+    "$NES_APU_CPU_PHASE5I_GAME_B_ROM" \
+    "$NES_APU_CPU_PHASE5I_REFERENCE" \
     "$CPU_WAVEFORM" \
     "$ALU_WAVEFORM" \
     "$ADDRESS_WAVEFORM" \
@@ -1153,6 +1166,40 @@ if [[ ! -s "$NES_DMC_SYSTEM_PHASE5F_WAVEFORM" ]]; then
     exit 1
 fi
 
+python3 scripts/generate_apu_cpu_phase5i_roms.py --output-dir build/sim
+
+verilator --binary --timing --trace-fst --Wall -Wno-fatal \
+    -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL -Wno-BLKSEQ \
+    --assert \
+    --Mdir build/verilator/nes_apu_cpu_phase5i \
+    --top-module nes_apu_cpu_phase5i_tb \
+    -o nes_apu_cpu_phase5i_tb \
+    rtl/apu/nes_apu_pkg.sv \
+    rtl/apu/nes_apu_pulse.sv \
+    rtl/apu/nes_apu_triangle.sv \
+    rtl/apu/nes_apu_noise.sv \
+    rtl/apu/nes_apu_dmc.sv \
+    rtl/apu/nes_apu_mixer_lut_pkg.sv \
+    rtl/apu/nes_apu_mixer.sv \
+    rtl/apu/nes_apu.sv \
+    rtl/loader/nes_runtime_loader_pkg.sv \
+    rtl/loader/nes_runtime_loader.sv \
+    rtl/cartridge/nes_runtime_cartridge_storage.sv \
+    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_cartridge.sv \
+    "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/controller/nes_controller.sv \
+    sim/nes_apu_cpu_phase5i_tb.sv
+
+build/verilator/nes_apu_cpu_phase5i/nes_apu_cpu_phase5i_tb
+
+if [[ ! -s "$NES_APU_CPU_PHASE5I_WAVEFORM" ||
+      ! -s "$NES_APU_CPU_PHASE5I_GAME_A_ROM" ||
+      ! -s "$NES_APU_CPU_PHASE5I_GAME_B_ROM" ]]; then
+    echo "ERROR: Phase 5I CPU/APU integration artifacts are missing" >&2
+    exit 1
+fi
+
 verilator --binary --timing --trace-fst --Wall \
     -Wno-UNUSEDPARAM -Wno-BLKSEQ \
     --assert \
@@ -1858,6 +1905,8 @@ echo "NES complete APU Phase 5G waveform: $ROOT_DIR/$NES_APU_COMPLETE_PHASE5G_WA
 echo "NES nonlinear mixer Phase 5H waveform: $ROOT_DIR/$NES_APU_MIXER_PHASE5H_WAVEFORM"
 echo "NES DMC DMA Phase 5F waveform: $ROOT_DIR/$NES_DMC_DMA_PHASE5F_WAVEFORM"
 echo "NES DMC system Phase 5F waveform: $ROOT_DIR/$NES_DMC_SYSTEM_PHASE5F_WAVEFORM"
+echo "NES CPU/APU Phase 5I waveform: $ROOT_DIR/$NES_APU_CPU_PHASE5I_WAVEFORM"
+echo "NES CPU/APU Phase 5I ROMs: $ROOT_DIR/$NES_APU_CPU_PHASE5I_GAME_A_ROM $ROOT_DIR/$NES_APU_CPU_PHASE5I_GAME_B_ROM"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

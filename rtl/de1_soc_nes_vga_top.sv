@@ -749,7 +749,7 @@ module de1_soc_nes_vga_top #(
         .clk(CLOCK_50),
         .reset(nes_functional_reset),
         .nes_enable(nes_ppu_ce && debugger_authorized),
-        .irq(1'b0),
+        .irq(apu_irq),
         .mirroring_mode(cartridge_mirroring_mode),
         .cart_cpu_address(cart_cpu_address),
         .cart_cpu_read(cart_cpu_read),
@@ -850,9 +850,9 @@ module de1_soc_nes_vga_top #(
 
     // The APU advances in the complete CPU-time slot stream. In particular,
     // OAM DMA stops the CPU core but not the APU, while debugger pause stops
-    // the scheduler and therefore the APU as well. CPU IRQ consumption is a
-    // deliberate Phase 5I integration point; apu_irq is verified here at the
-    // APU boundary and frame IRQ remains CPU-visible through $4015.
+    // the scheduler and therefore the APU as well. The combined level-sensitive
+    // frame/DMC interrupt is consumed by the CPU through its normal IRQ input;
+    // each source retains its own documented acknowledgement behavior.
     /* verilator lint_off PINCONNECTEMPTY */
     nes_apu apu (
         .clk(CLOCK_50),

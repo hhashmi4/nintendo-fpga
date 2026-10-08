@@ -7,6 +7,55 @@ from typing import Callable
 from verification.nes_bus import CpuTarget, decode_cpu_address
 
 
+@dataclass
+class ApuIrqSources:
+    """Independent CPU-visible model of the two level-sensitive APU IRQs.
+
+    Channel timing remains owned by :mod:`verification.apu`; this small model
+    captures the system contract at the CPU boundary.  In particular, a
+    status read acknowledges only the frame source, while either a $4015
+    write or disabling DMC IRQ through $4010 acknowledges only the DMC source.
+    """
+
+    frame: bool = False
+    dmc: bool = False
+
+    @property
+    def line(self) -> bool:
+        return self.frame or self.dmc
+
+    def status(self, channel_status: int = 0) -> int:
+        if not 0 <= channel_status <= 0x1F:
+            raise ValueError("APU channel status must fit bits 0 through 4")
+        return channel_status | (0x40 if self.frame else 0) | (
+            0x80 if self.dmc else 0
+        )
+
+    def read_4015(self, channel_status: int = 0) -> int:
+        value = self.status(channel_status)
+        self.frame = False
+        return value
+
+    def write_4015(self) -> None:
+        self.dmc = False
+
+    def write_4010(self, value: int) -> None:
+        if not 0 <= value <= 0xFF:
+            raise ValueError("APU register value must be one byte")
+        if not value & 0x80:
+            self.dmc = False
+
+    def write_4017(self, value: int) -> None:
+        if not 0 <= value <= 0xFF:
+            raise ValueError("APU register value must be one byte")
+        if value & 0x40:
+            self.frame = False
+
+    def reset(self) -> None:
+        self.frame = False
+        self.dmc = False
+
+
 class Scheduler:
     """Three always-enabled PPU ticks for every scheduled CPU slot."""
 

@@ -107,7 +107,7 @@ module nes_dmc_system_phase5f_tb;
         .clk(clk),
         .reset(functional_reset),
         .nes_enable(debugger_authorized),
-        .irq(1'b0),
+        .irq(apu_irq),
         .mirroring_mode(LOADER_MIRROR_HORIZONTAL),
         .cart_cpu_address(cart_cpu_address),
         .cart_cpu_read(cart_cpu_read),
