@@ -115,11 +115,28 @@ APU_RTL_FILES=(
     rtl/apu/nes_apu.sv
 )
 
+AUDIO_RTL_FILES=(
+    rtl/audio/nes_audio_fir_coeff_pkg.sv
+    rtl/audio/nes_audio_resampler.sv
+    rtl/audio/nes_audio_conditioner.sv
+    rtl/audio/audio_async_fifo.sv
+    rtl/audio/wm8731_i2c_init.sv
+    rtl/audio/wm8731_i2s_tx.sv
+    rtl/audio/audio_pll.sv
+    rtl/audio/nes_audio_output.sv
+)
+
 # Several package constants intentionally reserve stable names and bit
 # positions for later Phase 5 channel modules.
 verilator --lint-only --Wall -Wno-UNUSEDPARAM \
     --top-module nes_apu \
     "${APU_RTL_FILES[@]}"
+
+verilator --lint-only --Wall -Wno-fatal \
+    -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
+    --top-module nes_audio_output \
+    rtl/platform/reset_sync.sv \
+    "${AUDIO_RTL_FILES[@]}"
 
 verilator --lint-only --Wall \
     --top-module nes_cpu_bus \
@@ -301,6 +318,7 @@ verilator --lint-only --Wall -Wno-fatal \
 
 PHASE3K_RTL_FILES=(
     "${APU_RTL_FILES[@]}"
+    "${AUDIO_RTL_FILES[@]}"
     rtl/debug/nes_debug_snapshot_pkg.sv
     rtl/debug/nes_debug_snapshot.sv
     rtl/debug/nes_debug_page_select.sv

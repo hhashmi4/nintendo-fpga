@@ -69,8 +69,8 @@ if grep -Eqi "inferred latch|multiple constant drivers|multiple drivers" "$MAP_R
     echo "ERROR: DE1-SoC NES/VGA synthesis has a latch or multiple-driver warning" >&2
     exit 1
 fi
-if ! grep -q "Total PLLs[[:space:]]*; 1" "$FIT_REPORT"; then
-    echo "ERROR: DE1-SoC NES/VGA build does not report exactly one PLL" >&2
+if ! grep -q "Total PLLs[[:space:]]*; 2" "$FIT_REPORT"; then
+    echo "ERROR: DE1-SoC NES/VGA/audio build does not report exactly two PLLs" >&2
     exit 1
 fi
 

@@ -104,8 +104,11 @@ and closes IRQ/NMI/BRK, DMA/controller, debugger, replacement-reset, and
 five-channel mixed-audio integration. Phase 5J runs original legal audio ROMs
 on that real CPU/APU path, captures the Q0.20 mixer with explicit pipeline
 alignment, applies a deterministic fixed-point anti-alias/DC/resampling policy,
-and emits byte-reproducible 48 kHz signed-16 mono WAV files. Real-time and
-physical codec output remain later Phase 5 work.
+and emits byte-reproducible 48 kHz signed-16 mono WAV files. Phase 5K converts
+that validated source into a synthesizable filtered PCM path, crosses it into
+an exact-rate audio domain, configures the DE1-SoC WM8731, and drives signed
+16-bit duplicated-mono I2S to the board LINE OUT. Physical validation remains
+Phase 5L work.
 
 ## Phase 1 foundation
 
@@ -982,6 +985,27 @@ metrics and checksums, commands, regression/Quartus results, and scope are
 documented in
 [`docs/apu-phase5j-wav-validation.md`](docs/apu-phase5j-wav-validation.md).
 
+## Phase 5K — real-time DE1-SoC audio
+
+- Synthesizable exact-48 kHz path from the existing Q0.20 nonlinear mixer to
+  signed 16-bit PCM, with a time-multiplexed 961-tap anti-alias FIR, 10 Hz DC
+  blocker, fixed 0.75 gain, deterministic rounding, and saturation
+- Exact 12 MHz WM8731 USB-mode clock plan, rational 3.072 MHz BCLK, 48 kHz
+  LRCK, 16-bit I2S timing, and identical mono left/right samples
+- Gray-pointer 32-entry asynchronous FIFO, deterministic startup/mute policy,
+  checked two-wire codec initialization with timeout/retry/error states, and
+  bounded preserved diagnostics
+- ROM-independent 1 kHz hardware test tone, independent Python model,
+  directed fault injection, long-run sample/framing checks, full regression,
+  Verilator lint, and all-corners production Quartus timing
+- Official rev. F/G Terasic pins drive the board's analogue LINE OUT; no HDMI
+  audio and no Phase 5L physical-validation claims
+
+Architecture, official hardware sources, fixed-point policy, codec sequence,
+I2S timing, diagnostics, verification, build results, and the future physical
+procedure are documented in
+[`docs/apu-phase5k-audio-codec.md`](docs/apu-phase5k-audio-codec.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -1027,7 +1051,9 @@ Phase 5G complete-APU full-state comparison and interaction closure, plus the
 Phase 5H exhaustive nonlinear mixer and mixed-output integration comparisons,
 the Phase 5I CPU/APU/runtime interrupt integration ROM, and the Phase 5J
 real-CPU/APU audio captures, anti-aliased PCM/WAV conversion, all-channel/DMC/
-frequency checks, original melody, and byte-level determinism run,
+frequency checks, original melody, and byte-level determinism run, plus the
+Phase 5K real-time scheduler/FIR/DC/PCM/FIFO/codec/I2S path, fault injection,
+test tone, and extended exact-rate run,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -1227,6 +1253,7 @@ before use.
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — coordinated standalone OAM and DMC DMA timing engines
 - `rtl/apu` — APU frame/status logic, five channels, and nonlinear mixer
+- `rtl/audio` — real-time resampling, conditioning, CDC, codec control, and I2S
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
 - `rtl/loader` — runtime-loader protocol, manifest, and transfer validation
 - `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
