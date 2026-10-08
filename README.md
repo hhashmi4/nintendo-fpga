@@ -101,8 +101,11 @@ exhaustive separated-domain verification, and cycle-by-cycle complete-APU
 comparison. Phase 5I connects the combined frame/DMC APU IRQ to the real CPU,
 proves hardware interrupt entry and RTI with legal runtime-loaded test ROMs,
 and closes IRQ/NMI/BRK, DMA/controller, debugger, replacement-reset, and
-five-channel mixed-audio integration. Resampling and codec output remain later
-Phase 5 work.
+five-channel mixed-audio integration. Phase 5J runs original legal audio ROMs
+on that real CPU/APU path, captures the Q0.20 mixer with explicit pipeline
+alignment, applies a deterministic fixed-point anti-alias/DC/resampling policy,
+and emits byte-reproducible 48 kHz signed-16 mono WAV files. Real-time and
+physical codec output remain later Phase 5 work.
 
 ## Phase 1 foundation
 
@@ -955,6 +958,30 @@ Architecture, interrupt traces, DMA/debugger/runtime behavior, verification,
 production timing/resources, and remaining accuracy limits are documented in
 [`docs/apu-phase5i-cpu-integration.md`](docs/apu-phase5i-cpu-integration.md).
 
+## Phase 5J — deterministic PCM/WAV audio
+
+- Legal generated NROM-128 scenarios execute on the real RTL CPU and program
+  Pulse 1, Pulse 2, Triangle, Noise, DMC, all-channel, transition, silence,
+  and original multi-note demonstration audio
+- Bounded change-event captures retain NES cycle, raw channel, Q0.20 mix,
+  CPU-PC/register writes, DMC cartridge fetches, pause/reset, and instruction
+  evidence with explicit one-fabric-cycle mixer alignment
+- Exact `19,687,500/11` Hz to 48 kHz rational timing, a committed 3,073-tap
+  Q30 Blackman-sinc anti-alias FIR, a fixed-point 10 Hz DC blocker, fixed gain,
+  deterministic rounding, saturation, and canonical mono signed-16 RIFF/WAVE
+- Exact Phase 5H mixer checks at every captured change, calculated/measured
+  pulse and Triangle frequency checks, generated-ROM DMC byte verification,
+  all-five-channel contribution checks, exact-zero silence, pause/reset checks,
+  and byte-identical repeated capture/PCM/WAV output
+- A 3.000-second, 144,000-sample original CPU-driven melody generated locally
+  as `build/audio/phase5j_melody.wav`; generated audio stays ignored
+- Offline PCM/WAV only; no I2S, HDMI audio, DE1-SoC codec, or Phase 5K/5L work
+
+Capture format, timing math, filter/DC/PCM policy, measured per-scenario
+metrics and checksums, commands, regression/Quartus results, and scope are
+documented in
+[`docs/apu-phase5j-wav-validation.md`](docs/apu-phase5j-wav-validation.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -998,7 +1025,9 @@ Pulse 1, Phase 5C dual-pulse, Phase 5D three-channel Triangle, Phase 5E
 four-channel Noise, Phase 5F DMC oracle/RTL and DMA/system comparisons, and the
 Phase 5G complete-APU full-state comparison and interaction closure, plus the
 Phase 5H exhaustive nonlinear mixer and mixed-output integration comparisons,
-the Phase 5I CPU/APU/runtime interrupt integration ROM,
+the Phase 5I CPU/APU/runtime interrupt integration ROM, and the Phase 5J
+real-CPU/APU audio captures, anti-aliased PCM/WAV conversion, all-channel/DMC/
+frequency checks, original melody, and byte-level determinism run,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase

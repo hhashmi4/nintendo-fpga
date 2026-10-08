@@ -1200,6 +1200,10 @@ if [[ ! -s "$NES_APU_CPU_PHASE5I_WAVEFORM" ||
     exit 1
 fi
 
+# Phase 5J uses the real CPU/APU/cartridge path above, but deliberately keeps
+# its bounded captures and playable WAV files in ignored build output.
+scripts/run_apu_audio_phase5j.sh --full
+
 verilator --binary --timing --trace-fst --Wall \
     -Wno-UNUSEDPARAM -Wno-BLKSEQ \
     --assert \
@@ -1907,6 +1911,8 @@ echo "NES DMC DMA Phase 5F waveform: $ROOT_DIR/$NES_DMC_DMA_PHASE5F_WAVEFORM"
 echo "NES DMC system Phase 5F waveform: $ROOT_DIR/$NES_DMC_SYSTEM_PHASE5F_WAVEFORM"
 echo "NES CPU/APU Phase 5I waveform: $ROOT_DIR/$NES_APU_CPU_PHASE5I_WAVEFORM"
 echo "NES CPU/APU Phase 5I ROMs: $ROOT_DIR/$NES_APU_CPU_PHASE5I_GAME_A_ROM $ROOT_DIR/$NES_APU_CPU_PHASE5I_GAME_B_ROM"
+echo "NES APU Phase 5J metrics: $ROOT_DIR/build/audio/phase5j_metrics.json"
+echo "NES APU Phase 5J original demo WAV: $ROOT_DIR/build/audio/phase5j_melody.wav"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"

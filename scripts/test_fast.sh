@@ -12,6 +12,7 @@ fi
 
 echo "[FAST 1/3] Complete Python reference and software verification"
 python3 scripts/generate_runtime_loader_mmio_defs.py --check
+python3 scripts/generate_apu_audio_fir.py --check
 python3 -m pytest
 
 echo "[FAST 2/3] Complete Verilator RTL lint"
