@@ -231,6 +231,11 @@ verilator --lint-only --Wall -Wno-UNUSEDPARAM \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader_cdc.sv
 
+verilator --lint-only --Wall -Wno-UNUSEDPARAM \
+    --top-module nes_diagnostic_subsystem \
+    rtl/diagnostic/nes_diagnostic_mmio_pkg.sv \
+    rtl/diagnostic/nes_diagnostic_subsystem.sv
+
 verilator --lint-only --Wall \
     --top-module nes_runtime_cartridge \
     rtl/loader/nes_runtime_loader_pkg.sv \
@@ -342,6 +347,8 @@ PHASE3K_RTL_FILES=(
     rtl/cartridge/nes_cartridge_runtime_mux.sv
     "${CONTROLLER_RTL_FILES[@]}"
     rtl/diagnostic/hex7seg.sv
+    rtl/diagnostic/nes_diagnostic_mmio_pkg.sv
+    rtl/diagnostic/nes_diagnostic_subsystem.sv
     rtl/video/vga_timing.sv
     rtl/video/vga_nes_scaler.sv
     rtl/video/nes_palette_rgb.sv

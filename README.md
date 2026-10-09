@@ -108,7 +108,11 @@ and emits byte-reproducible 48 kHz signed-16 mono WAV files. Phase 5K converts
 that validated source into a synthesizable filtered PCM path, crosses it into
 an exact-rate audio domain, configures the DE1-SoC WM8731, and drives signed
 16-bit duplicated-mono I2S to the board LINE OUT. Physical validation remains
-Phase 5L work.
+Phase 5L work. Phase 5M adds an independent FPGA diagnostic plane with a
+separately decoded, versioned HPS MMIO slave; coherent snapshots; CPU, PPU,
+APU, audio, loader, cartridge and DMA counters; sticky faults; a bounded trace;
+an offline-first `nes-debug` CLI; and JSON/text reports. Hardware results remain
+NOT TESTED while the DE1-SoC is unavailable.
 
 ## Phase 1 foundation
 
@@ -1006,6 +1010,27 @@ I2S timing, diagnostics, verification, build results, and the future physical
 procedure are documented in
 [`docs/apu-phase5k-audio-codec.md`](docs/apu-phase5k-audio-codec.md).
 
+## Phase 5M — hardware diagnostics and fault reporting
+
+- Separate 512-byte diagnostic slave at `0xff201000`; the existing loader at
+  `0xff200000` and its protocol remain unchanged
+- Generated versioned register definitions, atomic HPS/fabric snapshots,
+  finite-bounded CDC payloads, independent clock heartbeats and explicit
+  unavailable-data semantics
+- Passive CPU/PPU/APU/audio/loader/cartridge/DMA counters, ten stable sticky
+  fault codes, explicit clear/re-latch behavior, and a 16-entry circular trace
+- Offline-by-default and explicit real-MMIO Python backends plus repository-
+  local `nes-debug doctor/status/faults/trace/report` commands
+- Deterministic injection of every fault and unsupported-version behavior,
+  independent Python model comparison, directed unrelated-clock RTL tests,
+  and retained full-system regression
+- No physical validation claim: DE1-SoC, HPS bridge, clocks, codec and VGA are
+  reported as `NOT TESTED` in offline mode
+
+Architecture, register map, CDC, fault and trace semantics, CLI/report usage,
+verification, future bring-up procedure and limitations are documented in
+[`docs/phase5m-hardware-diagnostics.md`](docs/phase5m-hardware-diagnostics.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -1053,7 +1078,8 @@ the Phase 5I CPU/APU/runtime interrupt integration ROM, and the Phase 5J
 real-CPU/APU audio captures, anti-aliased PCM/WAV conversion, all-channel/DMC/
 frequency checks, original melody, and byte-level determinism run, plus the
 Phase 5K real-time scheduler/FIR/DC/PCM/FIFO/codec/I2S path, fault injection,
-test tone, and extended exact-rate run,
+test tone, and extended exact-rate run, the Phase 5M diagnostic register/fault/
+trace/CDC path and independent model,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
