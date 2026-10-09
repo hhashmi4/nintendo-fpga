@@ -49,6 +49,14 @@
          type = "int";
       }
    }
+   element diagnostic_mmio_bridge
+   {
+      datum _sortIndex
+      {
+         value = "3";
+         type = "int";
+      }
+   }
 }
 ]]></parameter>
  <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
@@ -86,6 +94,11 @@
  <interface
    name="loader_mmio"
    internal="loader_mmio_bridge.m0"
+   type="avalon"
+   dir="start" />
+ <interface
+   name="diagnostic_mmio"
+   internal="diagnostic_mmio_bridge.m0"
    type="avalon"
    dir="start" />
  <interface name="reset" internal="clk_0.clk_in_reset" type="reset" dir="end" />
@@ -663,6 +676,24 @@
   <parameter name="USE_AUTO_ADDRESS_WIDTH" value="0" />
   <parameter name="USE_RESPONSE" value="0" />
  </module>
+ <module
+   name="diagnostic_mmio_bridge"
+   kind="altera_avalon_mm_bridge"
+   version="23.1"
+   enabled="1">
+  <parameter name="ADDRESS_UNITS" value="SYMBOLS" />
+  <parameter name="ADDRESS_WIDTH" value="9" />
+  <parameter name="DATA_WIDTH" value="32" />
+  <parameter name="LINEWRAPBURSTS" value="0" />
+  <parameter name="MAX_BURST_SIZE" value="1" />
+  <parameter name="MAX_PENDING_RESPONSES" value="1" />
+  <parameter name="PIPELINE_COMMAND" value="0" />
+  <parameter name="PIPELINE_RESPONSE" value="0" />
+  <parameter name="SYMBOL_WIDTH" value="8" />
+  <parameter name="SYSINFO_ADDR_WIDTH" value="10" />
+  <parameter name="USE_AUTO_ADDRESS_WIDTH" value="0" />
+  <parameter name="USE_RESPONSE" value="0" />
+ </module>
  <connection
    kind="avalon"
    version="23.1"
@@ -670,6 +701,15 @@
    end="loader_mmio_bridge.s0">
   <parameter name="arbitrationPriority" value="1" />
   <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="hps_0.h2f_lw_axi_master"
+   end="diagnostic_mmio_bridge.s0">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x1000" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -696,6 +736,11 @@
    kind="clock"
    version="23.1"
    start="hps_clock_fanout.out_clk"
+   end="diagnostic_mmio_bridge.clk" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="hps_clock_fanout.out_clk"
    end="hps_reset_fanout.clk" />
  <connection
    kind="clock"
@@ -712,6 +757,11 @@
    version="23.1"
    start="hps_reset_fanout.out_reset"
    end="loader_mmio_bridge.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="hps_reset_fanout.out_reset"
+   end="diagnostic_mmio_bridge.reset" />
  <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
  <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
  <interconnectRequirement for="$system" name="qsys_mm.insertDefaultSlave" value="FALSE" />

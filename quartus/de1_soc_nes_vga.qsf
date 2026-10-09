@@ -68,6 +68,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_mapp
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_cartridge.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_cartridge_runtime_mux.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/diagnostic/hex7seg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/diagnostic/nes_diagnostic_mmio_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/diagnostic/nes_diagnostic_subsystem.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/vga_timing.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/vga_nes_scaler.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_palette_rgb.sv

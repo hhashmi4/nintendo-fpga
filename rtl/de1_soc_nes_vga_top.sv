@@ -104,6 +104,7 @@ module de1_soc_nes_vga_top #(
     logic pll_locked;
     logic reset_request_n;
     logic system_reset;
+    logic diagnostic_reset;
     logic runtime_loader_reset;
     logic nes_functional_reset;
     logic video_reset;
@@ -152,6 +153,14 @@ module de1_soc_nes_vga_top #(
     logic hps_mmio_waitrequest;
     logic [31:0] hps_mmio_readdata;
     logic hps_mmio_readdatavalid;
+    logic [8:0] diagnostic_mmio_address;
+    logic diagnostic_mmio_read;
+    logic diagnostic_mmio_write;
+    logic [31:0] diagnostic_mmio_writedata;
+    logic [3:0] diagnostic_mmio_byteenable;
+    logic diagnostic_mmio_waitrequest;
+    logic [31:0] diagnostic_mmio_readdata;
+    logic diagnostic_mmio_readdatavalid;
     logic runtime_source_submit;
     nes_runtime_loader_pkg::loader_command_t runtime_source_command;
     nes_runtime_loader_pkg::loader_target_t runtime_source_target;
@@ -357,6 +366,8 @@ module de1_soc_nes_vga_top #(
 
     logic capture_heartbeat;
     logic vga_heartbeat;
+    logic vga_hsync_heartbeat;
+    logic vga_vsync_heartbeat;
     logic dma_heartbeat;
     logic nmi_heartbeat;
 
@@ -503,6 +514,15 @@ module de1_soc_nes_vga_top #(
         .reset(system_reset)
     );
 
+    // Diagnostic state resets only from the physical reset request. It keeps
+    // running through NES functional reset and can therefore report a frozen
+    // or held core without relying on CPU progress.
+    reset_sync diagnostic_reset_generator (
+        .clk(CLOCK_50),
+        .async_reset_n(KEY0),
+        .reset(diagnostic_reset)
+    );
+
     reset_sync video_reset_generator (
         .clk(pixel_clk),
         .async_reset_n(reset_request_n),
@@ -598,6 +618,16 @@ module de1_soc_nes_vga_top #(
         .loader_mmio_read(hps_mmio_read),
         .loader_mmio_byteenable(hps_mmio_byteenable),
         .loader_mmio_debugaccess(),
+        .diagnostic_mmio_waitrequest(diagnostic_mmio_waitrequest),
+        .diagnostic_mmio_readdata(diagnostic_mmio_readdata),
+        .diagnostic_mmio_readdatavalid(diagnostic_mmio_readdatavalid),
+        .diagnostic_mmio_burstcount(),
+        .diagnostic_mmio_writedata(diagnostic_mmio_writedata),
+        .diagnostic_mmio_address(diagnostic_mmio_address),
+        .diagnostic_mmio_write(diagnostic_mmio_write),
+        .diagnostic_mmio_read(diagnostic_mmio_read),
+        .diagnostic_mmio_byteenable(diagnostic_mmio_byteenable),
+        .diagnostic_mmio_debugaccess(),
         .reset_reset_n(KEY0)
     );
 `else
@@ -610,6 +640,11 @@ module de1_soc_nes_vga_top #(
     assign hps_mmio_write = 1'b0;
     assign hps_mmio_writedata = 32'h00000000;
     assign hps_mmio_byteenable = 4'b1111;
+    assign diagnostic_mmio_address = 9'h000;
+    assign diagnostic_mmio_read = 1'b0;
+    assign diagnostic_mmio_write = 1'b0;
+    assign diagnostic_mmio_writedata = 32'h00000000;
+    assign diagnostic_mmio_byteenable = 4'b1111;
 `endif
 
     reset_sync hps_mmio_reset_generator (
@@ -726,6 +761,87 @@ module de1_soc_nes_vga_top #(
         .destination_status_error_code(runtime_loader_error_code),
         .destination_status_activation_in_progress(
             runtime_activation_in_progress)
+    );
+
+    nes_diagnostic_subsystem diagnostics (
+        .fabric_clk(CLOCK_50),
+        .fabric_reset(diagnostic_reset),
+        .system_reset(system_reset),
+        .nes_reset(nes_functional_reset),
+        .hps_bridge_reset(runtime_loader_reset),
+        .runtime_replacement(runtime_activation_accepted),
+        .video_pll_locked(pll_locked),
+        .audio_pll_locked(audio_pll_locked),
+        .cpu_cycle_event(nes_core_cpu_cycle_slot),
+        .cpu_progress_event(nes_core_cpu_enable),
+        .cpu_stalled(dma_debug_cpu_stall),
+        .cpu_irq(apu_irq),
+        .cpu_nmi_event(ppu_nmi_event),
+        .cpu_pc(cpu_debug_pc),
+        .debugger_paused(
+            debugger_status.state == nes_debugger_pkg::DBG_PAUSED),
+        .debugger_step_event(debugger_command_done &&
+            debugger_command >= nes_debugger_pkg::DBG_STEP_I &&
+            debugger_command <= nes_debugger_pkg::DBG_STEP_F),
+        .ppu_frame_event(ppu_frame_start),
+        .ppu_scanline(ppu_debug_scanline),
+        .ppu_dot(ppu_debug_dot),
+        .ppu_frame_odd(ppu_debug_frame_odd),
+        .ppu_nmi_level(ppu_debug_nmi_level),
+        .ppu_nmi_event(ppu_nmi_event),
+        .vga_frame_toggle_async(vga_heartbeat),
+        .vga_hsync_toggle_async(vga_hsync_heartbeat),
+        .vga_vsync_toggle_async(vga_vsync_heartbeat),
+        .vga_active_async(active_video),
+        .apu_cycle_event(nes_core_cpu_cycle_slot),
+        .codec_init_busy(codec_init_busy),
+        .codec_init_done(codec_init_done),
+        .codec_init_error(codec_init_error),
+        .audio_codec_acks(audio_diag_i2c_ack_count),
+        .audio_codec_nacks(audio_diag_i2c_nack_count),
+        .audio_codec_timeouts(audio_diag_i2c_timeout_count),
+        .audio_codec_retries(audio_diag_init_retry_count),
+        .audio_mixed_samples(audio_diag_samples_generated),
+        .audio_pcm_samples(audio_diag_samples_generated),
+        .audio_i2s_frames(audio_diag_samples_transmitted),
+        .audio_fifo_occupancy(audio_diag_fifo_occupancy),
+        .audio_fifo_underruns(audio_diag_fifo_underruns),
+        .audio_fifo_overruns(audio_diag_fifo_overruns),
+        .audio_muted(audio_diag_muted),
+        .audio_last_fault(audio_diag_last_fault),
+        .loader_state(runtime_loader_state),
+        .loader_busy(runtime_loader_busy),
+        .loader_image_valid(runtime_staged_image_valid),
+        .loader_runtime_active(runtime_cartridge_active),
+        .loader_hold_reset(runtime_nes_hold_reset),
+        .loader_error(runtime_loader_error),
+        .loader_error_code(runtime_loader_error_code),
+        .loader_command_accepted(runtime_command_accepted),
+        .loader_command(runtime_command),
+        .loader_target(runtime_command_target),
+        .loader_activation_accepted(runtime_activation_accepted),
+        .oam_dma_active(dma_debug_active),
+        .oam_dma_start(dma_start_event),
+        .oam_dma_complete(dma_complete_event),
+        .dmc_dma_request(dmc_mem_request),
+        .dmc_dma_acknowledge(dmc_mem_acknowledge),
+        .dma_bus_owner({1'b0, dma_debug_bus_owner}),
+        .cartridge_present(cartridge_present),
+        .cartridge_mapper(cartridge_mapper_number),
+        .cartridge_nrom_256(cartridge_nrom_256),
+        .cartridge_chr_is_ram(cartridge_chr_is_ram),
+        .cartridge_mirroring(cartridge_mirroring_mode),
+        .fault_inject(10'd0),
+        .mmio_clk(hps_mmio_clk),
+        .mmio_reset(hps_mmio_reset),
+        .avs_address(diagnostic_mmio_address),
+        .avs_read(diagnostic_mmio_read),
+        .avs_write(diagnostic_mmio_write),
+        .avs_writedata(diagnostic_mmio_writedata),
+        .avs_byteenable(diagnostic_mmio_byteenable),
+        .avs_waitrequest(diagnostic_mmio_waitrequest),
+        .avs_readdata(diagnostic_mmio_readdata),
+        .avs_readdatavalid(diagnostic_mmio_readdatavalid)
     );
 
     // No Phase 4D-B board control is repurposed. This retained self-holding
@@ -1291,10 +1407,18 @@ module de1_soc_nes_vga_top #(
     end
 
     always_ff @(posedge pixel_clk) begin
-        if (video_reset)
+        if (video_reset) begin
             vga_heartbeat <= 1'b0;
-        else if (vga_frame_start)
-            vga_heartbeat <= !vga_heartbeat;
+            vga_hsync_heartbeat <= 1'b0;
+            vga_vsync_heartbeat <= 1'b0;
+        end else begin
+            if (vga_frame_start) begin
+                vga_heartbeat <= !vga_heartbeat;
+                vga_vsync_heartbeat <= !vga_vsync_heartbeat;
+            end
+            if (vga_line_start)
+                vga_hsync_heartbeat <= !vga_hsync_heartbeat;
+        end
     end
 
     // HEX1:HEX0 shows the synchronized Controller 1 state for board bring-up.

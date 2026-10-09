@@ -115,6 +115,42 @@ set loader_cdc_source_capture [get_registers {
 set_max_delay 20.000 \
     -from $loader_cdc_return_bank -to $loader_cdc_source_capture
 
+# Phase 5M diagnostic commands and snapshots use the same bundled-data
+# invariant as the loader mailbox. The payload is held while the request/ack
+# toggle traverses three synchronizer stages; these finite bounds ensure that
+# every payload bit settles before the receiving bank captures it.
+set diagnostic_cdc_first_stage_registers [get_registers {
+    *diagnostics|request_sync[0]
+    *diagnostics|acknowledge_sync[0]
+    *diagnostics|vga_frame_sync[0]
+    *diagnostics|vga_hsync_sync[0]
+    *diagnostics|vga_vsync_sync[0]
+    *diagnostics|vga_active_sync[0]
+    *diagnostics|video_pll_lock_sync[0]
+    *diagnostics|audio_pll_lock_sync[0]
+}]
+set_false_path -to $diagnostic_cdc_first_stage_registers
+
+set diagnostic_command_source [get_registers {
+    *diagnostics|control_mmio_bank*
+    *diagnostics|clear_mask_mmio_bank*
+}]
+set diagnostic_command_capture [get_registers {
+    *diagnostics|control_source_bank*
+    *diagnostics|clear_mask_source_bank*
+}]
+set_max_delay 20.000 \
+    -from $diagnostic_command_source -to $diagnostic_command_capture
+
+set diagnostic_snapshot_source [get_registers {
+    *diagnostics|snapshot_source_bank*
+}]
+set diagnostic_snapshot_capture [get_registers {
+    *diagnostics|snapshot_mmio_bank*
+}]
+set_max_delay 20.000 \
+    -from $diagnostic_snapshot_source -to $diagnostic_snapshot_capture
+
 # KEY0 asserts reset asynchronously; every slide switch enters a two-flop
 # synchronizer before its value is used in the corresponding clock domain.
 set_false_path -from [get_ports {KEY0 SW0 SW1 SW2 SW3 SW4 SW5 SW6 SW7 SW8 SW9}]

@@ -44,6 +44,7 @@ done
 
 python3 "$ROOT_DIR/scripts/validate_hps_loader_address_map.py" \
     --contract "$ROOT_DIR/config/runtime_loader_mmio.json" \
+    --diagnostic-contract "$ROOT_DIR/config/diagnostic_mmio.json" \
     --qsys "$SYSTEM_FILE" \
     --regmap "$REGMAP"
 

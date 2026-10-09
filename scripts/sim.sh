@@ -42,6 +42,7 @@ mkdir -p \
     build/verilator/nes_phase4db_playable \
     build/verilator/nes_apu_mixer_phase5h \
     build/verilator/nes_audio_phase5k \
+    build/verilator/nes_diagnostic_phase5m \
     build/verilator/nes_runtime_loader_phase4fa \
     build/verilator/nes_runtime_cartridge_phase4fb \
     build/verilator/nes_runtime_image_phase4fc \
@@ -593,8 +594,22 @@ if [[ ! -s "$NES_RUNTIME_IMAGE_PHASE4FC_WAVEFORM" ]]; then
     exit 1
 fi
 
+verilator --binary --timing --Wall -Wno-fatal \
+    -Wno-BLKSEQ -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
+    --assert \
+    --Mdir build/verilator/nes_diagnostic_phase5m \
+    --top-module nes_diagnostic_phase5m_tb \
+    -o nes_diagnostic_phase5m_tb \
+    rtl/diagnostic/nes_diagnostic_mmio_pkg.sv \
+    rtl/diagnostic/nes_diagnostic_subsystem.sv \
+    sim/nes_diagnostic_phase5m_tb.sv
+
+build/verilator/nes_diagnostic_phase5m/nes_diagnostic_phase5m_tb
+python3 scripts/verify_diagnostic_phase5m.py \
+    build/sim/phase5m_diagnostic_rtl.txt
+
 if [[ "$SIM_PROFILE" == "--fast" ]]; then
-    echo "FAST RTL smoke passed: platform, Phase 5A-5G APU, and Phase 4F-A/B/C runtime loading"
+    echo "FAST RTL smoke passed: platform, Phase 5A-5G APU, Phase 4F-A/B/C loading, and Phase 5M diagnostics"
     exit 0
 fi
 
@@ -1840,6 +1855,8 @@ PHASE4EC_TOP_RTL_FILES=(
     rtl/cartridge/nes_runtime_cartridge.sv
     rtl/cartridge/nes_cartridge_runtime_mux.sv
     rtl/diagnostic/hex7seg.sv
+    rtl/diagnostic/nes_diagnostic_mmio_pkg.sv
+    rtl/diagnostic/nes_diagnostic_subsystem.sv
     "${VIDEO_PHASE3K_RTL_FILES[@]}"
     rtl/video/nes_developer_compositor.sv
     rtl/video/video_pll.sv
@@ -1939,6 +1956,7 @@ echo "NES CPU/APU Phase 5I ROMs: $ROOT_DIR/$NES_APU_CPU_PHASE5I_GAME_A_ROM $ROOT
 echo "NES APU Phase 5J metrics: $ROOT_DIR/build/audio/phase5j_metrics.json"
 echo "NES APU Phase 5J original demo WAV: $ROOT_DIR/build/audio/phase5j_melody.wav"
 echo "NES real-time audio Phase 5K: directed and long-run checks passed"
+echo "NES hardware diagnostics Phase 5M: MMIO, counters, faults, trace, and CDC passed"
 echo "CPU waveform: $ROOT_DIR/$CPU_WAVEFORM"
 echo "ALU waveform: $ROOT_DIR/$ALU_WAVEFORM"
 echo "Address waveform: $ROOT_DIR/$ADDRESS_WAVEFORM"
