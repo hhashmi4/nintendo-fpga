@@ -112,7 +112,10 @@ Phase 5L work. Phase 5M adds an independent FPGA diagnostic plane with a
 separately decoded, versioned HPS MMIO slave; coherent snapshots; CPU, PPU,
 APU, audio, loader, cartridge and DMA counters; sticky faults; a bounded trace;
 an offline-first `nes-debug` CLI; and JSON/text reports. Hardware results remain
-NOT TESTED while the DE1-SoC is unavailable.
+NOT TESTED while the DE1-SoC is unavailable. Phase 6A documents the production
+HDMI, HDMI-audio, shared-video, USB-C power, optional DisplayPort Alt Mode,
+FPGA/SoC, PCB, BOM, diagnostics and verification architecture without starting
+transmitter RTL or production board design.
 
 ## Phase 1 foundation
 
@@ -1030,6 +1033,32 @@ procedure are documented in
 Architecture, register map, CDC, fault and trace semantics, CLI/report usage,
 verification, future bring-up procedure and limitations are documented in
 [`docs/phase5m-hardware-diagnostics.md`](docs/phase5m-hardware-diagnostics.md).
+
+## Phase 6A — HDMI, USB-C, and production hardware architecture
+
+- Conditional external-HDMI-transmitter recommendation, with ADV7513 as the
+  first procurement/prototype candidate rather than a locked production part
+- Initial 1280x720p60 target with a full-frame 960x720 4:3 presentation and an
+  optional centered 768x720 exact-3x mode; 640x480 fallback and later 1080p
+- Sink-neutral logical pixel, scan-timing, scaler-control, and 48 kHz signed-16
+  PCM contracts that preserve current VGA and Phase 5K behavior
+- Dedicated USB-C PD power input, preliminary 14.1 W design-peak estimate,
+  9 V/3 A preferred contract, protection/sequencing/monitoring architecture
+- USB-C DisplayPort Alt Mode feasibility and explicit deferral: the present
+  Cyclone V SE device has no HSSI PHY and a passive HDMI adapter is insufficient
+- Conditional Cyclone V SoC prototype recommendation, explicit Zynq/Agilex
+  alternatives, conceptual eight-layer PCB, preliminary BOM and decision gates
+- Phase 5M extension plan and separate remote, synthesis, PCB/SI, compliance,
+  and physical-test verification responsibilities
+- Architecture only: no Phase 6B transmitter RTL, scaler RTL, schematic, PCB
+  routing, or CPU/PPU/APU/loader functional change
+
+The evidence, interface contracts, mode/bandwidth calculations, component and
+FPGA comparisons, power/BOM estimates, unresolved decisions and future test
+plan are documented in
+[`docs/phase6a-hdmi-usbc-architecture.md`](docs/phase6a-hdmi-usbc-architecture.md).
+The machine-readable decision snapshot is
+[`config/phase6a_architecture.json`](config/phase6a_architecture.json).
 
 ## Development environment
 
