@@ -84,7 +84,7 @@ pulse, and a changing PC is not treated as retirement.
 | `04c` | `PPU_STATUS` | dot, scanline, odd-frame and NMI level |
 | `050` | `PPU_FRAMES` | NES PPU frame starts |
 | `054` | `PPU_NMI_EVENTS` | PPU NMI events |
-| `058` | `VIDEO_STATUS` | PLL, frame/line activity and active video |
+| `058` | `VIDEO_STATUS` | PLL, frame/line activity, active video and framebuffer status |
 | `05c` | `VGA_FRAMES` | synchronized VGA frame toggles |
 | `060` | `VGA_HSYNC_EVENTS` | synchronized line/HSYNC activity |
 | `064` | `VGA_VSYNC_EVENTS` | synchronized frame/VSYNC activity |
@@ -152,6 +152,27 @@ logic clocked solely by `CLOCK_50` can diagnose complete loss of that same
 reference clock; the HPS can instead observe that both the fabric heartbeat
 and snapshot sequence stopped while the independent MMIO heartbeat remains
 live. Lack of data alone never sets a hardware fault.
+
+Phase 6B extends `VIDEO_STATUS` in formerly reserved bits without changing the
+register address, interface version, snapshot behavior, or original meanings:
+
+| Bit | Meaning |
+|---:|---|
+| 0 | current video PLL lock |
+| 1 | synchronized VGA frame activity |
+| 2 | synchronized VGA line/HSYNC activity |
+| 3 | synchronized VGA frame/VSYNC activity |
+| 4 | synchronized VGA active-video level |
+| 5 | framebuffer capture active |
+| 6 | completed framebuffer pending handoff |
+| 7 | display bank contains a complete frame |
+| 8 | sticky framebuffer write-range error |
+| 9 | sticky framebuffer write-sequence error |
+
+Bits 5, 6, 8 and 9 are produced in the 50 MHz fabric domain. Bit 7 crosses
+from the VGA pixel domain through a forced two-flop synchronizer whose first
+stage is explicitly constrained. The extension adds no unsynchronized
+multi-bit observation. Bits 31:10 remain reserved and zero.
 
 The diagnostic plane survives NES functional reset. Reset cause distinguishes
 observable video-PLL loss, HPS bridge reset and runtime replacement. FPGA

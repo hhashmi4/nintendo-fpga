@@ -115,7 +115,12 @@ an offline-first `nes-debug` CLI; and JSON/text reports. Hardware results remain
 NOT TESTED while the DE1-SoC is unavailable. Phase 6A documents the production
 HDMI, HDMI-audio, shared-video, USB-C power, optional DisplayPort Alt Mode,
 FPGA/SoC, PCB, BOM, diagnostics and verification architecture without starting
-transmitter RTL or production board design.
+transmitter RTL or production board design. Phase 6B implements the shared,
+synthesizable 1280x720p60 digital pipeline: a 74.25 MHz clock/timing core,
+deterministic 4:3 scaling and pillarboxing, atomic three-bank frame transfer,
+RGB888 output, preserved Developer Mode coordinates, independent models, and
+standalone all-corners Cyclone V qualification. Production VGA remains
+unchanged; no HDMI transmitter or physical-HDMI validation is included.
 
 ## Phase 1 foundation
 
@@ -1060,6 +1065,34 @@ plan are documented in
 The machine-readable decision snapshot is
 [`config/phase6a_architecture.json`](config/phase6a_architecture.json).
 
+## Phase 6B — shared digital video pipeline
+
+- CTA 1280x720p60 timing at 74.25 MHz: 1650x750 totals, positive syncs,
+  registered RGB888/data-enable/sync/line/frame output contract
+- Centered 960x720 4:3 presentation with 160-pixel pillars, exact 3x vertical
+  scale, deterministic 15:4 nearest-neighbor horizontal scale, and complete
+  256x240 source-pixel coverage
+- Developer Mode preservation through an exact-3x 768x720 game area and
+  deterministic 192x720 rendering of the established 128x480 logical panel
+- Three-bank 256x240x9 indexed storage, palette expansion after RAM, atomic
+  toggle/acknowledge ownership transfer, frame-boundary-only swaps, and no
+  unsynchronized multi-bit frame crossing
+- Independent timing, scaler, memory, framebuffer and randomized sequencing
+  models; exhaustive RTL timing/scaling checks; asynchronous full-frame,
+  reset, freeze and fault tests; exact Python/RTL artifact comparison
+- Phase 5M `VIDEO_STATUS` extension in formerly reserved bits without changing
+  addresses, interface version, existing semantics, or unsafe CDC
+- Standalone Cyclone V fit using 267 ALMs, 204 M10Ks/1,658,880 bits, 3 DSPs,
+  and 1 PLL, with +0.394 ns worst setup, +0.118 ns worst hold, and zero TNS
+- Existing production VGA, game loading, Developer Mode, debugger, CPU, PPU,
+  APU, DMA, controller and audio paths retained
+- No TMDS, HDMI audio/packetization, USB-C DisplayPort, PCB implementation, or
+  physical HDMI validation
+
+Memory tradeoffs, timing/scaling equations, CDC ownership, digital interface,
+verification evidence, Quartus results, warnings and limitations are documented
+in [`docs/phase6b-shared-video-pipeline.md`](docs/phase6b-shared-video-pipeline.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -1108,7 +1141,9 @@ real-CPU/APU audio captures, anti-aliased PCM/WAV conversion, all-channel/DMC/
 frequency checks, original melody, and byte-level determinism run, plus the
 Phase 5K real-time scheduler/FIR/DC/PCM/FIFO/codec/I2S path, fault injection,
 test tone, and extended exact-rate run, the Phase 5M diagnostic register/fault/
-trace/CDC path and independent model,
+trace/CDC path and independent model, and the Phase 6B 720p timing, scaling,
+three-bank ownership, asynchronous frame-transfer, framebuffer fault, and
+independent RTL-artifact comparisons,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -1178,6 +1213,13 @@ python -m pytest -v
 ```
 
 ## Quartus and hardware
+
+Run the standalone Phase 6B shared-video synthesis, fit, assembly, and
+all-corners timing proof:
+
+```bash
+./scripts/build_phase6b_video_quartus.sh
+```
 
 Run standalone CPU analysis and synthesis without changing the board top:
 
@@ -1311,7 +1353,8 @@ before use.
 - `rtl/audio` — real-time resampling, conditioning, CDC, codec control, and I2S
 - `rtl/debug` — observation-only snapshot/CDC, font, and Developer Mode renderer
 - `rtl/loader` — runtime-loader protocol, manifest, and transfer validation
-- `rtl/video` — framebuffer, VGA timing/scaling, and palette conversion
+- `rtl/video` — shared framebuffer, VGA/720p timing and scaling, palette/RGB888,
+  and digital-video qualification top
 - `rtl/memory` — reserved for later phases
 - `sim` — self-checking SystemVerilog testbenches
 - `verification` and `tests/python` — Python reference infrastructure/tests

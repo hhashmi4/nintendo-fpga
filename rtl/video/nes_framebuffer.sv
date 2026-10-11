@@ -175,7 +175,8 @@ module nes_framebuffer (
                         completed_waiting <= 1'b1;
                     end
                 end else
-                    expected_write_address <= expected_write_address + 16'd1;
+                    expected_write_address <= selected_expected_address +
+                                              16'd1;
             end
         end
     end

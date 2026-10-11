@@ -236,6 +236,26 @@ verilator --lint-only --Wall -Wno-UNUSEDPARAM \
     rtl/diagnostic/nes_diagnostic_mmio_pkg.sv \
     rtl/diagnostic/nes_diagnostic_subsystem.sv
 
+SHARED_VIDEO_RTL_FILES=(
+    rtl/video/video_720p_timing.sv
+    rtl/video/nes_720p_scaler.sv
+    rtl/video/nes_palette_rgb.sv
+    rtl/video/nes_framebuffer.sv
+    rtl/video/nes_720p_video.sv
+    rtl/video/nes_digital_video_pipeline.sv
+)
+
+verilator --lint-only --Wall \
+    --top-module nes_digital_video_pipeline \
+    "${SHARED_VIDEO_RTL_FILES[@]}"
+
+verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
+    --top-module phase6b_video_top \
+    rtl/platform/reset_sync.sv \
+    "${SHARED_VIDEO_RTL_FILES[@]}" \
+    rtl/video/video_720p_pll.sv \
+    rtl/video/phase6b_video_top.sv
+
 verilator --lint-only --Wall \
     --top-module nes_runtime_cartridge \
     rtl/loader/nes_runtime_loader_pkg.sv \
@@ -356,6 +376,11 @@ PHASE3K_RTL_FILES=(
     rtl/video/nes_vga_video.sv
     rtl/video/nes_developer_compositor.sv
     rtl/video/video_pll.sv
+    rtl/video/video_720p_timing.sv
+    rtl/video/nes_720p_scaler.sv
+    rtl/video/nes_720p_video.sv
+    rtl/video/nes_digital_video_pipeline.sv
+    rtl/video/video_720p_pll.sv
     rtl/debug/nes_debugger_pkg.sv
     rtl/debug/nes_debug_command_cdc.sv
     rtl/debug/nes_debugger.sv

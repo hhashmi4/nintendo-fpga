@@ -126,6 +126,7 @@ set diagnostic_cdc_first_stage_registers [get_registers {
     *diagnostics|vga_hsync_sync[0]
     *diagnostics|vga_vsync_sync[0]
     *diagnostics|vga_active_sync[0]
+    *diagnostics|video_display_valid_sync[0]
     *diagnostics|video_pll_lock_sync[0]
     *diagnostics|audio_pll_lock_sync[0]
 }]
