@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "phase": "6A",
+  "research_date": "2026-10-11",
+  "scope": "architecture_only",
+  "status_legend": {
+    "CONFIRMED": "Measured in this repository or stated by a cited manufacturer specification.",
+    "PROPOSED": "Recommended for a later implementation phase but not implemented here.",
+    "UNVERIFIED": "Requires missing vendor evidence, implementation, or qualification.",
+    "REQUIRES_PHYSICAL_TESTING": "Cannot be closed by remote analysis or simulation."
+  },
+  "scope_exclusions": [
+    "hdmi_transmitter_rtl",
+    "displayport_transmitter_rtl",
+    "production_pcb_schematic_or_layout",
+    "cpu_ppu_apu_loader_functional_changes"
+  ],
+  "baseline": {
+    "commit": "0f23345",
+    "device": "5CSEMA5F31C6",
+    "python_tests": 1967,
+    "quartus": {
+      "version": "23.1std.1 Build 993",
+      "alms": 9613,
+      "combinational_aluts_logic": 12931,
+      "total_registers": 15011,
+      "dedicated_logic_registers": 14785,
+      "m10k_blocks": 275,
+      "block_memory_bits": 2238504,
+      "dsp_blocks": 7,
+      "plls": 2,
+      "pins": 226,
+      "available_device_pins": 457,
+      "worst_setup_slack_ns": 0.729,
+      "worst_hold_slack_ns": 0.077,
+      "worst_tns_ns": 0.0,
+      "analysis_synthesis_warnings": 105,
+      "fitter_warnings": 149,
+      "assembler_warnings": 0,
+      "timing_analyzer_warnings": 144
+    }
+  },
+  "video": {
+    "recommended_initial_mode": "1280x720p60",
+    "recommended_presentation": "full_256x240_in_960x720_4x3_box",
+    "optional_presentation": "integer_3x_768x720_centered",
+    "pixel_format": "RGB888",
+    "modes": [
+      {
+        "name": "640x480p59.94",
+        "pixel_clock_hz": 25175000,
+        "h_total": 800,
+        "v_total": 525,
+        "tmds_rate_per_data_lane_bps": 251750000,
+        "active_rgb_payload_bps": 441929143,
+        "status": "PROPOSED_FALLBACK"
+      },
+      {
+        "name": "1280x720p60",
+        "pixel_clock_hz": 74250000,
+        "h_total": 1650,
+        "v_total": 750,
+        "tmds_rate_per_data_lane_bps": 742500000,
+        "active_rgb_payload_bps": 1327104000,
+        "status": "PROPOSED_DEFAULT"
+      },
+      {
+        "name": "1920x1080p60",
+        "pixel_clock_hz": 148500000,
+        "h_total": 2200,
+        "v_total": 1125,
+        "tmds_rate_per_data_lane_bps": 1485000000,
+        "active_rgb_payload_bps": 2985984000,
+        "status": "PROPOSED_LATER_OPTION"
+      }
+    ]
+  },
+  "hdmi": {
+    "architecture": "external_parallel_video_hdmi_transmitter",
+    "preferred_candidate": "ADV7513BSWZ",
+    "candidate_status": "PROPOSED_PROCUREMENT_AND_PROTOTYPE_GATE",
+    "video_input": "RGB888 plus pixel_clock hsync vsync data_enable",
+    "audio_input": "I2S stereo signed_16 duplicated_mono 48000_samples_per_second",
+    "control": "I2C plus HPD INT and power_down",
+    "edid_owner": "HPS_firmware_via_transmitter_DDC",
+    "packet_owner": "HDMI_transmitter_IC",
+    "fallback_if_candidate_fails": "reselect_pin_compatible_or_architecturally_equivalent_external_transmitter_before_PCB_freeze"
+  },
+  "audio": {
+    "source_clock_domain_hz": 50000000,
+    "sample_rate_hz": 48000,
+    "sample_format": "signed_16_bit_PCM_mono",
+    "valid_semantics": "one_source_clock_pulse_per_sample",
+    "channel_mapping": "duplicate_mono_to_left_and_right",
+    "cdc": "independent_Gray_pointer_async_FIFO_per_physical_sink",
+    "i2s_bit_clock_hz": 3072000,
+    "i2s_lr_clock_hz": 48000,
+    "i2s_slot_bits": 32,
+    "hdmi_packetization_owner": "external_transmitter"
+  },
+  "usb_c_power": {
+    "connector_role": "dedicated_sink_only_power_input",
+    "preferred_controller": "STUSB4500QTR",
+    "controller_status": "PROPOSED",
+    "preferred_contract": {
+      "voltage_v": 9,
+      "current_a": 3,
+      "power_w": 27
+    },
+    "fallback_contract": {
+      "voltage_v": 5,
+      "current_a": 3,
+      "power_w": 15,
+      "condition": "only_when_CC_advertises_3A"
+    },
+    "insufficient_source_policy": "hold_high_load_rails_off_and_report_fault",
+    "estimated_budget_w": {
+      "typical_before_design_margin": 7.2,
+      "peak_before_design_margin": 11.3,
+      "design_peak_with_margin": 14.1
+    }
+  },
+  "usb_c_video": {
+    "status": "UNVERIFIED_OPTIONAL",
+    "recommended_connector_policy": "separate_from_power_input",
+    "transport": "DisplayPort_Alt_Mode",
+    "current_device_direct_phy": false,
+    "current_device_reason": "5CSEMA5_SE_has_no_high_speed_transceiver_channels",
+    "requirements": [
+      "DisplayPort_source_MAC_and_PHY",
+      "USB_PD_structured_VDM_Alt_Mode_negotiation",
+      "orientation_and_lane_mux",
+      "AUX_channel",
+      "HPD_translation",
+      "link_training",
+      "high_speed_signal_integrity_and_compliance"
+    ],
+    "decision": "do_not_populate_or_route_until_a_transmitter_and_Type_C_controller_are_qualified"
+  },
+  "production_fpga": {
+    "prototype_recommendation": "5CSEMA5F31C6N",
+    "recommendation_status": "PROPOSED_SUBJECT_TO_LIFECYCLE_PRICE_AND_POWER_GATES",
+    "alternatives": [
+      "AMD_XC7Z020",
+      "Intel_Agilex_5_SoC_E_series",
+      "AMD_Zynq_UltraScale_plus_if_native_DisplayPort_becomes_mandatory"
+    ],
+    "portable_boundary": "nes_core_and_sink_neutral_pixel_audio_contracts",
+    "platform_specific_rework": [
+      "PLL_IP",
+      "block_RAM_mapping",
+      "HPS_or_PS_subsystem",
+      "DDR_controller_and_boot_flow",
+      "MMIO_bridge",
+      "constraints_pinout_and_power_sequence",
+      "vendor_display_PHY_IP"
+    ]
+  },
+  "pcb": {
+    "status": "CONCEPT_ONLY",
+    "preliminary_board_mm": {
+      "width": 120,
+      "height": 90
+    },
+    "preliminary_layers": 8,
+    "stackup_status": "UNVERIFIED",
+    "requires_impedance_control": true,
+    "requires_pre_layout_SI": true,
+    "requires_post_layout_SI": true
+  },
+  "decision_gates": [
+    "obtain_authorized_ADV7513_quote_samples_and_complete_documentation",
+    "run_vendor_power_estimator_with_final_toggle_activity_and_thermal_model",
+    "prototype_720p60_HDMI_video_audio_HPD_and_EDID_on_hardware",
+    "choose_and_synthesize_the_exact_production_FPGA_package",
+    "qualify_DDR_and_power_tree_against_vendor_reference_designs",
+    "decide_whether_USB_C_DisplayPort_has_a_business_case_before_routing_it",
+    "complete_HDMI_USB_IF_and_if_applicable_VESA_licensing_and_compliance_plan"
+  ]
+}
