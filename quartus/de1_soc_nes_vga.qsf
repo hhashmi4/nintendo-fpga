@@ -77,6 +77,11 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_framebuffer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_vga_video.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_developer_compositor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_pll.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_timing.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_720p_scaler.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_720p_video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_digital_video_pipeline.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_pll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_command_cdc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger.sv

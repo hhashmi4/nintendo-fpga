@@ -1,0 +1,32 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY phase6b_video_top
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/reset_sync.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_timing.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_720p_scaler.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_palette_rgb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_framebuffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_720p_video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_digital_video_pipeline.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_pll.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/phase6b_video_top.sv
+set_global_assignment -name SDC_FILE ../constraints/phase6b_video.sdc
+set_global_assignment -name VERILOG_MACRO "ALTERA_SYNTHESIS=1"
+
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_phase6b_video/output_files
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS "AS INPUT TRI-STATED"
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+
+set_location_assignment PIN_AF14 -to CLOCK_50
+set_location_assignment PIN_AA14 -to RESET_N
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RESET_N
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DEVELOPER_LAYOUT
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to TEST_PATTERN
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CAPTURE_FREEZE
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VIDEO_*
+
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"

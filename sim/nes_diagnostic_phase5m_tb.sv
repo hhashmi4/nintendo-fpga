@@ -31,6 +31,11 @@ module nes_diagnostic_phase5m_tb;
     logic vga_hsync_toggle_async = 1'b0;
     logic vga_vsync_toggle_async = 1'b0;
     logic vga_active_async = 1'b0;
+    logic video_capture_active = 1'b0;
+    logic video_capture_pending = 1'b0;
+    logic video_display_valid_async = 1'b0;
+    logic video_write_range_error = 1'b0;
+    logic video_write_sequence_error = 1'b0;
     logic apu_cycle_event = 1'b0;
     logic codec_init_busy = 1'b0;
     logic codec_init_done = 1'b0;
@@ -229,6 +234,24 @@ module nes_diagnostic_phase5m_tb;
                "unavailable retirement count is explicit");
         mmio_read(DIAG_REG_AVAILABILITY, read_value);
         check_result(!read_value[11], "retirement availability is clear");
+
+        // Phase 6B adds framebuffer state in formerly reserved VIDEO_STATUS
+        // bits while preserving the original low five timing/PLL bits.
+        video_capture_active = 1'b1;
+        video_capture_pending = 1'b1;
+        video_display_valid_async = 1'b1;
+        video_write_range_error = 1'b1;
+        video_write_sequence_error = 1'b1;
+        repeat (3) @(posedge fabric_clk);
+        snapshot();
+        mmio_read(DIAG_REG_VIDEO_STATUS, read_value);
+        check_result(read_value[9:5] == 5'b11111,
+               "extended video status is observable and synchronized");
+        video_capture_active = 1'b0;
+        video_capture_pending = 1'b0;
+        video_display_valid_async = 1'b0;
+        video_write_range_error = 1'b0;
+        video_write_sequence_error = 1'b0;
 
         // Natural 32-bit wrap is intentional for fabric-owned event counters.
         @(negedge fabric_clk);

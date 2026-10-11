@@ -38,6 +38,11 @@ module nes_diagnostic_subsystem #(
     input  logic        vga_hsync_toggle_async,
     input  logic        vga_vsync_toggle_async,
     input  logic        vga_active_async,
+    input  logic        video_capture_active,
+    input  logic        video_capture_pending,
+    input  logic        video_display_valid_async,
+    input  logic        video_write_range_error,
+    input  logic        video_write_sequence_error,
 
     input  logic        apu_cycle_event,
     input  logic        codec_init_busy,
@@ -146,6 +151,8 @@ module nes_diagnostic_subsystem #(
     logic [2:0] vga_frame_sync, vga_hsync_sync, vga_vsync_sync;
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
     logic [1:0] vga_active_sync;
+    (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+    logic [1:0] video_display_valid_sync;
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
     logic [1:0] video_pll_lock_sync, audio_pll_lock_sync;
     logic previous_video_pll_locked;
@@ -306,6 +313,7 @@ module nes_diagnostic_subsystem #(
             vga_hsync_sync <= '0;
             vga_vsync_sync <= '0;
             vga_active_sync <= '0;
+            video_display_valid_sync <= '0;
             video_pll_lock_sync <= '0;
             audio_pll_lock_sync <= '0;
             fabric_heartbeat <= '0;
@@ -368,6 +376,8 @@ module nes_diagnostic_subsystem #(
             vga_hsync_sync <= {vga_hsync_sync[1:0], vga_hsync_toggle_async};
             vga_vsync_sync <= {vga_vsync_sync[1:0], vga_vsync_toggle_async};
             vga_active_sync <= {vga_active_sync[0], vga_active_async};
+            video_display_valid_sync <= {video_display_valid_sync[0],
+                                         video_display_valid_async};
             video_pll_lock_sync <= {video_pll_lock_sync[0], video_pll_locked};
             audio_pll_lock_sync <= {audio_pll_lock_sync[0], audio_pll_locked};
             fabric_heartbeat <= fabric_heartbeat + 1'b1;
@@ -557,7 +567,14 @@ module nes_diagnostic_subsystem #(
                         ppu_nmi_level, ppu_scanline, ppu_dot};
                     snapshot_source_bank[11] <= ppu_frames;
                     snapshot_source_bank[12] <= ppu_nmi_events;
-                    snapshot_source_bank[13] <= {27'd0,
+                    // Bits 4:0 retain the Phase 5M meaning. Phase 6B uses
+                    // formerly reserved bits for safe framebuffer status;
+                    // only the display-valid level requires synchronization.
+                    snapshot_source_bank[13] <= {22'd0,
+                        video_write_sequence_error,
+                        video_write_range_error,
+                        video_display_valid_sync[1],
+                        video_capture_pending, video_capture_active,
                         vga_active_sync[1], vga_vsync_event,
                         vga_hsync_event, vga_frame_event,
                         video_pll_locked_fabric};

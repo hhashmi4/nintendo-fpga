@@ -80,7 +80,11 @@ mkdir -p \
     build/verilator/cpu_phase2h \
     build/verilator/cpu_phase2i \
     build/verilator/cpu_phase2j \
-    build/verilator/cpu_board_diag
+    build/verilator/cpu_board_diag \
+    build/verilator/video_720p_timing_phase6b \
+    build/verilator/nes_720p_scaler_phase6b \
+    build/verilator/nes_digital_video_phase6b \
+    build/verilator/nes_framebuffer_fault_phase6b
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
 PPU_WAVEFORM="build/sim/ppu_timing.fst"
@@ -204,6 +208,7 @@ CPU_PHASE2H_WAVEFORM="build/sim/cpu_phase2h.fst"
 CPU_PHASE2I_WAVEFORM="build/sim/cpu_phase2i.fst"
 CPU_PHASE2J_WAVEFORM="build/sim/cpu_phase2j.fst"
 CPU_BOARD_DIAG_WAVEFORM="build/sim/cpu_board_diag.fst"
+SHARED_VIDEO_RESULTS="build/sim/phase6b_shared_video_rtl.txt"
 rm -f \
     "$PLATFORM_WAVEFORM" \
     "$PPU_WAVEFORM" \
@@ -325,7 +330,8 @@ rm -f \
     "$CPU_PHASE2H_WAVEFORM" \
     "$CPU_PHASE2I_WAVEFORM" \
     "$CPU_PHASE2J_WAVEFORM" \
-    "$CPU_BOARD_DIAG_WAVEFORM"
+    "$CPU_BOARD_DIAG_WAVEFORM" \
+    "$SHARED_VIDEO_RESULTS"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -1745,6 +1751,55 @@ if [[ ! -s "$CPU_BOARD_DIAG_WAVEFORM" ]]; then
     exit 1
 fi
 
+SHARED_VIDEO_RTL_FILES=(
+    rtl/video/video_720p_timing.sv
+    rtl/video/nes_720p_scaler.sv
+    rtl/video/nes_palette_rgb.sv
+    rtl/video/nes_framebuffer.sv
+    rtl/video/nes_720p_video.sv
+    rtl/video/nes_digital_video_pipeline.sv
+)
+
+verilator --binary --timing --Wall -Wno-BLKSEQ --assert \
+    --Mdir build/verilator/video_720p_timing_phase6b \
+    --top-module video_720p_timing_tb \
+    -o video_720p_timing_tb \
+    rtl/video/video_720p_timing.sv \
+    sim/video_720p_timing_tb.sv
+
+build/verilator/video_720p_timing_phase6b/video_720p_timing_tb
+
+verilator --binary --timing --Wall --assert \
+    --Mdir build/verilator/nes_720p_scaler_phase6b \
+    --top-module nes_720p_scaler_tb \
+    -o nes_720p_scaler_tb \
+    rtl/video/nes_720p_scaler.sv \
+    sim/nes_720p_scaler_tb.sv
+
+build/verilator/nes_720p_scaler_phase6b/nes_720p_scaler_tb
+
+verilator --binary --timing --Wall -Wno-BLKSEQ -Wno-UNUSEDSIGNAL \
+    --assert \
+    --Mdir build/verilator/nes_digital_video_phase6b \
+    --top-module nes_digital_video_pipeline_tb \
+    -o nes_digital_video_pipeline_tb \
+    "${SHARED_VIDEO_RTL_FILES[@]}" \
+    sim/nes_digital_video_pipeline_tb.sv
+
+build/verilator/nes_digital_video_phase6b/nes_digital_video_pipeline_tb
+
+# Assertions intentionally remain disabled in this one target so directed
+# malformed write coordinates can verify the synthesizable sticky fault flags.
+verilator --binary --timing --Wall -Wno-BLKSEQ -Wno-UNUSEDSIGNAL \
+    --Mdir build/verilator/nes_framebuffer_fault_phase6b \
+    --top-module nes_framebuffer_fault_tb \
+    -o nes_framebuffer_fault_tb \
+    rtl/video/nes_framebuffer.sv \
+    sim/nes_framebuffer_fault_tb.sv
+
+build/verilator/nes_framebuffer_fault_phase6b/nes_framebuffer_fault_tb
+python3 scripts/verify_shared_video.py "$SHARED_VIDEO_RESULTS"
+
 VIDEO_PHASE3K_RTL_FILES=(
     rtl/video/vga_timing.sv
     rtl/video/vga_nes_scaler.sv
@@ -1938,6 +1993,7 @@ echo "NES Developer pages Phase 4E-D frames: $ROOT_DIR/$NES_DEBUG_PAGES_ARTIFACT
 echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"
+echo "Phase 6B shared video RTL/model results: $ROOT_DIR/$SHARED_VIDEO_RESULTS"
 echo "NES/VGA Phase 3K trace: $ROOT_DIR/$NES_VGA_PHASE3K_TRACE"
 echo "NES/VGA playable Phase 4D-B trace: $ROOT_DIR/$NES_VGA_PHASE4DB_TRACE"
 echo "NES/VGA playable Phase 4E-C frame: $ROOT_DIR/$NES_VGA_PHASE4EC_FRAME"
