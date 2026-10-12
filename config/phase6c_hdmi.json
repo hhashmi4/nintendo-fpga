@@ -1,0 +1,53 @@
+{
+  "phase": "6C",
+  "status": "simulation-qualified-hardware-unverified",
+  "transmitter": {
+    "candidate": "ADV7513BSWZ",
+    "production_approved": false,
+    "main_i2c_address_8bit": "0x72",
+    "main_i2c_address_7bit": "0x39",
+    "edid_i2c_address_8bit": "0x7e",
+    "edid_i2c_address_7bit": "0x3f",
+    "pd_active_high_for_selected_address": true,
+    "post_supply_i2c_delay_ms": 200,
+    "requires_physical_qualification": true
+  },
+  "video": {
+    "mode": "1280x720p60",
+    "pixel_clock_hz": 74250000,
+    "rgb_bits": 24,
+    "input_id": 0,
+    "clock_capture_edge": "rising",
+    "forwarded_clock_inverted": true,
+    "hsync_positive": true,
+    "vsync_positive": true,
+    "active_width": 1280,
+    "active_height": 720,
+    "horizontal_front_porch": 110,
+    "horizontal_sync": 40,
+    "horizontal_back_porch": 220,
+    "horizontal_total": 1650,
+    "vertical_front_porch": 5,
+    "vertical_sync": 5,
+    "vertical_back_porch": 20,
+    "vertical_total": 750,
+    "cta_vic": 4
+  },
+  "control": {
+    "clock_hz": 50000000,
+    "i2c_hz": 100000,
+    "configuration_entries": 24,
+    "transaction_retries": 2,
+    "hpd_debounce_ms": 5,
+    "audio_configured": false,
+    "hdcp_enabled": false
+  },
+  "physical_boundary": {
+    "de1_soc_has_native_hdmi_transmitter": false,
+    "de1_soc_pin_assignments_added": false,
+    "tmds_implemented_in_fpga": false,
+    "external_power_rails_verified": false,
+    "pcb_signal_integrity_verified": false,
+    "sink_interoperability_verified": false
+  }
+}

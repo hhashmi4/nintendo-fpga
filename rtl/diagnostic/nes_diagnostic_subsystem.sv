@@ -44,6 +44,23 @@ module nes_diagnostic_subsystem #(
     input  logic        video_write_range_error,
     input  logic        video_write_sequence_error,
 
+    // Phase 6C controller-domain observations.  The HDMI controller already
+    // synchronizes HPD, pixel-lock, and frame toggles into fabric_clk.
+    input  logic        hdmi_transmitter_present,
+    input  logic        hdmi_transmitter_configured,
+    input  logic        hdmi_transmitter_fault,
+    input  logic [1:0]  hdmi_hpd_state,
+    input  logic        hdmi_edid_valid,
+    input  logic        hdmi_mode_supported,
+    input  logic        hdmi_video_clock_locked,
+    input  logic        hdmi_video_enabled,
+    input  logic [3:0]  hdmi_startup_state,
+    input  logic [31:0] hdmi_video_frames,
+    input  logic [31:0] hdmi_i2c_nacks,
+    input  logic [31:0] hdmi_i2c_timeouts,
+    input  logic [31:0] hdmi_recoveries,
+    input  logic [7:0]  hdmi_last_error,
+
     input  logic        apu_cycle_event,
     input  logic        codec_init_busy,
     input  logic        codec_init_done,
@@ -102,7 +119,7 @@ module nes_diagnostic_subsystem #(
 );
     import nes_diagnostic_mmio_pkg::*;
 
-    localparam integer SNAPSHOT_WORDS = 80;
+    localparam integer SNAPSHOT_WORDS = 86;
     localparam integer TRACE_WORD_BASE = 48;
 
     logic [31:0] snapshot_source_bank [0:SNAPSHOT_WORDS-1];
@@ -635,6 +652,18 @@ module nes_diagnostic_subsystem #(
                         snapshot_source_bank[TRACE_WORD_BASE + index * 2 + 1]
                             <= trace_header[index];
                     end
+                    snapshot_source_bank[80] <= {19'd0,
+                        hdmi_startup_state, hdmi_video_enabled,
+                        hdmi_video_clock_locked, hdmi_mode_supported,
+                        hdmi_edid_valid, hdmi_hpd_state,
+                        hdmi_transmitter_fault,
+                        hdmi_transmitter_configured,
+                        hdmi_transmitter_present};
+                    snapshot_source_bank[81] <= hdmi_video_frames;
+                    snapshot_source_bank[82] <= hdmi_i2c_nacks;
+                    snapshot_source_bank[83] <= hdmi_i2c_timeouts;
+                    snapshot_source_bank[84] <= hdmi_recoveries;
+                    snapshot_source_bank[85] <= {24'd0, hdmi_last_error};
                 end
                 acknowledge_toggle_source <= request_sync[2];
                 end
@@ -800,6 +829,18 @@ module nes_diagnostic_subsystem #(
                             trace_read_index * 2 + 1][23:0]};
                     DIAG_REG_TRACE_OVERFLOW:
                         avs_readdata <= snapshot_mmio_bank[46];
+                    DIAG_REG_HDMI_STATUS:
+                        avs_readdata <= snapshot_mmio_bank[80];
+                    DIAG_REG_HDMI_VIDEO_FRAMES:
+                        avs_readdata <= snapshot_mmio_bank[81];
+                    DIAG_REG_HDMI_I2C_NACKS:
+                        avs_readdata <= snapshot_mmio_bank[82];
+                    DIAG_REG_HDMI_I2C_TIMEOUTS:
+                        avs_readdata <= snapshot_mmio_bank[83];
+                    DIAG_REG_HDMI_RECOVERIES:
+                        avs_readdata <= snapshot_mmio_bank[84];
+                    DIAG_REG_HDMI_LAST_ERROR:
+                        avs_readdata <= snapshot_mmio_bank[85];
                     default: avs_readdata <= 32'h0000_0000;
                 endcase
             end

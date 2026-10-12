@@ -798,6 +798,23 @@ module de1_soc_nes_vga_top #(
         .video_display_valid_async(framebuffer_valid),
         .video_write_range_error(write_range_error),
         .video_write_sequence_error(write_sequence_error),
+        // The stock DE1-SoC has no HDMI transmitter or routed RGB/DDC/HPD
+        // pins.  Preserve the versioned diagnostic extension, but report the
+        // physically honest disconnected state in the production VGA image.
+        .hdmi_transmitter_present(1'b0),
+        .hdmi_transmitter_configured(1'b0),
+        .hdmi_transmitter_fault(1'b0),
+        .hdmi_hpd_state(2'd0),
+        .hdmi_edid_valid(1'b0),
+        .hdmi_mode_supported(1'b0),
+        .hdmi_video_clock_locked(1'b0),
+        .hdmi_video_enabled(1'b0),
+        .hdmi_startup_state(4'd0),
+        .hdmi_video_frames(32'd0),
+        .hdmi_i2c_nacks(32'd0),
+        .hdmi_i2c_timeouts(32'd0),
+        .hdmi_recoveries(32'd0),
+        .hdmi_last_error(8'd0),
         .apu_cycle_event(nes_core_cpu_cycle_slot),
         .codec_init_busy(codec_init_busy),
         .codec_init_done(codec_init_done),

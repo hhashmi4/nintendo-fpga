@@ -120,7 +120,12 @@ synthesizable 1280x720p60 digital pipeline: a 74.25 MHz clock/timing core,
 deterministic 4:3 scaling and pillarboxing, atomic three-bank frame transfer,
 RGB888 output, preserved Developer Mode coordinates, independent models, and
 standalone all-corners Cyclone V qualification. Production VGA remains
-unchanged; no HDMI transmitter or physical-HDMI validation is included.
+unchanged. Phase 6C adds the logically integrated external-transmitter
+boundary: aligned RGB888/sync/DE, reusable open-drain I2C, an official-guide
+ADV7513 qualification profile and readback, synchronized/debounced HPD,
+buffered EDID validation, fail-closed startup/recovery, and versioned HDMI
+diagnostics. The DE1-SoC has no native transmitter or routed HDMI interface,
+so all physical HDMI results remain explicitly unverified.
 
 ## Phase 1 foundation
 
@@ -1093,6 +1098,33 @@ Memory tradeoffs, timing/scaling equations, CDC ownership, digital interface,
 verification evidence, Quartus results, warnings and limitations are documented
 in [`docs/phase6b-shared-video-pipeline.md`](docs/phase6b-shared-video-pipeline.md).
 
+## Phase 6C — HDMI transmitter interface and control
+
+- Clean 24-bit RGB, positive HSYNC/VSYNC, DE, frame-start, and inverted
+  74.25 MHz forwarded-clock boundary fed independently from Phase 6B
+- ADV7513 qualification candidate using official 0x72 main-map and default
+  0x7e EDID-map addresses; 200 ms address-latch delay; masked, ordered
+  video-only register updates; readback; ACK/NACK/timeout and bounded retries
+- Reusable open-drain I2C master with register reads, repeated START,
+  clock-stretch timeout, and nine-pulse stuck-bus recovery
+- Symmetric 5 ms HPD debounce, buffered EDID header/checksum/CTA VIC 4 and
+  detailed-timing validation, deterministic startup and fail-closed recovery
+- Phase 5M diagnostic MMIO v1.1 append-only extension for presence,
+  configuration, fault, HPD, EDID/mode/clock state, frame/transport/recovery
+  counters, startup state, and stable HDMI-local fault code
+- Independent Python models and self-checking I2C, configuration, EDID,
+  controller, fault-injection, ten-frame RGB/timing/border/Developer Mode, and
+  retained VGA regression coverage
+- Standalone Cyclone V logical-interface Quartus project with every HDMI
+  boundary signal declared virtual and no production DE1-SoC HDMI pin claim
+- No HDMI audio, FPGA-native TMDS, USB-C DisplayPort, PCB design, or physical
+  sink qualification
+
+The qualification boundary, official references, interface/register
+contracts, verification evidence, timing results, hardware limitations, and
+physical test plan are documented in
+[`docs/phase6c-hdmi-transmitter.md`](docs/phase6c-hdmi-transmitter.md).
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
@@ -1143,7 +1175,9 @@ Phase 5K real-time scheduler/FIR/DC/PCM/FIFO/codec/I2S path, fault injection,
 test tone, and extended exact-rate run, the Phase 5M diagnostic register/fault/
 trace/CDC path and independent model, and the Phase 6B 720p timing, scaling,
 three-bank ownership, asynchronous frame-transfer, framebuffer fault, and
-independent RTL-artifact comparisons,
+independent RTL-artifact comparisons, plus the Phase 6C RGB/sync alignment,
+I2C, configuration/readback, HPD, EDID, startup/recovery, diagnostics, fault
+injection, ten-frame video run, and independent RTL/model comparisons,
 and the self-checking platform, Phase
 4A exhaustive system-bus/RAM test, Phase 4B Mapper 0 and cartridge-boot tests,
 Phase 4C exhaustive controller and integrated cartridge-poll tests, Phase
@@ -1219,6 +1253,13 @@ all-corners timing proof:
 
 ```bash
 ./scripts/build_phase6b_video_quartus.sh
+```
+
+Run the Phase 6C logical external-transmitter qualification build. Its HDMI
+ports are deliberately virtual because the stock board has no transmitter:
+
+```bash
+./scripts/build_phase6c_hdmi_quartus.sh
 ```
 
 Run standalone CPU analysis and synthesis without changing the board top:

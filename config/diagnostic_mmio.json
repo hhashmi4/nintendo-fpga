@@ -4,8 +4,8 @@
   "span_bytes": 512,
   "magic": "0x4e455344",
   "version_major": 1,
-  "version_minor": 0,
-  "build_id": "0x0005000d",
+  "version_minor": 1,
+  "build_id": "0x0006000c",
   "trace_depth": 16,
   "capabilities": {
     "ATOMIC_SNAPSHOT": 0,
@@ -13,7 +13,8 @@
     "BOUNDED_TRACE": 2,
     "FAULT_INJECTION": 3,
     "CLOCK_HEARTBEATS": 4,
-    "OFFLINE_MODEL": 5
+    "OFFLINE_MODEL": 5,
+    "HDMI_TX": 6
   },
   "availability": {
     "CPU_CYCLES": 0,
@@ -27,7 +28,8 @@
     "LOADER": 8,
     "DMA": 9,
     "CARTRIDGE": 10,
-    "CPU_INSTRUCTIONS": 11
+    "CPU_INSTRUCTIONS": 11,
+    "HDMI_TX": 12
   },
   "control_bits": {
     "SNAPSHOT": 0,
@@ -99,7 +101,13 @@
     "TRACE_TIMESTAMP": "0x0e8",
     "TRACE_EVENT": "0x0ec",
     "TRACE_PAYLOAD": "0x0f0",
-    "TRACE_OVERFLOW": "0x0f4"
+    "TRACE_OVERFLOW": "0x0f4",
+    "HDMI_STATUS": "0x0f8",
+    "HDMI_VIDEO_FRAMES": "0x0fc",
+    "HDMI_I2C_NACKS": "0x100",
+    "HDMI_I2C_TIMEOUTS": "0x104",
+    "HDMI_RECOVERIES": "0x108",
+    "HDMI_LAST_ERROR": "0x10c"
   },
   "faults": {
     "CLOCK_UNLOCKED": 1,

@@ -36,6 +36,20 @@ module nes_diagnostic_phase5m_tb;
     logic video_display_valid_async = 1'b0;
     logic video_write_range_error = 1'b0;
     logic video_write_sequence_error = 1'b0;
+    logic hdmi_transmitter_present = 1'b0;
+    logic hdmi_transmitter_configured = 1'b0;
+    logic hdmi_transmitter_fault = 1'b0;
+    logic [1:0] hdmi_hpd_state = 2'd0;
+    logic hdmi_edid_valid = 1'b0;
+    logic hdmi_mode_supported = 1'b0;
+    logic hdmi_video_clock_locked = 1'b0;
+    logic hdmi_video_enabled = 1'b0;
+    logic [3:0] hdmi_startup_state = 4'd0;
+    logic [31:0] hdmi_video_frames = 32'd0;
+    logic [31:0] hdmi_i2c_nacks = 32'd0;
+    logic [31:0] hdmi_i2c_timeouts = 32'd0;
+    logic [31:0] hdmi_recoveries = 32'd0;
+    logic [7:0] hdmi_last_error = 8'd0;
     logic apu_cycle_event = 1'b0;
     logic codec_init_busy = 1'b0;
     logic codec_init_done = 1'b0;
@@ -252,6 +266,37 @@ module nes_diagnostic_phase5m_tb;
         video_display_valid_async = 1'b0;
         video_write_range_error = 1'b0;
         video_write_sequence_error = 1'b0;
+
+        // Phase 6C appends a versioned HDMI bank without changing any Phase
+        // 5M address.  Values arrive as one bundled atomic snapshot.
+        hdmi_transmitter_present = 1'b1;
+        hdmi_transmitter_configured = 1'b1;
+        hdmi_transmitter_fault = 1'b0;
+        hdmi_hpd_state = 2'd2;
+        hdmi_edid_valid = 1'b1;
+        hdmi_mode_supported = 1'b1;
+        hdmi_video_clock_locked = 1'b1;
+        hdmi_video_enabled = 1'b1;
+        hdmi_startup_state = 4'd7;
+        hdmi_video_frames = 32'd1234;
+        hdmi_i2c_nacks = 32'd5;
+        hdmi_i2c_timeouts = 32'd6;
+        hdmi_recoveries = 32'd7;
+        hdmi_last_error = 8'd8;
+        snapshot();
+        mmio_read(DIAG_REG_HDMI_STATUS, read_value);
+        check_result(read_value[12:0] == 13'b0111_1_1_1_1_10_0_1_1,
+               "HDMI status fields retain their documented bit positions");
+        mmio_read(DIAG_REG_HDMI_VIDEO_FRAMES, read_value);
+        check_result(read_value == 1234, "HDMI frame counter snapshot");
+        mmio_read(DIAG_REG_HDMI_I2C_NACKS, read_value);
+        check_result(read_value == 5, "HDMI NACK counter snapshot");
+        mmio_read(DIAG_REG_HDMI_I2C_TIMEOUTS, read_value);
+        check_result(read_value == 6, "HDMI timeout counter snapshot");
+        mmio_read(DIAG_REG_HDMI_RECOVERIES, read_value);
+        check_result(read_value == 7, "HDMI recovery counter snapshot");
+        mmio_read(DIAG_REG_HDMI_LAST_ERROR, read_value);
+        check_result(read_value[7:0] == 8, "HDMI stable local error code");
 
         // Natural 32-bit wrap is intentional for fabric-owned event counters.
         @(negedge fabric_clk);

@@ -256,6 +256,27 @@ verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
     rtl/video/video_720p_pll.sv \
     rtl/video/phase6b_video_top.sv
 
+HDMI_TX_RTL_FILES=(
+    rtl/video/hdmi_tx_pkg.sv
+    rtl/video/hdmi_hpd_filter.sv
+    rtl/video/hdmi_rgb_output.sv
+    rtl/video/i2c_register_master.sv
+    rtl/video/adv7513_720p_profile.sv
+    rtl/video/adv7513_config_engine.sv
+    rtl/video/adv7513_edid_reader.sv
+    rtl/video/edid_720p_validator.sv
+    rtl/video/hdmi_tx_controller.sv
+)
+
+verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
+    --top-module phase6c_hdmi_top \
+    rtl/platform/reset_sync.sv \
+    "${SHARED_VIDEO_RTL_FILES[@]}" \
+    rtl/video/video_720p_pll.sv \
+    rtl/video/phase6b_video_top.sv \
+    "${HDMI_TX_RTL_FILES[@]}" \
+    rtl/video/phase6c_hdmi_top.sv
+
 verilator --lint-only --Wall \
     --top-module nes_runtime_cartridge \
     rtl/loader/nes_runtime_loader_pkg.sv \
