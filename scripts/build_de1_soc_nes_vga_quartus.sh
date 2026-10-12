@@ -74,6 +74,8 @@ if ! grep -q "Total PLLs[[:space:]]*; 2" "$FIT_REPORT"; then
     exit 1
 fi
 
+quartus_sta -t "$ROOT_DIR/scripts/report_de1_soc_nes_vga_timing.tcl"
+
 quartus_cpf -c "$SOF_PATH" "$RBF_PATH"
 if [[ ! -f "$RBF_PATH" ]]; then
     echo "ERROR: DE1-SoC NES/VGA RBF was not generated" >&2

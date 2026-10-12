@@ -84,7 +84,12 @@ mkdir -p \
     build/verilator/video_720p_timing_phase6b \
     build/verilator/nes_720p_scaler_phase6b \
     build/verilator/nes_digital_video_phase6b \
-    build/verilator/nes_framebuffer_fault_phase6b
+    build/verilator/nes_framebuffer_fault_phase6b \
+    build/verilator/i2c_register_master_phase6c \
+    build/verilator/edid_720p_validator_phase6c \
+    build/verilator/adv7513_config_engine_phase6c \
+    build/verilator/hdmi_tx_controller_phase6c \
+    build/verilator/hdmi_rgb_output_phase6c
 
 PLATFORM_WAVEFORM="build/sim/platform_foundation.fst"
 PPU_WAVEFORM="build/sim/ppu_timing.fst"
@@ -209,6 +214,8 @@ CPU_PHASE2I_WAVEFORM="build/sim/cpu_phase2i.fst"
 CPU_PHASE2J_WAVEFORM="build/sim/cpu_phase2j.fst"
 CPU_BOARD_DIAG_WAVEFORM="build/sim/cpu_board_diag.fst"
 SHARED_VIDEO_RESULTS="build/sim/phase6b_shared_video_rtl.txt"
+HDMI_CONTROLLER_RESULTS="build/sim/phase6c_hdmi_rtl.txt"
+HDMI_RGB_RESULTS="build/sim/phase6c_hdmi_rgb_rtl.txt"
 rm -f \
     "$PLATFORM_WAVEFORM" \
     "$PPU_WAVEFORM" \
@@ -331,7 +338,9 @@ rm -f \
     "$CPU_PHASE2I_WAVEFORM" \
     "$CPU_PHASE2J_WAVEFORM" \
     "$CPU_BOARD_DIAG_WAVEFORM" \
-    "$SHARED_VIDEO_RESULTS"
+    "$SHARED_VIDEO_RESULTS" \
+    "$HDMI_CONTROLLER_RESULTS" \
+    "$HDMI_RGB_RESULTS"
 
 RTL_FILES=(
     rtl/platform/platform_config_pkg.sv
@@ -614,8 +623,69 @@ build/verilator/nes_diagnostic_phase5m/nes_diagnostic_phase5m_tb
 python3 scripts/verify_diagnostic_phase5m.py \
     build/sim/phase5m_diagnostic_rtl.txt
 
+HDMI_TX_RTL_FILES=(
+    rtl/video/hdmi_tx_pkg.sv
+    rtl/video/hdmi_hpd_filter.sv
+    rtl/video/i2c_register_master.sv
+    rtl/video/adv7513_720p_profile.sv
+    rtl/video/adv7513_config_engine.sv
+    rtl/video/adv7513_edid_reader.sv
+    rtl/video/edid_720p_validator.sv
+    rtl/video/hdmi_tx_controller.sv
+)
+
+verilator --binary --timing --Wall -Wno-BLKSEQ --assert \
+    --Mdir build/verilator/i2c_register_master_phase6c \
+    --top-module i2c_register_master_tb \
+    -o i2c_register_master_tb \
+    rtl/video/i2c_register_master.sv \
+    sim/i2c_register_master_tb.sv
+build/verilator/i2c_register_master_phase6c/i2c_register_master_tb
+
+verilator --binary --timing --Wall -Wno-BLKSEQ --assert \
+    --Mdir build/verilator/edid_720p_validator_phase6c \
+    --top-module edid_720p_validator_tb \
+    -o edid_720p_validator_tb \
+    rtl/video/edid_720p_validator.sv \
+    sim/edid_720p_validator_tb.sv
+build/verilator/edid_720p_validator_phase6c/edid_720p_validator_tb
+
+verilator --binary --timing --Wall -Wno-BLKSEQ -Wno-UNUSEDPARAM --assert \
+    --Mdir build/verilator/adv7513_config_engine_phase6c \
+    --top-module adv7513_config_engine_tb \
+    -o adv7513_config_engine_tb \
+    rtl/video/hdmi_tx_pkg.sv \
+    rtl/video/adv7513_720p_profile.sv \
+    rtl/video/adv7513_config_engine.sv \
+    sim/adv7513_config_engine_tb.sv
+build/verilator/adv7513_config_engine_phase6c/adv7513_config_engine_tb
+
+verilator --binary --timing --Wall -Wno-BLKSEQ -Wno-UNUSEDPARAM --assert \
+    --Mdir build/verilator/hdmi_tx_controller_phase6c \
+    --top-module hdmi_tx_controller_tb \
+    -o hdmi_tx_controller_tb \
+    "${HDMI_TX_RTL_FILES[@]}" \
+    sim/hdmi_tx_controller_tb.sv
+build/verilator/hdmi_tx_controller_phase6c/hdmi_tx_controller_tb
+
+verilator --binary --timing --Wall -Wno-BLKSEQ -Wno-PINCONNECTEMPTY \
+    --assert \
+    --Mdir build/verilator/hdmi_rgb_output_phase6c \
+    --top-module hdmi_rgb_output_tb \
+    -o hdmi_rgb_output_tb \
+    rtl/video/video_720p_timing.sv \
+    rtl/video/nes_720p_scaler.sv \
+    rtl/video/nes_palette_rgb.sv \
+    rtl/video/nes_720p_video.sv \
+    rtl/video/hdmi_rgb_output.sv \
+    sim/hdmi_rgb_output_tb.sv
+build/verilator/hdmi_rgb_output_phase6c/hdmi_rgb_output_tb
+
+python3 scripts/verify_hdmi_transmitter.py \
+    "$HDMI_CONTROLLER_RESULTS" "$HDMI_RGB_RESULTS"
+
 if [[ "$SIM_PROFILE" == "--fast" ]]; then
-    echo "FAST RTL smoke passed: platform, Phase 5A-5G APU, Phase 4F-A/B/C loading, and Phase 5M diagnostics"
+    echo "FAST RTL smoke passed: platform, Phase 5A-5G APU, Phase 4F-A/B/C loading, Phase 5M diagnostics, and Phase 6C HDMI"
     exit 0
 fi
 
@@ -1994,6 +2064,8 @@ echo "NES Phase 3J waveform: $ROOT_DIR/$NES_PHASE3J_WAVEFORM"
 echo "VGA Phase 3K waveform: $ROOT_DIR/$VGA_PHASE3K_WAVEFORM"
 echo "VGA Phase 3K static trace: $ROOT_DIR/$VGA_PHASE3K_TRACE"
 echo "Phase 6B shared video RTL/model results: $ROOT_DIR/$SHARED_VIDEO_RESULTS"
+echo "Phase 6C HDMI controller RTL/model results: $ROOT_DIR/$HDMI_CONTROLLER_RESULTS"
+echo "Phase 6C HDMI RGB RTL/model results: $ROOT_DIR/$HDMI_RGB_RESULTS"
 echo "NES/VGA Phase 3K trace: $ROOT_DIR/$NES_VGA_PHASE3K_TRACE"
 echo "NES/VGA playable Phase 4D-B trace: $ROOT_DIR/$NES_VGA_PHASE4DB_TRACE"
 echo "NES/VGA playable Phase 4E-C frame: $ROOT_DIR/$NES_VGA_PHASE4EC_FRAME"

@@ -75,7 +75,7 @@ def collect_report(backend: DiagnosticBackend, client: DiagnosticClient) -> dict
         warnings.append("Physical DE1-SoC hardware was not accessed; hardware checks are NOT TESTED.")
     if faults:
         warnings.append(f"{len(faults)} sticky diagnostic fault(s) are present.")
-    unavailable = ["cpu_instruction_retirement"]
+    unavailable = ["cpu_instruction_retirement", "physical_hdmi_transmitter"]
     if not hardware_available:
         unavailable.extend([
             "de1_soc_board",
@@ -102,6 +102,9 @@ def collect_report(backend: DiagnosticBackend, client: DiagnosticClient) -> dict
             "fpga_clocks": "OBSERVED" if hardware_available else "NOT TESTED",
             "audio_codec": "OBSERVED" if hardware_available else "NOT TESTED",
             "vga": "OBSERVED" if hardware_available else "NOT TESTED",
+            # The stock DE1-SoC has no HDMI transmitter. This remains
+            # unobserved even when the existing VGA board is available.
+            "hdmi_transmitter": "NOT TESTED",
         },
         "observed_registers": {
             name: f"0x{value:08x}" for name, value in sorted(snapshot.items())

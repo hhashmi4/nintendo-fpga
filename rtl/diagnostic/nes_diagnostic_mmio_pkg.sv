@@ -4,10 +4,10 @@
 // Edit config/diagnostic_mmio.json, not this file.
 package nes_diagnostic_mmio_pkg;
     localparam logic [31:0] DIAG_MAGIC = 32'h4e455344;
-    localparam logic [31:0] DIAG_VERSION = 32'h00010000;
-    localparam logic [31:0] DIAG_BUILD_ID = 32'h0005000d;
-    localparam logic [31:0] DIAG_CAPABILITIES = 32'h0000003f;
-    localparam logic [31:0] DIAG_AVAILABILITY = 32'h000007ff;
+    localparam logic [31:0] DIAG_VERSION = 32'h00010001;
+    localparam logic [31:0] DIAG_BUILD_ID = 32'h0006000c;
+    localparam logic [31:0] DIAG_CAPABILITIES = 32'h0000007f;
+    localparam logic [31:0] DIAG_AVAILABILITY = 32'h000017ff;
     localparam integer DIAG_SPAN_BYTES = 512;
     localparam integer DIAG_TRACE_DEPTH = 16;
     localparam logic [31:0] DIAG_HPS_WINDOW_BASE = 32'hff200000;
@@ -77,6 +77,12 @@ package nes_diagnostic_mmio_pkg;
     localparam logic [8:0] DIAG_REG_TRACE_EVENT = 9'h0ec;
     localparam logic [8:0] DIAG_REG_TRACE_PAYLOAD = 9'h0f0;
     localparam logic [8:0] DIAG_REG_TRACE_OVERFLOW = 9'h0f4;
+    localparam logic [8:0] DIAG_REG_HDMI_STATUS = 9'h0f8;
+    localparam logic [8:0] DIAG_REG_HDMI_VIDEO_FRAMES = 9'h0fc;
+    localparam logic [8:0] DIAG_REG_HDMI_I2C_NACKS = 9'h100;
+    localparam logic [8:0] DIAG_REG_HDMI_I2C_TIMEOUTS = 9'h104;
+    localparam logic [8:0] DIAG_REG_HDMI_RECOVERIES = 9'h108;
+    localparam logic [8:0] DIAG_REG_HDMI_LAST_ERROR = 9'h10c;
 
     localparam integer DIAG_CONTROL_SNAPSHOT_BIT = 0;
     localparam integer DIAG_CONTROL_FAULT_CLEAR_BIT = 1;

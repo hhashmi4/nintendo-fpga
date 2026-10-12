@@ -148,6 +148,7 @@ class DiagnosticClient:
         loader = snapshot["loader_status"]
         dma = snapshot["dma_status"]
         cartridge = snapshot["cartridge_status"]
+        hdmi = snapshot["hdmi_status"]
         availability = snapshot["availability"]
         return {
             "system": {
@@ -185,6 +186,22 @@ class DiagnosticClient:
                 "pll_locked": bool(video & 1),
                 "active": bool(video & 16),
                 "frames": snapshot["vga_frames"],
+            },
+            "hdmi": {
+                "transmitter_present": bool(hdmi & (1 << 0)),
+                "transmitter_configured": bool(hdmi & (1 << 1)),
+                "transmitter_fault": bool(hdmi & (1 << 2)),
+                "hpd_state": (hdmi >> 3) & 0x3,
+                "edid_valid": bool(hdmi & (1 << 5)),
+                "mode_supported": bool(hdmi & (1 << 6)),
+                "video_clock_locked": bool(hdmi & (1 << 7)),
+                "video_enabled": bool(hdmi & (1 << 8)),
+                "startup_state": (hdmi >> 9) & 0xF,
+                "video_frames": snapshot["hdmi_video_frames"],
+                "i2c_nacks": snapshot["hdmi_i2c_nacks"],
+                "i2c_timeouts": snapshot["hdmi_i2c_timeouts"],
+                "recoveries": snapshot["hdmi_recoveries"],
+                "last_error": snapshot["hdmi_last_error"] & 0xFF,
             },
             "audio": {
                 "pll_locked": bool(audio & 1),

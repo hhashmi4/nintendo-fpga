@@ -1,0 +1,72 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY phase6c_hdmi_top
+
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/reset_sync.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_timing.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_720p_scaler.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_palette_rgb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_framebuffer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_720p_video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_digital_video_pipeline.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_pll.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/phase6b_video_top.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/hdmi_tx_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/hdmi_hpd_filter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/hdmi_rgb_output.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/i2c_register_master.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/adv7513_720p_profile.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/adv7513_config_engine.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/adv7513_edid_reader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/edid_720p_validator.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/hdmi_tx_controller.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/phase6c_hdmi_top.sv
+set_global_assignment -name SDC_FILE ../constraints/phase6c_hdmi.sdc
+set_global_assignment -name VERILOG_MACRO "ALTERA_SYNTHESIS=1"
+
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_phase6c_hdmi/output_files
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS "AS INPUT TRI-STATED"
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+
+set_location_assignment PIN_AF14 -to CLOCK_50
+set_location_assignment PIN_AA14 -to RESET_N
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RESET_N
+
+# The DE1-SoC has no routed RGB888 HDMI transmitter.  Every Phase 6C
+# boundary signal is intentionally virtual; a future qualified carrier must
+# supply explicit electrical standards, voltage translation, and locations.
+set_instance_assignment -name VIRTUAL_PIN ON -to DEVELOPER_LAYOUT
+set_instance_assignment -name VIRTUAL_PIN ON -to TEST_PATTERN
+set_instance_assignment -name VIRTUAL_PIN ON -to CAPTURE_FREEZE
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_HPD
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_I2C_SCL_IN
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_I2C_SDA_IN
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_I2C_SCL_DRIVE_LOW
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_I2C_SDA_DRIVE_LOW
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_PD
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_PCLK
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_RGB[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_HSYNC
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_VSYNC
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_DE
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_FRAME_START
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_VIDEO_ENABLED
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_TX_PRESENT
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_TX_CONFIGURED
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_TX_FAULT
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_HPD_STATE[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_EDID_VALID
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_MODE_SUPPORTED
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_STARTUP_STATE[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_LAST_ERROR[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_VIDEO_FRAMES[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_I2C_NACKS[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_I2C_TIMEOUTS[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_RECOVERIES[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to VIDEO_LOCKED
+set_instance_assignment -name VIRTUAL_PIN ON -to VIDEO_ERROR
+
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"

@@ -196,6 +196,35 @@ def test_trace_readout_reorders_wrapped_physical_entries() -> None:
     assert [event["payload"] for event in events] == [12, 13, 10, 11]
 
 
+def test_phase6c_hdmi_status_extension_is_decoded() -> None:
+    backend = OfflineDiagnosticBackend()
+    backend.words[regs.REG_HDMI_STATUS] = int("0111111110011", 2)
+    backend.words[regs.REG_HDMI_VIDEO_FRAMES] = 123
+    backend.words[regs.REG_HDMI_I2C_NACKS] = 4
+    backend.words[regs.REG_HDMI_I2C_TIMEOUTS] = 5
+    backend.words[regs.REG_HDMI_RECOVERIES] = 6
+    backend.words[regs.REG_HDMI_LAST_ERROR] = 8
+    status = DiagnosticClient(backend).interpreted_status(
+        DiagnosticClient(backend).snapshot()
+    )["hdmi"]
+    assert status == {
+        "transmitter_present": True,
+        "transmitter_configured": True,
+        "transmitter_fault": False,
+        "hpd_state": 2,
+        "edid_valid": True,
+        "mode_supported": True,
+        "video_clock_locked": True,
+        "video_enabled": True,
+        "startup_state": 7,
+        "video_frames": 123,
+        "i2c_nacks": 4,
+        "i2c_timeouts": 5,
+        "recoveries": 6,
+        "last_error": 8,
+    }
+
+
 def test_json_and_text_reports_label_offline_hardware_not_tested(
     tmp_path: Path,
 ) -> None:
