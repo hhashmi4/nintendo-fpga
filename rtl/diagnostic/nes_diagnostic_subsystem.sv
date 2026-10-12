@@ -7,7 +7,8 @@ module nes_diagnostic_subsystem #(
     parameter integer CPU_STALL_LIMIT = 50_000_000,
     parameter integer VIDEO_STALL_LIMIT = 100_000_000,
     parameter integer DMA_TIMEOUT_LIMIT = 1_000_000,
-    parameter integer LOADER_TIMEOUT_LIMIT = 250_000_000
+    parameter integer LOADER_TIMEOUT_LIMIT = 250_000_000,
+    parameter bit HDMI_AUDIO_AVAILABLE = 1'b0
 ) (
     input  logic        fabric_clk,
     input  logic        fabric_reset,
@@ -60,6 +61,22 @@ module nes_diagnostic_subsystem #(
     input  logic [31:0] hdmi_i2c_timeouts,
     input  logic [31:0] hdmi_recoveries,
     input  logic [7:0]  hdmi_last_error,
+
+    // Phase 6D HDMI-audio status is already synchronized/counted in the
+    // 50 MHz controller domain; it joins the same atomic snapshot bundle.
+    input  logic        hdmi_audio_enabled,
+    input  logic        hdmi_audio_configured,
+    input  logic        hdmi_audio_muted,
+    input  logic        hdmi_audio_clock_locked,
+    input  logic        hdmi_audio_fault,
+    input  logic [3:0]  hdmi_audio_state,
+    input  logic [31:0] hdmi_audio_sample_count,
+    input  logic [15:0] hdmi_audio_fifo_occupancy,
+    input  logic [31:0] hdmi_audio_fifo_underruns,
+    input  logic [31:0] hdmi_audio_fifo_overruns,
+    input  logic [31:0] hdmi_audio_reconnect_count,
+    input  logic [7:0]  hdmi_audio_last_error,
+    output logic        hdmi_audio_fault_clear,
 
     input  logic        apu_cycle_event,
     input  logic        codec_init_busy,
@@ -119,7 +136,7 @@ module nes_diagnostic_subsystem #(
 );
     import nes_diagnostic_mmio_pkg::*;
 
-    localparam integer SNAPSHOT_WORDS = 86;
+    localparam integer SNAPSHOT_WORDS = 93;
     localparam integer TRACE_WORD_BASE = 48;
 
     logic [31:0] snapshot_source_bank [0:SNAPSHOT_WORDS-1];
@@ -321,6 +338,7 @@ module nes_diagnostic_subsystem #(
 
     always_ff @(posedge fabric_clk) begin
         if (fabric_reset) begin
+            hdmi_audio_fault_clear <= 1'b0;
             request_sync <= '0;
             acknowledge_toggle_source <= 1'b0;
             control_source_bank <= '0;
@@ -388,6 +406,7 @@ module nes_diagnostic_subsystem #(
             for (index = 0; index < SNAPSHOT_WORDS; index = index + 1)
                 snapshot_source_bank[index] <= '0;
         end else begin
+            hdmi_audio_fault_clear <= 1'b0;
             request_sync <= {request_sync[1:0], request_toggle_mmio};
             vga_frame_sync <= {vga_frame_sync[1:0], vga_frame_toggle_async};
             vga_hsync_sync <= {vga_hsync_sync[1:0], vga_hsync_toggle_async};
@@ -530,6 +549,8 @@ module nes_diagnostic_subsystem #(
                 end
                 if (command_capture_pending) begin
                     command_capture_pending <= 1'b0;
+                    hdmi_audio_fault_clear <=
+                        control_source_bank[DIAG_CONTROL_HDMI_AUDIO_FAULT_CLEAR_BIT];
                 if (control_source_bank[DIAG_CONTROL_FAULT_CLEAR_BIT]) begin
                     fault_flags <= (fault_flags & ~clear_mask_source_bank) |
                                    detected_faults;
@@ -664,6 +685,18 @@ module nes_diagnostic_subsystem #(
                     snapshot_source_bank[83] <= hdmi_i2c_timeouts;
                     snapshot_source_bank[84] <= hdmi_recoveries;
                     snapshot_source_bank[85] <= {24'd0, hdmi_last_error};
+                    snapshot_source_bank[86] <= {23'd0,
+                        hdmi_audio_state, hdmi_audio_fault,
+                        hdmi_audio_clock_locked, hdmi_audio_muted,
+                        hdmi_audio_configured, hdmi_audio_enabled};
+                    snapshot_source_bank[87] <= hdmi_audio_sample_count;
+                    snapshot_source_bank[88] <= {16'd0,
+                        hdmi_audio_fifo_occupancy};
+                    snapshot_source_bank[89] <= hdmi_audio_fifo_underruns;
+                    snapshot_source_bank[90] <= hdmi_audio_fifo_overruns;
+                    snapshot_source_bank[91] <= hdmi_audio_reconnect_count;
+                    snapshot_source_bank[92] <= {24'd0,
+                        hdmi_audio_last_error};
                 end
                 acknowledge_toggle_source <= request_sync[2];
                 end
@@ -741,7 +774,8 @@ module nes_diagnostic_subsystem #(
                         29'd0, command_rejected, snapshot_valid, command_busy};
                     DIAG_REG_SNAPSHOT_SEQUENCE:
                         avs_readdata <= snapshot_sequence;
-                    DIAG_REG_AVAILABILITY: avs_readdata <= DIAG_AVAILABILITY;
+                    DIAG_REG_AVAILABILITY: avs_readdata <= DIAG_AVAILABILITY &
+                        (HDMI_AUDIO_AVAILABLE ? 32'hffffffff : 32'hffffdfff);
                     DIAG_REG_RESET_CAUSE: avs_readdata <= snapshot_mmio_bank[0];
                     DIAG_REG_SYSTEM_STATUS: avs_readdata <= snapshot_mmio_bank[1];
                     DIAG_REG_CLOCK_STATUS: avs_readdata <= snapshot_mmio_bank[2];
@@ -841,6 +875,20 @@ module nes_diagnostic_subsystem #(
                         avs_readdata <= snapshot_mmio_bank[84];
                     DIAG_REG_HDMI_LAST_ERROR:
                         avs_readdata <= snapshot_mmio_bank[85];
+                    DIAG_REG_HDMI_AUDIO_STATUS:
+                        avs_readdata <= snapshot_mmio_bank[86];
+                    DIAG_REG_HDMI_AUDIO_SAMPLE_COUNT:
+                        avs_readdata <= snapshot_mmio_bank[87];
+                    DIAG_REG_HDMI_AUDIO_FIFO_OCCUPANCY:
+                        avs_readdata <= snapshot_mmio_bank[88];
+                    DIAG_REG_HDMI_AUDIO_FIFO_UNDERRUNS:
+                        avs_readdata <= snapshot_mmio_bank[89];
+                    DIAG_REG_HDMI_AUDIO_FIFO_OVERRUNS:
+                        avs_readdata <= snapshot_mmio_bank[90];
+                    DIAG_REG_HDMI_AUDIO_RECONNECT_COUNT:
+                        avs_readdata <= snapshot_mmio_bank[91];
+                    DIAG_REG_HDMI_AUDIO_LAST_ERROR:
+                        avs_readdata <= snapshot_mmio_bank[92];
                     default: avs_readdata <= 32'h0000_0000;
                 endcase
             end

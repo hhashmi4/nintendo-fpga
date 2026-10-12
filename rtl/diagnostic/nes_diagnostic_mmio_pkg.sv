@@ -4,10 +4,10 @@
 // Edit config/diagnostic_mmio.json, not this file.
 package nes_diagnostic_mmio_pkg;
     localparam logic [31:0] DIAG_MAGIC = 32'h4e455344;
-    localparam logic [31:0] DIAG_VERSION = 32'h00010001;
-    localparam logic [31:0] DIAG_BUILD_ID = 32'h0006000c;
-    localparam logic [31:0] DIAG_CAPABILITIES = 32'h0000007f;
-    localparam logic [31:0] DIAG_AVAILABILITY = 32'h000017ff;
+    localparam logic [31:0] DIAG_VERSION = 32'h00010002;
+    localparam logic [31:0] DIAG_BUILD_ID = 32'h0006000d;
+    localparam logic [31:0] DIAG_CAPABILITIES = 32'h000000ff;
+    localparam logic [31:0] DIAG_AVAILABILITY = 32'h000037ff;
     localparam integer DIAG_SPAN_BYTES = 512;
     localparam integer DIAG_TRACE_DEPTH = 16;
     localparam logic [31:0] DIAG_HPS_WINDOW_BASE = 32'hff200000;
@@ -83,6 +83,13 @@ package nes_diagnostic_mmio_pkg;
     localparam logic [8:0] DIAG_REG_HDMI_I2C_TIMEOUTS = 9'h104;
     localparam logic [8:0] DIAG_REG_HDMI_RECOVERIES = 9'h108;
     localparam logic [8:0] DIAG_REG_HDMI_LAST_ERROR = 9'h10c;
+    localparam logic [8:0] DIAG_REG_HDMI_AUDIO_STATUS = 9'h110;
+    localparam logic [8:0] DIAG_REG_HDMI_AUDIO_SAMPLE_COUNT = 9'h114;
+    localparam logic [8:0] DIAG_REG_HDMI_AUDIO_FIFO_OCCUPANCY = 9'h118;
+    localparam logic [8:0] DIAG_REG_HDMI_AUDIO_FIFO_UNDERRUNS = 9'h11c;
+    localparam logic [8:0] DIAG_REG_HDMI_AUDIO_FIFO_OVERRUNS = 9'h120;
+    localparam logic [8:0] DIAG_REG_HDMI_AUDIO_RECONNECT_COUNT = 9'h124;
+    localparam logic [8:0] DIAG_REG_HDMI_AUDIO_LAST_ERROR = 9'h128;
 
     localparam integer DIAG_CONTROL_SNAPSHOT_BIT = 0;
     localparam integer DIAG_CONTROL_FAULT_CLEAR_BIT = 1;
@@ -90,6 +97,7 @@ package nes_diagnostic_mmio_pkg;
     localparam integer DIAG_CONTROL_TRACE_TRIGGER_BIT = 3;
     localparam integer DIAG_CONTROL_TRACE_FREEZE_BIT = 4;
     localparam integer DIAG_CONTROL_TRACE_CLEAR_BIT = 5;
+    localparam integer DIAG_CONTROL_HDMI_AUDIO_FAULT_CLEAR_BIT = 6;
 
     localparam logic [7:0] DIAG_FAULT_CLOCK_UNLOCKED = 8'd1;
     localparam integer DIAG_FAULT_CLOCK_UNLOCKED_BIT = 0;

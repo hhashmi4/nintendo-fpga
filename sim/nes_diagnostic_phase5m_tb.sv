@@ -50,6 +50,22 @@ module nes_diagnostic_phase5m_tb;
     logic [31:0] hdmi_i2c_timeouts = 32'd0;
     logic [31:0] hdmi_recoveries = 32'd0;
     logic [7:0] hdmi_last_error = 8'd0;
+    logic hdmi_audio_enabled = 1'b0;
+    logic hdmi_audio_configured = 1'b0;
+    logic hdmi_audio_muted = 1'b1;
+    logic hdmi_audio_clock_locked = 1'b0;
+    logic hdmi_audio_fault = 1'b0;
+    logic [3:0] hdmi_audio_state = 4'd0;
+    logic [31:0] hdmi_audio_sample_count = 32'd0;
+    logic [15:0] hdmi_audio_fifo_occupancy = 16'd0;
+    logic [31:0] hdmi_audio_fifo_underruns = 32'd0;
+    logic [31:0] hdmi_audio_fifo_overruns = 32'd0;
+    logic [31:0] hdmi_audio_reconnect_count = 32'd0;
+    logic [7:0] hdmi_audio_last_error = 8'd0;
+    logic hdmi_audio_fault_clear;
+    integer hdmi_audio_clear_count = 0;
+    always @(posedge fabric_clk)
+        if (hdmi_audio_fault_clear) hdmi_audio_clear_count++;
     logic apu_cycle_event = 1'b0;
     logic codec_init_busy = 1'b0;
     logic codec_init_done = 1'b0;
@@ -113,7 +129,8 @@ module nes_diagnostic_phase5m_tb;
         .CPU_STALL_LIMIT(8),
         .VIDEO_STALL_LIMIT(8),
         .DMA_TIMEOUT_LIMIT(8),
-        .LOADER_TIMEOUT_LIMIT(8)
+        .LOADER_TIMEOUT_LIMIT(8),
+        .HDMI_AUDIO_AVAILABLE(1'b1)
     ) dut (.*);
 
     task automatic check_result(input logic condition, input string message);
@@ -297,6 +314,41 @@ module nes_diagnostic_phase5m_tb;
         check_result(read_value == 7, "HDMI recovery counter snapshot");
         mmio_read(DIAG_REG_HDMI_LAST_ERROR, read_value);
         check_result(read_value[7:0] == 8, "HDMI stable local error code");
+
+        // Phase 6D adds a non-overlapping, versioned HDMI-audio bank.
+        hdmi_audio_enabled = 1'b1;
+        hdmi_audio_configured = 1'b1;
+        hdmi_audio_muted = 1'b0;
+        hdmi_audio_clock_locked = 1'b1;
+        hdmi_audio_fault = 1'b1;
+        hdmi_audio_state = 4'd7;
+        hdmi_audio_sample_count = 32'd5678;
+        hdmi_audio_fifo_occupancy = 16'd4;
+        hdmi_audio_fifo_underruns = 32'd9;
+        hdmi_audio_fifo_overruns = 32'd10;
+        hdmi_audio_reconnect_count = 32'd11;
+        hdmi_audio_last_error = 8'd7;
+        snapshot();
+        mmio_read(DIAG_REG_HDMI_AUDIO_STATUS, read_value);
+        check_result(read_value[8:0] == 9'b0_111_1_1_0_1_1,
+               "HDMI audio status bit positions");
+        mmio_read(DIAG_REG_HDMI_AUDIO_SAMPLE_COUNT, read_value);
+        check_result(read_value == 5678, "HDMI audio sample counter");
+        mmio_read(DIAG_REG_HDMI_AUDIO_FIFO_OCCUPANCY, read_value);
+        check_result(read_value == 4, "HDMI audio FIFO occupancy");
+        mmio_read(DIAG_REG_HDMI_AUDIO_FIFO_UNDERRUNS, read_value);
+        check_result(read_value == 9, "HDMI audio FIFO underruns");
+        mmio_read(DIAG_REG_HDMI_AUDIO_FIFO_OVERRUNS, read_value);
+        check_result(read_value == 10, "HDMI audio FIFO overruns");
+        mmio_read(DIAG_REG_HDMI_AUDIO_RECONNECT_COUNT, read_value);
+        check_result(read_value == 11, "HDMI audio reconnect count");
+        mmio_read(DIAG_REG_HDMI_AUDIO_LAST_ERROR, read_value);
+        check_result(read_value[7:0] == 7, "HDMI audio stable error code");
+        mmio_write(DIAG_REG_CONTROL,
+                   32'(1 << DIAG_CONTROL_HDMI_AUDIO_FAULT_CLEAR_BIT));
+        wait_command();
+        check_result(hdmi_audio_clear_count == 1,
+                     "HDMI audio clear crosses mailbox once");
 
         // Natural 32-bit wrap is intentional for fabric-owned event counters.
         @(negedge fabric_clk);

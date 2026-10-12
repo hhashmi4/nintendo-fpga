@@ -100,6 +100,13 @@ module phase6c_hdmi_top (
         .hpd_async(HDMI_HPD),
         .scl_in(HDMI_I2C_SCL_IN),
         .sda_in(HDMI_I2C_SDA_IN),
+        .audio_clock_locked_async(1'b0),
+        .audio_configuration_allowed(1'b0),
+        .audio_transport_primed(1'b0),
+        .audio_user_mute(1'b0),
+        .audio_fault_clear(1'b0),
+        .audio_fifo_underruns(32'b0),
+        .audio_fifo_overruns(32'b0),
         .scl_drive_low(HDMI_I2C_SCL_DRIVE_LOW),
         .sda_drive_low(HDMI_I2C_SDA_DRIVE_LOW),
         .video_enable(video_enable),
@@ -118,7 +125,18 @@ module phase6c_hdmi_top (
         .i2c_timeout_count(HDMI_I2C_TIMEOUTS),
         .recovery_count(HDMI_RECOVERIES),
         .last_error_code(HDMI_LAST_ERROR),
-        .startup_state(HDMI_STARTUP_STATE)
+        .startup_state(HDMI_STARTUP_STATE),
+        .hdmi_audio_configured(),
+        .hdmi_audio_enabled(),
+        .hdmi_audio_muted(),
+        .hdmi_audio_clock_locked(),
+        .hdmi_audio_accept_samples(),
+        .hdmi_audio_stream_enable(),
+        .hdmi_audio_fifo_flush(),
+        .hdmi_audio_fault(),
+        .hdmi_audio_state(),
+        .hdmi_audio_reconnect_count(),
+        .hdmi_audio_last_error()
     );
 
     assign HDMI_VIDEO_ENABLED = video_enable && !safe_disable &&

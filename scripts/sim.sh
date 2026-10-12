@@ -625,6 +625,11 @@ python3 scripts/verify_diagnostic_phase5m.py \
 
 HDMI_TX_RTL_FILES=(
     rtl/video/hdmi_tx_pkg.sv
+    rtl/audio/hdmi_audio_pkg.sv
+    rtl/audio/adv7513_audio_profile.sv
+    rtl/audio/adv7513_audio_config_engine.sv
+    rtl/audio/hdmi_audio_controller.sv
+    rtl/audio/hdmi_audio_edid.sv
     rtl/video/hdmi_hpd_filter.sv
     rtl/video/i2c_register_master.sv
     rtl/video/adv7513_720p_profile.sv
@@ -1295,6 +1300,7 @@ fi
 # Phase 5J uses the real CPU/APU/cartridge path above, but deliberately keeps
 # its bounded captures and playable WAV files in ignored build output.
 scripts/run_apu_audio_phase5j.sh --full
+bash scripts/test_hdmi_audio.sh
 
 verilator --binary --timing --Wall -Wno-fatal \
     -Wno-BLKSEQ -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \

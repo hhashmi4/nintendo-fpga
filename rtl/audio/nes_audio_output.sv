@@ -3,7 +3,9 @@
 // Complete real-time Phase 5K path.  Diagnostics are bounded counters in the
 // 50 MHz domain so a later HPS/Developer Mode register bank can expose them
 // without touching the real-time datapath.
-module nes_audio_output (
+module nes_audio_output #(
+    parameter bit ENABLE_HDMI_CLOCK = 1'b0
+) (
     input  logic        clk,
     input  logic        reset,
     input  logic        source_reset,
@@ -35,7 +37,16 @@ module nes_audio_output (
     output logic [15:0] diag_fifo_occupancy,
     output logic [31:0] diag_sample_rate,
     output logic        diag_muted,
-    output logic [7:0]  diag_last_fault
+    output logic [7:0]  diag_last_fault,
+
+    // Phase 6D broadcast contract.  This is the conditioned Phase 5K stream
+    // before the codec FIFO: exact-rate signed 16-bit mono PCM in the 50 MHz
+    // domain.  Consumers may not backpressure the real-time producer; each
+    // consumer therefore owns an independently diagnosed FIFO.
+    output logic signed [15:0] pcm_output_sample,
+    output logic               pcm_output_valid,
+    output logic               pcm_output_reset,
+    output logic               hdmi_audio_clk
 );
     logic audio_clk;
     logic audio_pll_locked_raw;
@@ -110,10 +121,11 @@ module nes_audio_output (
         saturating_increment = (&value) ? value : value + 1'b1;
     endfunction
 
-    audio_pll audio_clock_source (
+    audio_pll #(.ENABLE_HDMI_CLOCK(ENABLE_HDMI_CLOCK)) audio_clock_source (
         .ref_clk(clk),
         .reset(reset),
         .audio_clk(audio_clk),
+        .hdmi_audio_clk(hdmi_audio_clk),
         .locked(audio_pll_locked_raw)
     );
     assign aud_xck = audio_clk;
@@ -175,6 +187,10 @@ module nes_audio_output (
         .pcm_sample(pcm_sample),
         .saturation_event(saturation_event)
     );
+
+    assign pcm_output_sample = pcm_sample;
+    assign pcm_output_valid = pcm_valid;
+    assign pcm_output_reset = pipeline_reset;
 
     reset_sync audio_reset_generator (
         .clk(audio_clk),
