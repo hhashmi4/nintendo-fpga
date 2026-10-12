@@ -29,6 +29,8 @@ module hdmi_tx_controller_tb;
     integer index;
     integer checksum;
     integer metrics_file;
+    logic audio_configuration_allowed = 0;
+    logic hdmi_audio_configured, hdmi_audio_enabled, hdmi_audio_muted;
 
     always #5 clk = !clk;
 
@@ -43,7 +45,19 @@ module hdmi_tx_controller_tb;
         .I2C_TIMEOUT_CYCLES(24),
         .EDID_READY_POLLS(4),
         .EDID_POLL_DELAY_CYCLES(2)
-    ) dut (.*);
+    ) dut (
+        .audio_clock_locked_async(1'b1), .audio_transport_primed(1'b1),
+        .audio_user_mute(1'b0), .audio_fault_clear(1'b0),
+        .audio_fifo_underruns(32'd0), .audio_fifo_overruns(32'd0),
+        /* verilator lint_off PINCONNECTEMPTY */
+        .hdmi_audio_clock_locked(),
+        .hdmi_audio_accept_samples(), .hdmi_audio_stream_enable(),
+        .hdmi_audio_fifo_flush(), .hdmi_audio_fault(),
+        .hdmi_audio_state(), .hdmi_audio_reconnect_count(),
+        .hdmi_audio_last_error(),
+        /* verilator lint_on PINCONNECTEMPTY */
+        .*
+    );
 
     task automatic check(input logic condition, input string message);
         if (!condition) begin
@@ -297,6 +311,39 @@ module hdmi_tx_controller_tb;
         $fdisplay(metrics_file, "bounded_nacks=%0d", i2c_nack_count);
         $fdisplay(metrics_file, "final_error=%0d", last_error_code);
         $fclose(metrics_file);
+
+        // Phase 6D shares the real open-drain master. Prove a video-only EDID
+        // cannot configure audio, then reconnect a basic-audio-capable sink.
+        @(negedge clk);
+        reset = 1; audio_configuration_allowed = 1;
+        repeat (3) @(negedge clk);
+        reset = 0;
+        wait_for_state(HDMI_STATE_RUNNING, 250_000, "audio-gated video startup");
+        repeat(100) @(posedge clk);
+        check(!hdmi_audio_configured, "video EDID alone does not authorize audio");
+        @(negedge clk);
+        reset = 1;
+        edid_memory[131] = 8'h40;
+        edid_memory[255] = edid_memory[255] - 8'h40;
+        repeat (3) @(negedge clk);
+        reset = 0;
+        wait_for_state(HDMI_STATE_RUNNING, 250_000, "basic audio sink startup");
+        begin : wait_audio
+            integer cycles;
+            cycles = 0;
+            while (!hdmi_audio_enabled && cycles < 100_000) begin
+                @(negedge clk); cycles++;
+            end
+        end
+        check(hdmi_audio_configured && hdmi_audio_enabled && !hdmi_audio_muted,
+              "audio profile passes real I2C readback before enabling");
+        check(video_enable && main_registers[8'h3c][5:0] == 4 &&
+              main_registers[8'h15][3:0] == 0,
+              "audio profile preserves video timing and input ID");
+        check(main_registers[8'h0c] == 8'hc4 &&
+              (main_registers[8'h44] & 8'h78) == 8'h78,
+              "audio and AVI packets coexist");
+        $display("Phase 6D shared-I2C audio/video integration passed");
 
         if (failures == 0) begin
             $display("Phase 6C startup/HPD/EDID/reset/recovery/fault test passed");

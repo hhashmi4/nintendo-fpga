@@ -495,7 +495,11 @@ module de1_soc_nes_vga_top #(
         .diag_fifo_occupancy(audio_diag_fifo_occupancy),
         .diag_sample_rate(audio_diag_sample_rate),
         .diag_muted(audio_diag_muted),
-        .diag_last_fault(audio_diag_last_fault)
+        .diag_last_fault(audio_diag_last_fault),
+        .pcm_output_sample(),
+        .pcm_output_valid(),
+        .pcm_output_reset(),
+        .hdmi_audio_clk()
     );
 
 
@@ -815,6 +819,19 @@ module de1_soc_nes_vga_top #(
         .hdmi_i2c_timeouts(32'd0),
         .hdmi_recoveries(32'd0),
         .hdmi_last_error(8'd0),
+        .hdmi_audio_enabled(1'b0),
+        .hdmi_audio_configured(1'b0),
+        .hdmi_audio_muted(1'b1),
+        .hdmi_audio_clock_locked(1'b0),
+        .hdmi_audio_fault(1'b0),
+        .hdmi_audio_state(4'd0),
+        .hdmi_audio_sample_count(32'd0),
+        .hdmi_audio_fifo_occupancy(16'd0),
+        .hdmi_audio_fifo_underruns(32'd0),
+        .hdmi_audio_fifo_overruns(32'd0),
+        .hdmi_audio_reconnect_count(32'd0),
+        .hdmi_audio_last_error(8'd0),
+        .hdmi_audio_fault_clear(),
         .apu_cycle_event(nes_core_cpu_cycle_slot),
         .codec_init_busy(codec_init_busy),
         .codec_init_done(codec_init_done),

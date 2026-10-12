@@ -4,8 +4,8 @@
   "span_bytes": 512,
   "magic": "0x4e455344",
   "version_major": 1,
-  "version_minor": 1,
-  "build_id": "0x0006000c",
+  "version_minor": 2,
+  "build_id": "0x0006000d",
   "trace_depth": 16,
   "capabilities": {
     "ATOMIC_SNAPSHOT": 0,
@@ -14,7 +14,8 @@
     "FAULT_INJECTION": 3,
     "CLOCK_HEARTBEATS": 4,
     "OFFLINE_MODEL": 5,
-    "HDMI_TX": 6
+    "HDMI_TX": 6,
+    "HDMI_AUDIO": 7
   },
   "availability": {
     "CPU_CYCLES": 0,
@@ -29,7 +30,8 @@
     "DMA": 9,
     "CARTRIDGE": 10,
     "CPU_INSTRUCTIONS": 11,
-    "HDMI_TX": 12
+    "HDMI_TX": 12,
+    "HDMI_AUDIO": 13
   },
   "control_bits": {
     "SNAPSHOT": 0,
@@ -37,7 +39,8 @@
     "TRACE_ARM": 2,
     "TRACE_TRIGGER": 3,
     "TRACE_FREEZE": 4,
-    "TRACE_CLEAR": 5
+    "TRACE_CLEAR": 5,
+    "HDMI_AUDIO_FAULT_CLEAR": 6
   },
   "registers": {
     "MAGIC": "0x000",
@@ -107,7 +110,14 @@
     "HDMI_I2C_NACKS": "0x100",
     "HDMI_I2C_TIMEOUTS": "0x104",
     "HDMI_RECOVERIES": "0x108",
-    "HDMI_LAST_ERROR": "0x10c"
+    "HDMI_LAST_ERROR": "0x10c",
+    "HDMI_AUDIO_STATUS": "0x110",
+    "HDMI_AUDIO_SAMPLE_COUNT": "0x114",
+    "HDMI_AUDIO_FIFO_OCCUPANCY": "0x118",
+    "HDMI_AUDIO_FIFO_UNDERRUNS": "0x11c",
+    "HDMI_AUDIO_FIFO_OVERRUNS": "0x120",
+    "HDMI_AUDIO_RECONNECT_COUNT": "0x124",
+    "HDMI_AUDIO_LAST_ERROR": "0x128"
   },
   "faults": {
     "CLOCK_UNLOCKED": 1,

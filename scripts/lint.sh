@@ -258,6 +258,11 @@ verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
 
 HDMI_TX_RTL_FILES=(
     rtl/video/hdmi_tx_pkg.sv
+    rtl/audio/hdmi_audio_pkg.sv
+    rtl/audio/adv7513_audio_profile.sv
+    rtl/audio/adv7513_audio_config_engine.sv
+    rtl/audio/hdmi_audio_controller.sv
+    rtl/audio/hdmi_audio_edid.sv
     rtl/video/hdmi_hpd_filter.sv
     rtl/video/hdmi_rgb_output.sv
     rtl/video/i2c_register_master.sv
@@ -276,6 +281,18 @@ verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
     rtl/video/phase6b_video_top.sv \
     "${HDMI_TX_RTL_FILES[@]}" \
     rtl/video/phase6c_hdmi_top.sv
+
+verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
+    -Wno-UNUSEDPARAM --top-module phase6d_hdmi_audio_top \
+    rtl/platform/reset_sync.sv \
+    "${SHARED_VIDEO_RTL_FILES[@]}" \
+    rtl/video/video_720p_pll.sv rtl/video/phase6b_video_top.sv \
+    "${HDMI_TX_RTL_FILES[@]}" \
+    rtl/audio/audio_async_fifo.sv rtl/audio/hdmi_i2s_tx.sv \
+    rtl/audio/hdmi_audio_transport.sv rtl/video/phase6d_hdmi_audio_top.sv \
+    rtl/audio/nes_audio_fir_coeff_pkg.sv rtl/audio/nes_audio_resampler.sv \
+    rtl/audio/nes_audio_conditioner.sv rtl/audio/wm8731_i2c_init.sv \
+    rtl/audio/wm8731_i2s_tx.sv rtl/audio/audio_pll.sv rtl/audio/nes_audio_output.sv
 
 verilator --lint-only --Wall \
     --top-module nes_runtime_cartridge \

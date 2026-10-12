@@ -3,10 +3,13 @@
 // 50 MHz board reference to the WM8731's exact 12 MHz USB-mode MCLK.  This
 // integer-ratio PLL avoids the small frequency quantization error of the
 // Terasic demonstration's nominal 18.432 MHz fractional clock.
-module audio_pll (
+module audio_pll #(
+    parameter bit ENABLE_HDMI_CLOCK = 1'b0
+) (
     input  logic ref_clk,
     input  logic reset,
     output logic audio_clk,
+    output logic hdmi_audio_clk,
     output logic locked
 );
 `ifdef ALTERA_SYNTHESIS
@@ -18,6 +21,10 @@ module audio_pll (
         .clk0_duty_cycle(50),
         .clk0_multiply_by(6),
         .clk0_phase_shift("0"),
+        .clk1_divide_by(1),
+        .clk1_multiply_by(1),
+        .clk1_duty_cycle(50),
+        .port_clk1(ENABLE_HDMI_CLOCK ? "PORT_USED" : "PORT_UNUSED"),
         .compensate_clock("CLK0"),
         .inclk0_input_frequency(20000),
         .intended_device_family("Cyclone V"),
@@ -35,6 +42,7 @@ module audio_pll (
     );
 
     assign audio_clk = pll_clocks[0];
+    assign hdmi_audio_clk = ENABLE_HDMI_CLOCK ? pll_clocks[1] : 1'b0;
 `else
     // Average-exact 50-to-12 MHz behavioral clock for integration simulation.
     // Its 40/60 ns half-period jitter is not a physical PLL model, but the
@@ -66,5 +74,8 @@ module audio_pll (
     end
 
     assign audio_clk = simulated_audio_clk;
+    // The second PLL output has the reference frequency; relative phase in
+    // silicon is irrelevant to the Gray FIFO. Codec clock behavior is intact.
+    assign hdmi_audio_clk = ENABLE_HDMI_CLOCK ? ref_clk : 1'b0;
 `endif
 endmodule

@@ -225,6 +225,36 @@ def test_phase6c_hdmi_status_extension_is_decoded() -> None:
     }
 
 
+def test_phase6d_hdmi_audio_status_extension_is_decoded() -> None:
+    backend = OfflineDiagnosticBackend()
+    backend.words[regs.REG_HDMI_AUDIO_STATUS] = (
+        (7 << 5) | (1 << 4) | (1 << 3) | (0 << 2) | (1 << 1) | 1
+    )
+    backend.words[regs.REG_HDMI_AUDIO_SAMPLE_COUNT] = 5678
+    backend.words[regs.REG_HDMI_AUDIO_FIFO_OCCUPANCY] = 4
+    backend.words[regs.REG_HDMI_AUDIO_FIFO_UNDERRUNS] = 9
+    backend.words[regs.REG_HDMI_AUDIO_FIFO_OVERRUNS] = 10
+    backend.words[regs.REG_HDMI_AUDIO_RECONNECT_COUNT] = 11
+    backend.words[regs.REG_HDMI_AUDIO_LAST_ERROR] = 7
+    status = DiagnosticClient(backend).interpreted_status(
+        DiagnosticClient(backend).snapshot()
+    )["hdmi_audio"]
+    assert status == {
+        "enabled": True,
+        "configured": True,
+        "muted": False,
+        "clock_locked": True,
+        "fault": True,
+        "state": 7,
+        "sample_count": 5678,
+        "fifo_occupancy": 4,
+        "fifo_underruns": 9,
+        "fifo_overruns": 10,
+        "reconnect_count": 11,
+        "last_error": 7,
+    }
+
+
 def test_json_and_text_reports_label_offline_hardware_not_tested(
     tmp_path: Path,
 ) -> None:

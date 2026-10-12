@@ -116,6 +116,9 @@ class DiagnosticClient:
         self.backend.write32(regs.REG_FAULT_CLEAR_MASK, mask & 0xFFFF_FFFF)
         self._command(regs.CONTROL_FAULT_CLEAR)
 
+    def clear_hdmi_audio_fault(self) -> None:
+        self._command(regs.CONTROL_HDMI_AUDIO_FAULT_CLEAR)
+
     def trace(self, snapshot: dict[str, int] | None = None) -> list[dict[str, int | str]]:
         current = snapshot if snapshot is not None else self.snapshot()
         status = current["trace_status"]
@@ -149,6 +152,7 @@ class DiagnosticClient:
         dma = snapshot["dma_status"]
         cartridge = snapshot["cartridge_status"]
         hdmi = snapshot["hdmi_status"]
+        hdmi_audio = snapshot["hdmi_audio_status"]
         availability = snapshot["availability"]
         return {
             "system": {
@@ -202,6 +206,24 @@ class DiagnosticClient:
                 "i2c_timeouts": snapshot["hdmi_i2c_timeouts"],
                 "recoveries": snapshot["hdmi_recoveries"],
                 "last_error": snapshot["hdmi_last_error"] & 0xFF,
+            },
+            "hdmi_audio": {
+                "enabled": bool(hdmi_audio & (1 << 0)),
+                "configured": bool(hdmi_audio & (1 << 1)),
+                "muted": bool(hdmi_audio & (1 << 2)),
+                "clock_locked": bool(hdmi_audio & (1 << 3)),
+                "fault": bool(hdmi_audio & (1 << 4)),
+                "state": (hdmi_audio >> 5) & 0xF,
+                "sample_count": snapshot["hdmi_audio_sample_count"],
+                "fifo_occupancy": snapshot[
+                    "hdmi_audio_fifo_occupancy"
+                ] & 0xFFFF,
+                "fifo_underruns": snapshot["hdmi_audio_fifo_underruns"],
+                "fifo_overruns": snapshot["hdmi_audio_fifo_overruns"],
+                "reconnect_count": snapshot[
+                    "hdmi_audio_reconnect_count"
+                ],
+                "last_error": snapshot["hdmi_audio_last_error"] & 0xFF,
             },
             "audio": {
                 "pll_locked": bool(audio & 1),

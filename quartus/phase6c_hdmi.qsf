@@ -12,6 +12,11 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_digital_video_pi
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_pll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/phase6b_video_top.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/hdmi_tx_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/hdmi_audio_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/adv7513_audio_profile.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/adv7513_audio_config_engine.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/hdmi_audio_controller.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/audio/hdmi_audio_edid.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/hdmi_hpd_filter.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/hdmi_rgb_output.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/i2c_register_master.sv

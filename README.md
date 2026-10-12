@@ -1125,6 +1125,25 @@ contracts, verification evidence, timing results, hardware limitations, and
 physical test plan are documented in
 [`docs/phase6c-hdmi-transmitter.md`](docs/phase6c-hdmi-transmitter.md).
 
+## Phase 6D — HDMI audio integration
+
+- Broadcasts the actual Phase 5K 48 kHz signed-16 PCM to independent WM8731
+  and HDMI consumers; Gray-pointer FIFO, mono-to-stereo I2S and deterministic
+  silence/flush/reprime behavior preserve the existing audio and VGA paths
+- Reuses the audio PLL with an optional 50 MHz output for HDMI BCLK duty;
+  3.072 MHz BCLK, 32-bit slots, no additional resampler or audio PLL
+- Documented ADV7513 audio RMW/readback stage shares Phase 6C I2C and validated
+  HPD/EDID handling; physical qualification gate defaults closed
+- Phase 5M MMIO v1.2 adds audio status, counters and explicit sticky-fault clear
+- Independent Python/I2S vectors, seeded CDC/control tests, nominal/fitted-clock
+  A/V runs and CPU-capture replay through the real Phase 5K PCM path
+- Standalone logical Quartus target only; production DE1-SoC has no invented
+  HDMI pins. No physical TV-audio, TMDS, DisplayPort or Phase 6E claim
+
+See [`docs/phase6d-hdmi-audio.md`](docs/phase6d-hdmi-audio.md) for contracts,
+qualification, verification, timing and the physical test plan. Run the logical
+build with `bash scripts/build_phase6d_hdmi_audio_quartus.sh`.
+
 ## Development environment
 
 - Terasic DE1-SoC (`5CSEMA5F31C6`)
