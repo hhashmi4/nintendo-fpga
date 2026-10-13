@@ -832,6 +832,8 @@ module de1_soc_nes_vga_top #(
         .hdmi_audio_reconnect_count(32'd0),
         .hdmi_audio_last_error(8'd0),
         .hdmi_audio_fault_clear(),
+        .usbc_diagnostics(416'd0),
+        .usbc_fault_clear(),
         .apu_cycle_event(nes_core_cpu_cycle_slot),
         .codec_init_busy(codec_init_busy),
         .codec_init_done(codec_init_done),

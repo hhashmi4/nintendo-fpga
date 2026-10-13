@@ -1,0 +1,750 @@
+{
+  "schema_version": 1,
+  "phase": "6E",
+  "units": {
+    "voltage": "mV",
+    "current": "mA",
+    "power": "mW",
+    "time": "cycles",
+    "capacitance": "uF"
+  },
+  "sources": [
+    {
+      "id": "st_datasheet",
+      "url": "https://www.st.com/resource/en/datasheet/stusb4500.pdf",
+      "title": "STUSB4500 standalone USB PD sink controller",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Sections 2\u20137; tables 16, 18, 22",
+      "revision": "DS12499 Rev 8",
+      "sections": "Sections 2\u20137; tables 16, 18, 22"
+    },
+    {
+      "id": "st_registers",
+      "url": "https://www.st.com/resource/en/user_manual/um2650-the-stusb4500-software-programing-guide-stmicroelectronics.pdf",
+      "title": "The STUSB4500 software programming guide",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Sections 1.1, 1.7\u20131.11, 2 and 3",
+      "revision": "UM2650 Rev 3, January 2023",
+      "sections": "Sections 1.1, 1.7\u20131.11, 2 and 3"
+    },
+    {
+      "id": "usb_functional",
+      "url": "https://www.usb.org/sites/default/files/USB%20Type%20C%20Functional%20Test%20Specification%202024%2003%2003.pdf",
+      "title": "USB Type-C Functional Test Specification",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Sink power substates and current advertisement; TD 4.10",
+      "revision": "March 3, 2024",
+      "sections": "Sink power substates and current advertisement; TD 4.10"
+    },
+    {
+      "id": "usb_current_release",
+      "url": "https://www.usb.org/document-library/usb-type-cr-cable-and-connector-specification-release-25",
+      "title": "USB Type-C Cable and Connector Specification publication page",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Publication metadata only; full latest specification/compliance closure remains open",
+      "revision": "Release 2.5, April 8, 2026",
+      "sections": "Publication metadata only; full latest specification/compliance closure remains open"
+    },
+    {
+      "id": "fpga_supplies",
+      "url": "https://docs.altera.com/r/docs/683801/current/cyclone-v-device-datasheet/recommended-operating-conditions",
+      "title": "Cyclone V Device Datasheet: Recommended Operating Conditions",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Table 4 and notes; DC limits are not dynamic PDN tolerance",
+      "revision": "Online edition 2025-12-16",
+      "sections": "Table 4 and notes; DC limits are not dynamic PDN tolerance"
+    },
+    {
+      "id": "hps_supplies",
+      "url": "https://docs.altera.com/r/docs/683801/current/cyclone-v-device-datasheet/hps-power-supply-operating-conditions",
+      "title": "Cyclone V Device Datasheet: HPS Power Supply Operating Conditions",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Table 6; SE A5 auxiliary shared-supply note",
+      "revision": "Online edition 2025-12-16",
+      "sections": "Table 6; SE A5 auxiliary shared-supply note"
+    },
+    {
+      "id": "fpga_sequence",
+      "url": "https://docs.altera.com/r/docs/683375/current/cyclone-v-device-handbook-volume-1-device-interfaces-and-integration/power-up-sequence-recommendation-for-cyclone-v-devices",
+      "title": "Cyclone V Device Handbook: Power-Up Sequence Recommendation",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Section 10.4, Figure 182 and Table 117; exact pin-group audit remains open",
+      "revision": "Online edition 2025-12-16",
+      "sections": "Section 10.4, Figure 182 and Table 117; exact pin-group audit remains open"
+    },
+    {
+      "id": "hps_guidelines",
+      "url": "https://docs.altera.com/r/docs/683360/18.0/an-796-cyclone-v-and-arria-v-soc-device-design-guidelines/device-power-up",
+      "title": "AN 796: Cyclone V and Arria V SoC Device Design Guidelines",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Section 4.3.3.1: HPS supply inventory and transient/PDN analysis",
+      "revision": "18.0 online edition",
+      "sections": "Section 4.3.3.1: HPS supply inventory and transient/PDN analysis"
+    },
+    {
+      "id": "fpga_configuration",
+      "url": "https://docs.altera.com/r/docs/683375/current/cyclone-v-device-handbook-volume-1-device-interfaces-and-integration/power-up",
+      "title": "Cyclone V Device Handbook: Configuration Power Up",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Section 7.3.1: POR, nCONFIG and ramp requirements",
+      "revision": "Online edition 2025-12-16",
+      "sections": "Section 7.3.1: POR, nCONFIG and ramp requirements"
+    },
+    {
+      "id": "hdmi",
+      "url": "https://www.analog.com/media/en/technical-documentation/data-sheets/adv7513.pdf",
+      "title": "ADV7513 Data Sheet",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Table 1: supply ranges and typical power",
+      "revision": "Rev B",
+      "sections": "Table 1: supply ranges and typical power"
+    },
+    {
+      "id": "codec_summary",
+      "url": "https://statics.cirrus.com/pubs/brochure/Cirrus_Product_Summary_Guide_November_2021.pdf",
+      "title": "Cirrus Logic Product Summary Guide",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "WM8731 analog/digital supply ranges; not a substitute for final codec power-up qualification",
+      "revision": "November 2021",
+      "sections": "WM8731 analog/digital supply ranges; not a substitute for final codec power-up qualification"
+    },
+    {
+      "id": "repository",
+      "url": "https://github.com/hhashmi4/nintendo-fpga/tree/f1f242d",
+      "title": "Nintendo FPGA Phase 6D baseline",
+      "reviewed": "2026-10-13",
+      "status": "REVIEWED",
+      "scope": "Phase 6A estimates, Qsys DDR3 1.5V, Phase 5K/5M/6B/6C/6D interfaces",
+      "revision": "f1f242d",
+      "sections": "Phase 6A estimates, Qsys DDR3 1.5V, Phase 5K/5M/6B/6C/6D interfaces"
+    }
+  ],
+  "device": "5CSEMA5F31C6",
+  "physical_implementation": false,
+  "contracts": [
+    {
+      "id": "pd_9v3a",
+      "mv": 9000,
+      "ma": 3000,
+      "nominal_mw": 27000,
+      "derated_mw": 24150,
+      "requires": "completed_fixed_PD_contract",
+      "full_operation": true
+    },
+    {
+      "id": "pd_5v3a",
+      "mv": 5000,
+      "ma": 3000,
+      "nominal_mw": 15000,
+      "derated_mw": 12750,
+      "requires": "completed_fixed_PD_contract_or_CC_3A",
+      "full_operation": false
+    }
+  ],
+  "policy": {
+    "role": "sink_only",
+    "full_operation_contract": "pd_9v3a",
+    "fallback": "5V full operation disabled; standby only",
+    "source_voltage_factor_ppm": 950000,
+    "cable_drop_mv": 500,
+    "adc_telemetry": false
+  },
+  "controller": {
+    "candidate": "STUSB4500",
+    "status": "DOCUMENTATION_REVIEWED_PHYSICAL_UNQUALIFIED",
+    "register_document": "st_registers",
+    "interface": "abstract coherent status mailbox; no physical I2C adapter",
+    "nvm_required": true,
+    "proposed_pdos": [
+      {
+        "mv": 5000,
+        "ma": 3000
+      },
+      {
+        "mv": 9000,
+        "ma": 3000
+      }
+    ],
+    "default_pdos": [
+      {
+        "mv": 5000,
+        "ma": 1500
+      },
+      {
+        "mv": 15000,
+        "ma": 1500
+      },
+      {
+        "mv": 20000,
+        "ma": 1000
+      }
+    ],
+    "verified_read_registers": {
+      "ALERT_STATUS_1": 11,
+      "PORT_STATUS_1": 14,
+      "CC_STATUS": 17,
+      "PE_FSM": 41,
+      "RDO_REG_STATUS_0": 145
+    }
+  },
+  "loads": [
+    {
+      "id": "fpga_core",
+      "typical_mw": 2200,
+      "peak_mw": 3100,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "fpga_aux",
+      "typical_mw": 300,
+      "peak_mw": 400,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "hps_core",
+      "typical_mw": 1100,
+      "peak_mw": 1800,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "hps_aux",
+      "typical_mw": 100,
+      "peak_mw": 200,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "fpga_io",
+      "typical_mw": 300,
+      "peak_mw": 500,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "ddr",
+      "typical_mw": 1100,
+      "peak_mw": 1500,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "hdmi",
+      "typical_mw": 300,
+      "peak_mw": 450,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "audio",
+      "typical_mw": 150,
+      "peak_mw": 300,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "microsd_qspi",
+      "typical_mw": 250,
+      "peak_mw": 800,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "usb_peripherals",
+      "typical_mw": 500,
+      "peak_mw": 2500,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "clocks",
+      "typical_mw": 200,
+      "peak_mw": 300,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    },
+    {
+      "id": "support",
+      "typical_mw": 400,
+      "peak_mw": 700,
+      "status": "ESTIMATED",
+      "source": "repository",
+      "basis": "engineering allowance; requires vendor activity model and physical measurement"
+    }
+  ],
+  "budget": {
+    "efficiency_typical_ppm": 900000,
+    "efficiency_peak_ppm": 850000,
+    "protection_typical_mw": 150,
+    "protection_peak_mw": 350,
+    "margin_ppm": 250000,
+    "output_typical_mw": 6900,
+    "output_peak_mw": 12550,
+    "input_typical_mw": 7817,
+    "input_peak_mw": 15115,
+    "input_design_mw": 18894,
+    "phase6a_typical_mw": 7200,
+    "phase6a_peak_mw": 11300,
+    "phase6a_design_mw": 14100
+  },
+  "inrush": {
+    "status": "ILLUSTRATIVE_NOT_A_LIMIT",
+    "switched_capacitance_uf": 470,
+    "voltage_mv": 9000,
+    "ramp_ms": 20,
+    "capacitor_current_ma": 211.5,
+    "input_power_mw": 1903.5,
+    "stored_energy_mj": 19.035,
+    "silicon_startup_peak_mw": null
+  },
+  "rails": [
+    {
+      "id": "fpga_core",
+      "nominal_mv": 1100,
+      "min_mv": 1070,
+      "max_mv": 1130,
+      "typical_ma": 2000,
+      "peak_ma": 2819,
+      "depends_on": [],
+      "source": "fpga_supplies",
+      "status": "PROVISIONAL",
+      "current_basis": "architecture allocation, rounded up; not a regulator rating",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "hps_core",
+      "nominal_mv": 1100,
+      "min_mv": 1070,
+      "max_mv": 1130,
+      "typical_ma": 1000,
+      "peak_ma": 1637,
+      "depends_on": [],
+      "source": "hps_supplies",
+      "status": "PROVISIONAL",
+      "current_basis": "architecture allocation, rounded up; not a regulator rating",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "aux_2v5",
+      "nominal_mv": 2500,
+      "min_mv": 2375,
+      "max_mv": 2625,
+      "typical_ma": 160,
+      "peak_ma": 240,
+      "depends_on": [],
+      "source": "hps_supplies",
+      "status": "PROVISIONAL",
+      "current_basis": "architecture allocation, rounded up; not a regulator rating",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "io_3v3",
+      "nominal_mv": 3300,
+      "min_mv": 3135,
+      "max_mv": 3465,
+      "typical_ma": 91,
+      "peak_ma": 152,
+      "depends_on": [
+        "aux_2v5"
+      ],
+      "source": "fpga_supplies",
+      "status": "PROVISIONAL",
+      "current_basis": "architecture allocation, rounded up; not a regulator rating",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "hps_reset_clock",
+      "nominal_mv": 3300,
+      "min_mv": 3135,
+      "max_mv": 3465,
+      "typical_ma": null,
+      "peak_ma": null,
+      "depends_on": [
+        "aux_2v5"
+      ],
+      "source": "hps_supplies",
+      "status": "PROVISIONAL",
+      "current_basis": "UNKNOWN: exact load split/termination topology requires qualification",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "ddr_1v5",
+      "nominal_mv": 1500,
+      "min_mv": null,
+      "max_mv": null,
+      "typical_ma": null,
+      "peak_ma": null,
+      "depends_on": [
+        "aux_2v5"
+      ],
+      "source": "repository",
+      "status": "PROVISIONAL",
+      "current_basis": "UNKNOWN: exact load split/termination topology requires qualification",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "ddr_vtt",
+      "nominal_mv": 750,
+      "min_mv": null,
+      "max_mv": null,
+      "typical_ma": null,
+      "peak_ma": null,
+      "depends_on": [
+        "ddr_1v5"
+      ],
+      "source": "repository",
+      "status": "PROVISIONAL",
+      "current_basis": "UNKNOWN: exact load split/termination topology requires qualification",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "ddr_vref",
+      "nominal_mv": 750,
+      "min_mv": null,
+      "max_mv": null,
+      "typical_ma": null,
+      "peak_ma": null,
+      "depends_on": [
+        "ddr_1v5"
+      ],
+      "source": "repository",
+      "status": "PROVISIONAL",
+      "current_basis": "UNKNOWN: exact load split/termination topology requires qualification",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "hdmi_1v8",
+      "nominal_mv": 1800,
+      "min_mv": 1710,
+      "max_mv": 1900,
+      "typical_ma": null,
+      "peak_ma": null,
+      "depends_on": [
+        "io_3v3"
+      ],
+      "source": "hdmi",
+      "status": "PROVISIONAL",
+      "current_basis": "UNKNOWN: exact load split/termination topology requires qualification",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "hdmi_3v3",
+      "nominal_mv": 3300,
+      "min_mv": 3150,
+      "max_mv": 3450,
+      "typical_ma": null,
+      "peak_ma": null,
+      "depends_on": [
+        "io_3v3"
+      ],
+      "source": "hdmi",
+      "status": "PROVISIONAL",
+      "current_basis": "UNKNOWN: exact load split/termination topology requires qualification",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "codec_3v3",
+      "nominal_mv": 3300,
+      "min_mv": null,
+      "max_mv": null,
+      "typical_ma": 46,
+      "peak_ma": 91,
+      "depends_on": [
+        "io_3v3"
+      ],
+      "source": "codec_summary",
+      "status": "PROVISIONAL",
+      "current_basis": "architecture allocation, rounded up; not a regulator rating",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "microsd_3v3",
+      "nominal_mv": 3300,
+      "min_mv": null,
+      "max_mv": null,
+      "typical_ma": 76,
+      "peak_ma": 243,
+      "depends_on": [
+        "io_3v3"
+      ],
+      "source": "repository",
+      "status": "PROVISIONAL",
+      "current_basis": "architecture allocation, rounded up; not a regulator rating",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    },
+    {
+      "id": "usb_5v",
+      "nominal_mv": 5000,
+      "min_mv": null,
+      "max_mv": null,
+      "typical_ma": 100,
+      "peak_ma": 500,
+      "depends_on": [
+        "io_3v3"
+      ],
+      "source": "repository",
+      "status": "PROVISIONAL",
+      "current_basis": "architecture allocation, rounded up; not a regulator rating",
+      "startup": "external sequencer; monotonic ramp and vendor pin-group audit required",
+      "enable": "qualified protected input and external dependency interlock",
+      "power_good": "external supervisor threshold; final accuracy/hysteresis not selected",
+      "monitor": "digital PGOOD only; analog telemetry unavailable"
+    }
+  ],
+  "faults": [
+    {
+      "id": "VBUS_OVERVOLTAGE",
+      "bit": 0,
+      "source": "external_hardware"
+    },
+    {
+      "id": "VBUS_UNDERVOLTAGE",
+      "bit": 1,
+      "source": "external_hardware"
+    },
+    {
+      "id": "INPUT_OVERCURRENT",
+      "bit": 2,
+      "source": "external_hardware"
+    },
+    {
+      "id": "SHORT_CIRCUIT",
+      "bit": 3,
+      "source": "external_hardware"
+    },
+    {
+      "id": "REVERSE_CURRENT",
+      "bit": 4,
+      "source": "external_hardware"
+    },
+    {
+      "id": "THERMAL_SHUTDOWN",
+      "bit": 5,
+      "source": "external_hardware"
+    },
+    {
+      "id": "REGULATOR_FAULT",
+      "bit": 6,
+      "source": "external_hardware"
+    },
+    {
+      "id": "RAIL_POWER_GOOD_LOSS",
+      "bit": 7,
+      "source": "external_hardware"
+    },
+    {
+      "id": "PD_REJECTED",
+      "bit": 8,
+      "source": "external_hardware"
+    },
+    {
+      "id": "BROWNOUT",
+      "bit": 9,
+      "source": "external_hardware"
+    },
+    {
+      "id": "UNEXPECTED_DETACH",
+      "bit": 10,
+      "source": "logical_observation"
+    },
+    {
+      "id": "INVALID_CONTRACT",
+      "bit": 11,
+      "source": "logical_observation"
+    },
+    {
+      "id": "INSUFFICIENT_POWER",
+      "bit": 12,
+      "source": "logical_observation"
+    },
+    {
+      "id": "PD_TIMEOUT",
+      "bit": 13,
+      "source": "logical_observation"
+    },
+    {
+      "id": "STARTUP_TIMEOUT",
+      "bit": 14,
+      "source": "logical_observation"
+    },
+    {
+      "id": "RECOVERY_TIMEOUT",
+      "bit": 15,
+      "source": "logical_observation"
+    },
+    {
+      "id": "STALE_STATUS",
+      "bit": 16,
+      "source": "logical_observation"
+    },
+    {
+      "id": "INVALID_STATUS",
+      "bit": 17,
+      "source": "logical_observation"
+    },
+    {
+      "id": "CONFIGURATION_LOSS",
+      "bit": 18,
+      "source": "logical_observation"
+    },
+    {
+      "id": "HPS_NOT_READY",
+      "bit": 19,
+      "source": "logical_observation"
+    },
+    {
+      "id": "DDR_NOT_READY",
+      "bit": 20,
+      "source": "logical_observation"
+    },
+    {
+      "id": "INVALID_STATE",
+      "bit": 21,
+      "source": "logical_observation"
+    }
+  ],
+  "states": [
+    {
+      "id": "POWER_OFF",
+      "value": 0
+    },
+    {
+      "id": "ATTACHED",
+      "value": 1
+    },
+    {
+      "id": "CONTRACT_PENDING",
+      "value": 2
+    },
+    {
+      "id": "CONTRACT_VALID",
+      "value": 3
+    },
+    {
+      "id": "INPUT_PROTECTED",
+      "value": 4
+    },
+    {
+      "id": "RAILS_STARTING",
+      "value": 5
+    },
+    {
+      "id": "RAILS_STABLE",
+      "value": 6
+    },
+    {
+      "id": "FPGA_RELEASE",
+      "value": 7
+    },
+    {
+      "id": "SYSTEM_READY",
+      "value": 8
+    },
+    {
+      "id": "FAULT",
+      "value": 9
+    },
+    {
+      "id": "SHUTDOWN",
+      "value": 10
+    },
+    {
+      "id": "RECOVERY",
+      "value": 11
+    }
+  ],
+  "timeouts": {
+    "clock_hz": 50000000,
+    "pd_cycles": 100000000,
+    "startup_cycles": 250000000,
+    "recovery_cycles": 50000000,
+    "stable_cycles": 250000,
+    "stale_cycles": 5000000
+  },
+  "validation_status": {
+    "python": "PASS",
+    "rtl": "PASS",
+    "quartus": "PASS",
+    "physical": "NOT_TESTED"
+  },
+  "known_unknowns": [
+    "Exact production device ordering code, package pin-group sequencing and POR mode audit",
+    "Final DDR part, DDR3 versus DDR3L, VTT/VREF tolerance and source/sink currents",
+    "EPE/Power Analyzer with HPS, DDR, final clocks, activity, junction temperature and process corner",
+    "Actual USB accessories and microSD write/inrush peaks; allowance is one 500mA USB load",
+    "Regulator efficiency, current limits, soft start, capacitors, compensation and thermal derating",
+    "Protection cutoff thresholds, surge withstand, reverse blocking, discharge and cable loss",
+    "Program and read back STUSB4500 NVM; verify 9V/3A matching, mismatch, hard reset and default-policy exclusion",
+    "Physical status adapter and alert/read-clear race handling; no actual I2C interface implemented",
+    "Hold-up time and persistent fault logging on total power loss",
+    "Latest USB Type-C/PD compliance revision and test plan closure",
+    "Physical DE1-SoC, production circuit, ADC telemetry and hardware measurements unavailable"
+  ],
+  "rail_dependency_scope": "proposed coarse external qualification dependencies, not final silicon pin-group ramp order",
+  "load_notes": {
+    "support": "Includes controller/control, debug, LEDs, HDMI connector 5V allowance and level translation. No unlimited accessories.",
+    "fpga_io": "I/O load allocation excludes separately budgeted DDR; final bank split is unknown.",
+    "ddr": "Combined memory and termination estimate; VTT is not an extra additive load row.",
+    "audio": "Codec allowance; no power amplifier is assumed."
+  }
+}

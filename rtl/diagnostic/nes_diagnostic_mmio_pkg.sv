@@ -4,10 +4,10 @@
 // Edit config/diagnostic_mmio.json, not this file.
 package nes_diagnostic_mmio_pkg;
     localparam logic [31:0] DIAG_MAGIC = 32'h4e455344;
-    localparam logic [31:0] DIAG_VERSION = 32'h00010002;
-    localparam logic [31:0] DIAG_BUILD_ID = 32'h0006000d;
-    localparam logic [31:0] DIAG_CAPABILITIES = 32'h000000ff;
-    localparam logic [31:0] DIAG_AVAILABILITY = 32'h000037ff;
+    localparam logic [31:0] DIAG_VERSION = 32'h00010003;
+    localparam logic [31:0] DIAG_BUILD_ID = 32'h0006000e;
+    localparam logic [31:0] DIAG_CAPABILITIES = 32'h000001ff;
+    localparam logic [31:0] DIAG_AVAILABILITY = 32'h000077ff;
     localparam integer DIAG_SPAN_BYTES = 512;
     localparam integer DIAG_TRACE_DEPTH = 16;
     localparam logic [31:0] DIAG_HPS_WINDOW_BASE = 32'hff200000;
@@ -90,6 +90,19 @@ package nes_diagnostic_mmio_pkg;
     localparam logic [8:0] DIAG_REG_HDMI_AUDIO_FIFO_OVERRUNS = 9'h120;
     localparam logic [8:0] DIAG_REG_HDMI_AUDIO_RECONNECT_COUNT = 9'h124;
     localparam logic [8:0] DIAG_REG_HDMI_AUDIO_LAST_ERROR = 9'h128;
+    localparam logic [8:0] DIAG_REG_USBC_ATTACHED = 9'h12c;
+    localparam logic [8:0] DIAG_REG_USBC_PD_CONTRACT_VALID = 9'h130;
+    localparam logic [8:0] DIAG_REG_USBC_NEGOTIATED_MV = 9'h134;
+    localparam logic [8:0] DIAG_REG_USBC_NEGOTIATED_MA = 9'h138;
+    localparam logic [8:0] DIAG_REG_USBC_INPUT_POWER_MW = 9'h13c;
+    localparam logic [8:0] DIAG_REG_USBC_POWER_GOOD = 9'h140;
+    localparam logic [8:0] DIAG_REG_USBC_RAILS_READY = 9'h144;
+    localparam logic [8:0] DIAG_REG_USBC_STARTUP_STATE = 9'h148;
+    localparam logic [8:0] DIAG_REG_USBC_FAULT_STATUS = 9'h14c;
+    localparam logic [8:0] DIAG_REG_USBC_FAULT_COUNT = 9'h150;
+    localparam logic [8:0] DIAG_REG_USBC_DETACH_COUNT = 9'h154;
+    localparam logic [8:0] DIAG_REG_USBC_RECOVERY_COUNT = 9'h158;
+    localparam logic [8:0] DIAG_REG_USBC_PROVENANCE = 9'h15c;
 
     localparam integer DIAG_CONTROL_SNAPSHOT_BIT = 0;
     localparam integer DIAG_CONTROL_FAULT_CLEAR_BIT = 1;
@@ -98,6 +111,7 @@ package nes_diagnostic_mmio_pkg;
     localparam integer DIAG_CONTROL_TRACE_FREEZE_BIT = 4;
     localparam integer DIAG_CONTROL_TRACE_CLEAR_BIT = 5;
     localparam integer DIAG_CONTROL_HDMI_AUDIO_FAULT_CLEAR_BIT = 6;
+    localparam integer DIAG_CONTROL_USBC_FAULT_CLEAR_BIT = 7;
 
     localparam logic [7:0] DIAG_FAULT_CLOCK_UNLOCKED = 8'd1;
     localparam integer DIAG_FAULT_CLOCK_UNLOCKED_BIT = 0;

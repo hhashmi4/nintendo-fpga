@@ -79,6 +79,7 @@ def collect_report(backend: DiagnosticBackend, client: DiagnosticClient) -> dict
         "cpu_instruction_retirement",
         "physical_hdmi_transmitter",
         "physical_hdmi_audio",
+        "physical_usbc_power",
     ]
     if not hardware_available:
         unavailable.extend([
@@ -110,6 +111,7 @@ def collect_report(backend: DiagnosticBackend, client: DiagnosticClient) -> dict
             # unobserved even when the existing VGA board is available.
             "hdmi_transmitter": "NOT TESTED",
             "hdmi_audio": "NOT TESTED",
+            "usbc_power": "NOT TESTED",
         },
         "observed_registers": {
             name: f"0x{value:08x}" for name, value in sorted(snapshot.items())

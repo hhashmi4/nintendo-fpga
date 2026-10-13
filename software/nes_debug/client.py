@@ -116,6 +116,9 @@ class DiagnosticClient:
         self.backend.write32(regs.REG_FAULT_CLEAR_MASK, mask & 0xFFFF_FFFF)
         self._command(regs.CONTROL_FAULT_CLEAR)
 
+    def clear_usbc_fault(self) -> None:
+        self._command(regs.CONTROL_USBC_FAULT_CLEAR)
+
     def clear_hdmi_audio_fault(self) -> None:
         self._command(regs.CONTROL_HDMI_AUDIO_FAULT_CLEAR)
 
@@ -206,6 +209,19 @@ class DiagnosticClient:
                 "i2c_timeouts": snapshot["hdmi_i2c_timeouts"],
                 "recoveries": snapshot["hdmi_recoveries"],
                 "last_error": snapshot["hdmi_last_error"] & 0xFF,
+            },
+            "usbc_power": {
+                "available": bool(availability & regs.AVAILABLE_USBC_POWER),
+                "provenance": "UNAVAILABLE" if not availability & regs.AVAILABLE_USBC_POWER else
+                    "SIMULATED_CONFIGURED_ESTIMATED" if snapshot.get("usbc_provenance", 0) == 7 else
+                    ("CONFIGURED_ESTIMATED" if snapshot.get("usbc_provenance", 0) == 6 else "UNAVAILABLE"),
+                "measured_voltage_mv": None,
+                "measured_current_ma": None,
+                "measured_power_mw": None,
+                **{name: snapshot.get("usbc_" + name, 0) if availability & regs.AVAILABLE_USBC_POWER else None
+                   for name in ("attached", "pd_contract_valid", "negotiated_mv", "negotiated_ma",
+                                "input_power_mw", "power_good", "rails_ready", "startup_state",
+                                "fault_status", "fault_count", "detach_count", "recovery_count")},
             },
             "hdmi_audio": {
                 "enabled": bool(hdmi_audio & (1 << 0)),
