@@ -161,6 +161,9 @@ module nes_digital_video_pipeline_tb;
         source_reset = 1'b0;
         repeat (7) @(posedge pixel_clk);
         pixel_reset = 1'b0;
+        // Content ownership releases synchronously in both domains. Preserve
+        // the same two complete frame transactions after that startup barrier.
+        repeat (4) @(negedge source_clk);
 
         fork
             begin
@@ -198,6 +201,37 @@ module nes_digital_video_pipeline_tb;
                 captured_frames, displayed_frames, checked_game_pixels,
                 checked_border_pixels, checked_panel_pixels);
         $fclose(artifact);
+        if ($test$plusargs("phase6g_reset")) begin : reset_epochs
+            logic [10:0] before_x;
+            for (integer epoch = 0; epoch < 6; epoch++) begin
+                // Reset one endpoint while both a displayed and partial
+                // source frame exist. Either reset must revoke all ownership.
+                @(negedge source_clk);
+                source_frame_start = 1;
+                source_pixel_valid = 1;
+                source_pixel_x = 0; source_pixel_y = 0;
+                @(negedge source_clk);
+                source_frame_start = 0; source_pixel_valid = 0;
+                before_x = scan_x;
+                if (epoch % 2 == 0) source_reset = 1;
+                else pixel_reset = 1;
+                repeat (8) @(negedge source_clk);
+                if (display_valid || capture_active || capture_pending || captured_frames != 0)
+                    $fatal(1, "Phase6G content reset failed epoch=%0d", epoch);
+                if (epoch % 2 == 0 && scan_x == before_x)
+                    $fatal(1, "source reset stopped video timing");
+                source_reset = 0; pixel_reset = 0;
+                repeat (8) @(negedge source_clk);
+                write_uniform_frame(6'h21);
+                wait (display_valid);
+                if (captured_frames != 1 || displayed_frames != 1 ||
+                    write_range_error || write_sequence_error)
+                    $fatal(1, "Phase6G reset recovery failed epoch=%0d", epoch);
+                // A new display bank must still hold the entire recovered image.
+                check_developer_frame(24'h57a5ff);
+            end
+            $display("PASS: Phase6G asynchronous content reset epochs=6 mismatches=0");
+        end
         $display("PASS: asynchronous pipeline displayed two atomic frames and Developer Mode");
         $finish;
     end

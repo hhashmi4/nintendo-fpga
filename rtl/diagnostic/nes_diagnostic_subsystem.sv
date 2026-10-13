@@ -223,9 +223,11 @@ module nes_diagnostic_subsystem #(
             detected_faults[DIAG_FAULT_CODEC_INIT_NACK_BIT] = 1'b1;
         if ((audio_codec_timeouts != previous_timeouts) && codec_init_error)
             detected_faults[DIAG_FAULT_CODEC_INIT_TIMEOUT_BIT] = 1'b1;
-        if (audio_fifo_underruns != previous_underruns)
+        // Saturating totals restart on their subsystem's reset. A decrease
+        // rebases the observation; only an increase represents a new fault.
+        if (audio_fifo_underruns > previous_underruns)
             detected_faults[DIAG_FAULT_AUDIO_FIFO_UNDERRUN_BIT] = 1'b1;
-        if (audio_fifo_overruns != previous_overruns)
+        if (audio_fifo_overruns > previous_overruns)
             detected_faults[DIAG_FAULT_AUDIO_FIFO_OVERRUN_BIT] = 1'b1;
         if (loader_busy && loader_elapsed == LOADER_TIMEOUT_LIMIT - 1)
             detected_faults[DIAG_FAULT_LOADER_TIMEOUT_BIT] = 1'b1;
@@ -290,11 +292,11 @@ module nes_diagnostic_subsystem #(
             trace_event_valid = 1'b1;
             trace_event_code = DIAG_EVENT_CODEC_FAILURE;
             trace_event_payload = {16'd0, audio_last_fault};
-        end else if (audio_fifo_underruns != previous_underruns) begin
+        end else if (audio_fifo_underruns > previous_underruns) begin
             trace_event_valid = 1'b1;
             trace_event_code = DIAG_EVENT_FIFO_UNDERRUN;
             trace_event_payload = audio_fifo_underruns[23:0];
-        end else if (audio_fifo_overruns != previous_overruns) begin
+        end else if (audio_fifo_overruns > previous_overruns) begin
             trace_event_valid = 1'b1;
             trace_event_code = DIAG_EVENT_FIFO_OVERRUN;
             trace_event_payload = audio_fifo_overruns[23:0];

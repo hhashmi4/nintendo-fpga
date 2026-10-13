@@ -1861,6 +1861,7 @@ verilator --binary --timing --Wall -Wno-BLKSEQ -Wno-UNUSEDSIGNAL \
     --Mdir build/verilator/nes_digital_video_phase6b \
     --top-module nes_digital_video_pipeline_tb \
     -o nes_digital_video_pipeline_tb \
+    rtl/platform/reset_sync.sv \
     "${SHARED_VIDEO_RTL_FILES[@]}" \
     sim/nes_digital_video_pipeline_tb.sv
 

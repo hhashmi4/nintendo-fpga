@@ -54,10 +54,22 @@ module nes_digital_video_pipeline (
     logic [15:0] framebuffer_address;
     logic [8:0] framebuffer_pixel;
     logic framebuffer_frame_end;
+    logic framebuffer_source_reset, framebuffer_pixel_reset;
+
+    // Either endpoint losing its epoch invalidates ownership at both ends.
+    // Reset only content on a source restart; the raster continues running.
+    reset_sync source_content_reset (
+        .clk(source_clk), .async_reset_n(!source_reset && !pixel_reset),
+        .reset(framebuffer_source_reset)
+    );
+    reset_sync pixel_content_reset (
+        .clk(pixel_clk), .async_reset_n(!source_reset && !pixel_reset),
+        .reset(framebuffer_pixel_reset)
+    );
 
     nes_framebuffer framebuffer (
         .write_clk(source_clk),
-        .write_reset(source_reset),
+        .write_reset(framebuffer_source_reset),
         .write_frame_start(source_frame_start),
         .write_valid(source_pixel_valid),
         .write_x(source_pixel_x),
@@ -73,7 +85,7 @@ module nes_digital_video_pipeline (
         .write_range_error(write_range_error),
         .write_sequence_error(write_sequence_error),
         .read_clk(pixel_clk),
-        .read_reset(pixel_reset),
+        .read_reset(framebuffer_pixel_reset),
         .read_frame_end(framebuffer_frame_end),
         .read_address(framebuffer_address),
         .read_pixel(framebuffer_pixel),

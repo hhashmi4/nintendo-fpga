@@ -55,9 +55,13 @@ module nes_framebuffer (
     logic [1:0] selected_write_bank;
     logic [15:0] selected_expected_address;
     logic completed_waiting;
+    logic capture_corrupt;
 
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-    logic [1:0] acknowledge_sync;
+    // The returning two-bit read bank settles through two stages. Delay the
+    // acknowledgement one extra stage before releasing its old reservation,
+    // just as request_sync guards completed_bank in the opposite direction.
+    logic [2:0] acknowledge_sync;
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
     logic [2:0] request_sync;
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
@@ -87,7 +91,7 @@ module nes_framebuffer (
     endfunction
 
     assign write_address = {write_y, write_x};
-    assign capture_pending = request_toggle != acknowledge_sync[1];
+    assign capture_pending = request_toggle != acknowledge_sync[2];
     always_comb begin
         case (read_bank)
             2'd1: read_pixel = read_pixel1;
@@ -95,24 +99,24 @@ module nes_framebuffer (
             default: read_pixel = read_pixel0;
         endcase
     end
-    assign start_capture = write_frame_start && !capture_active &&
+    assign start_capture = write_frame_start &&
                            !completed_waiting &&
                            !capture_freeze;
     assign accept_write = write_valid && (capture_active || start_capture);
     assign selected_write_bank = capture_active ? write_bank :
                                  free_bank(read_bank_sync, completed_bank,
                                            capture_pending);
-    assign selected_expected_address = capture_active ?
+    assign selected_expected_address = capture_active && !start_capture ?
                                        expected_write_address : 16'd0;
 
     always_ff @(posedge write_clk) begin
-        acknowledge_sync <= {acknowledge_sync[0], acknowledge_toggle};
+        acknowledge_sync <= {acknowledge_sync[1:0], acknowledge_toggle};
         read_bank_meta <= read_bank;
         read_bank_sync <= read_bank_meta;
         capture_complete <= 1'b0;
 
         if (write_reset) begin
-            acknowledge_sync <= 2'b00;
+            acknowledge_sync <= 3'b000;
             read_bank_meta <= 2'd0;
             read_bank_sync <= 2'd0;
             capture_active <= 1'b0;
@@ -125,6 +129,7 @@ module nes_framebuffer (
             write_sequence_error <= 1'b0;
             expected_write_address <= 16'd0;
             completed_waiting <= 1'b0;
+            capture_corrupt <= 1'b0;
         end else begin
             // Debugger pauses can shift source/video phase enough that a
             // second frame completes before the first handoff is acknowledged.
@@ -139,15 +144,21 @@ module nes_framebuffer (
                 completed_waiting <= 1'b0;
             end
             if (start_capture) begin
-                write_bank <= free_bank(read_bank_sync, completed_bank,
-                                        capture_pending);
+                write_bank <= selected_write_bank;
                 capture_active <= 1'b1;
                 expected_write_address <= 16'd0;
+                capture_corrupt <= 1'b0;
+                // A new origin cancels an interrupted frame. No partial
+                // content is published, and the next frame can recover.
+                if (capture_active)
+                    write_sequence_error <= 1'b1;
             end
 
             if (accept_write) begin
-                if (write_address != selected_expected_address)
+                if (write_address != selected_expected_address) begin
                     write_sequence_error <= 1'b1;
+                    capture_corrupt <= 1'b1;
+                end
                 if (write_y < 8'd240) begin
                     case (selected_write_bank)
                         2'd1: framebuffer1[write_address] <= {
@@ -162,11 +173,17 @@ module nes_framebuffer (
                     endcase
                 end else begin
                     write_range_error <= 1'b1;
+                    capture_corrupt <= 1'b1;
                 end
 
                 if (write_x == 8'd255 && write_y == 8'd239) begin
                     capture_active <= 1'b0;
-                    if (!capture_pending) begin
+                    // The terminal coordinate is necessary but insufficient:
+                    // every preceding pixel must belong to this ordered frame.
+                    if ((capture_corrupt && !start_capture) ||
+                        write_address != selected_expected_address) begin
+                        completed_waiting <= 1'b0;
+                    end else if (!capture_pending) begin
                         completed_bank <= selected_write_bank;
                         request_toggle <= !request_toggle;
                         capture_complete <= 1'b1;
@@ -220,7 +237,7 @@ module nes_framebuffer (
                 assert (selected_write_bank != completed_bank);
         end
         if (!write_reset && capture_complete)
-            assert (request_toggle != acknowledge_sync[1]);
+            assert (request_toggle != acknowledge_sync[2]);
     end
 
     always_ff @(posedge read_clk) begin

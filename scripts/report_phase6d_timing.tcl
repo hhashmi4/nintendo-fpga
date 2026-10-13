@@ -9,5 +9,9 @@ report_timing -setup -npaths 20 -detail full_path \
     -file ../build/quartus_phase6d_hdmi_audio/critical_setup_paths.txt
 report_timing -hold -npaths 20 -detail full_path \
     -file ../build/quartus_phase6d_hdmi_audio/critical_hold_paths.txt
+set_operating_conditions -model fast -temperature 0 -voltage 1100
+update_timing_netlist
+report_timing -hold -npaths 20 -detail full_path \
+    -file ../build/quartus_phase6d_hdmi_audio/critical_fast_hold_paths.txt
 delete_timing_netlist
 project_close
