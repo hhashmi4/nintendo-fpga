@@ -1,0 +1,33 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY phase6e_power_top
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/platform/reset_sync.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/power/usbc_power_status_cdc.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/power/usbc_power_supervisor.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/power/phase6e_power_top.sv
+set_global_assignment -name SDC_FILE ../constraints/phase6e_power.sdc
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_phase6e_power/output_files
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
+set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS "AS INPUT TRI-STATED"
+# Qualification clocks only; this project is not a DE1-SoC power interface.
+set_location_assignment PIN_AF14 -to CLOCK_50
+set_location_assignment PIN_AA16 -to STATUS_CLK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STATUS_CLK
+set_instance_assignment -name VIRTUAL_PIN ON -to RESET_N
+set_instance_assignment -name VIRTUAL_PIN ON -to STATUS_VALID
+set_instance_assignment -name VIRTUAL_PIN ON -to STATUS_DATA[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to FAULT_CLEAR
+set_instance_assignment -name VIRTUAL_PIN ON -to STATUS_READY
+set_instance_assignment -name VIRTUAL_PIN ON -to STARTUP_STATE[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to SYSTEM_READY
+set_instance_assignment -name VIRTUAL_PIN ON -to VIDEO_POWER_PERMIT
+set_instance_assignment -name VIRTUAL_PIN ON -to AUDIO_POWER_PERMIT
+set_instance_assignment -name VIRTUAL_PIN ON -to DOWNSTREAM_DISABLE_REQUEST
+set_instance_assignment -name VIRTUAL_PIN ON -to DIAGNOSTICS[*]
+
+set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"

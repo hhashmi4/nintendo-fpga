@@ -1138,7 +1138,7 @@ physical test plan are documented in
 - Independent Python/I2S vectors, seeded CDC/control tests, nominal/fitted-clock
   A/V runs and CPU-capture replay through the real Phase 5K PCM path
 - Standalone logical Quartus target only; production DE1-SoC has no invented
-  HDMI pins. No physical TV-audio, TMDS, DisplayPort or Phase 6E claim
+  HDMI pins. No physical TV-audio, TMDS or DisplayPort claim
 
 See [`docs/phase6d-hdmi-audio.md`](docs/phase6d-hdmi-audio.md) for contracts,
 qualification, verification, timing and the physical test plan. Run the logical
@@ -1422,3 +1422,21 @@ before use.
 - `quartus` — hand-maintained Quartus project files
 - `scripts` — verification, build, and explicit deployment entry points
 - `docs` — architecture and engineering documentation
+
+## Phase 6E — USB-C power architecture and supervision
+
+Phase 6E defines a proposed sink-only USB-C power architecture and an isolated
+post-configuration power observer. The recalculated input design estimate is
+18.894 W: 9 V/3 A is the preferred qualified policy, and 5 V/3 A is insufficient
+for full operation after losses and margin. These are estimates, not measurements.
+
+The supervisor adds bounded startup/recovery, sticky faults, saturating counters,
+coherent status CDC, downstream power permissions and diagnostic schema 1.3.
+Production DE1-SoC power, reset, gameplay, VGA and codec behavior are preserved;
+its USB-C diagnostic bank reports unavailable. No physical PD negotiation,
+regulator control, production PCB, or Phase 6F implementation is included.
+
+See [Phase 6E architecture and qualification](docs/phase6e-usbc-power.md) and
+[machine-readable power data](config/phase6e_power_architecture.json). Run focused
+verification with `PATH="$PWD/.venv/bin:$PATH" bash scripts/test_usbc_power.sh`.
+The separate logical Quartus target is `bash scripts/build_phase6e_power_quartus.sh`.

@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module nes_diagnostic_phase5m_tb;
+module nes_diagnostic_phase5m_tb #(parameter bit POWER_AVAILABLE = 1'b1);
     import nes_diagnostic_mmio_pkg::*;
 
     logic fabric_clk = 1'b0;
@@ -62,6 +62,11 @@ module nes_diagnostic_phase5m_tb;
     logic [31:0] hdmi_audio_fifo_overruns = 32'd0;
     logic [31:0] hdmi_audio_reconnect_count = 32'd0;
     logic [7:0] hdmi_audio_last_error = 8'd0;
+    logic [415:0] usbc_diagnostics = '0;
+    logic usbc_fault_clear;
+    integer usbc_clear_count = 0;
+    always @(posedge fabric_clk)
+        if (usbc_fault_clear) usbc_clear_count++;
     logic hdmi_audio_fault_clear;
     integer hdmi_audio_clear_count = 0;
     always @(posedge fabric_clk)
@@ -130,7 +135,8 @@ module nes_diagnostic_phase5m_tb;
         .VIDEO_STALL_LIMIT(8),
         .DMA_TIMEOUT_LIMIT(8),
         .LOADER_TIMEOUT_LIMIT(8),
-        .HDMI_AUDIO_AVAILABLE(1'b1)
+        .HDMI_AUDIO_AVAILABLE(1'b1),
+        .USBC_POWER_AVAILABLE(POWER_AVAILABLE)
     ) dut (.*);
 
     task automatic check_result(input logic condition, input string message);
@@ -349,6 +355,25 @@ module nes_diagnostic_phase5m_tb;
         wait_command();
         check_result(hdmi_audio_clear_count == 1,
                      "HDMI audio clear crosses mailbox once");
+
+        // Append-only Phase 6E snapshot bank and exactly-once explicit clear.
+        for (integer word_index = 0; word_index < 13; word_index++)
+            usbc_diagnostics[word_index*32 +: 32] = 32'(100 + word_index);
+        snapshot();
+        usbc_diagnostics = '0;
+        for (integer word_index = 0; word_index < 13; word_index++) begin
+            mmio_read(9'(9'h12c + word_index*4), read_value);
+            check_result(read_value == (POWER_AVAILABLE ? 32'(100 + word_index) : 32'd0),
+                         "USB-C atomic snapshot holds every extension word");
+        end
+        mmio_read(DIAG_REG_AVAILABILITY, read_value);
+        check_result(read_value[14] == POWER_AVAILABLE, "USB-C logical availability");
+        mmio_write(DIAG_REG_CONTROL, 32'(1 << DIAG_CONTROL_USBC_FAULT_CLEAR_BIT));
+        wait_command();
+        check_result(usbc_clear_count == (POWER_AVAILABLE ? 1 : 0), "USB-C fault clear crosses once when available");
+        snapshot();
+        mmio_read(DIAG_REG_USBC_PROVENANCE, read_value);
+        check_result(read_value == 0, "USB-C next snapshot sees changed bundle");
 
         // Natural 32-bit wrap is intentional for fabric-owned event counters.
         @(negedge fabric_clk);

@@ -431,3 +431,8 @@ verilator --lint-only --Wall -Wno-fatal \
     -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
     --top-module de1_soc_nes_vga_top \
     "${PHASE3K_RTL_FILES[@]}"
+
+# Phase 6E logical power supervision; no board power pins.
+verilator --lint-only --Wall --top-module phase6e_power_top \
+    rtl/platform/reset_sync.sv rtl/power/usbc_power_status_cdc.sv \
+    rtl/power/usbc_power_supervisor.sv rtl/power/phase6e_power_top.sv

@@ -8,7 +8,8 @@ module nes_diagnostic_subsystem #(
     parameter integer VIDEO_STALL_LIMIT = 100_000_000,
     parameter integer DMA_TIMEOUT_LIMIT = 1_000_000,
     parameter integer LOADER_TIMEOUT_LIMIT = 250_000_000,
-    parameter bit HDMI_AUDIO_AVAILABLE = 1'b0
+    parameter bit HDMI_AUDIO_AVAILABLE = 1'b0,
+    parameter bit USBC_POWER_AVAILABLE = 1'b0
 ) (
     input  logic        fabric_clk,
     input  logic        fabric_reset,
@@ -78,6 +79,10 @@ module nes_diagnostic_subsystem #(
     input  logic [7:0]  hdmi_audio_last_error,
     output logic        hdmi_audio_fault_clear,
 
+    // Phase 6E coherent fabric-domain observations; zero/unavailable on DE1-SoC.
+    input  logic [415:0] usbc_diagnostics,
+    output logic        usbc_fault_clear,
+
     input  logic        apu_cycle_event,
     input  logic        codec_init_busy,
     input  logic        codec_init_done,
@@ -136,7 +141,7 @@ module nes_diagnostic_subsystem #(
 );
     import nes_diagnostic_mmio_pkg::*;
 
-    localparam integer SNAPSHOT_WORDS = 93;
+    localparam integer SNAPSHOT_WORDS = 106;
     localparam integer TRACE_WORD_BASE = 48;
 
     logic [31:0] snapshot_source_bank [0:SNAPSHOT_WORDS-1];
@@ -339,6 +344,7 @@ module nes_diagnostic_subsystem #(
     always_ff @(posedge fabric_clk) begin
         if (fabric_reset) begin
             hdmi_audio_fault_clear <= 1'b0;
+            usbc_fault_clear <= 1'b0;
             request_sync <= '0;
             acknowledge_toggle_source <= 1'b0;
             control_source_bank <= '0;
@@ -407,6 +413,7 @@ module nes_diagnostic_subsystem #(
                 snapshot_source_bank[index] <= '0;
         end else begin
             hdmi_audio_fault_clear <= 1'b0;
+            usbc_fault_clear <= 1'b0;
             request_sync <= {request_sync[1:0], request_toggle_mmio};
             vga_frame_sync <= {vga_frame_sync[1:0], vga_frame_toggle_async};
             vga_hsync_sync <= {vga_hsync_sync[1:0], vga_hsync_toggle_async};
@@ -549,6 +556,8 @@ module nes_diagnostic_subsystem #(
                 end
                 if (command_capture_pending) begin
                     command_capture_pending <= 1'b0;
+                    usbc_fault_clear <= USBC_POWER_AVAILABLE &&
+                        control_source_bank[DIAG_CONTROL_USBC_FAULT_CLEAR_BIT];
                     hdmi_audio_fault_clear <=
                         control_source_bank[DIAG_CONTROL_HDMI_AUDIO_FAULT_CLEAR_BIT];
                 if (control_source_bank[DIAG_CONTROL_FAULT_CLEAR_BIT]) begin
@@ -697,6 +706,9 @@ module nes_diagnostic_subsystem #(
                     snapshot_source_bank[91] <= hdmi_audio_reconnect_count;
                     snapshot_source_bank[92] <= {24'd0,
                         hdmi_audio_last_error};
+                    for (index = 0; index < 13; index = index + 1)
+                        snapshot_source_bank[93 + index] <= USBC_POWER_AVAILABLE
+                            ? usbc_diagnostics[index*32 +: 32] : 32'd0;
                 end
                 acknowledge_toggle_source <= request_sync[2];
                 end
@@ -775,7 +787,8 @@ module nes_diagnostic_subsystem #(
                     DIAG_REG_SNAPSHOT_SEQUENCE:
                         avs_readdata <= snapshot_sequence;
                     DIAG_REG_AVAILABILITY: avs_readdata <= DIAG_AVAILABILITY &
-                        (HDMI_AUDIO_AVAILABLE ? 32'hffffffff : 32'hffffdfff);
+                        (HDMI_AUDIO_AVAILABLE ? 32'hffffffff : 32'hffffdfff) &
+                        (USBC_POWER_AVAILABLE ? 32'hffffffff : 32'hffffbfff);
                     DIAG_REG_RESET_CAUSE: avs_readdata <= snapshot_mmio_bank[0];
                     DIAG_REG_SYSTEM_STATUS: avs_readdata <= snapshot_mmio_bank[1];
                     DIAG_REG_CLOCK_STATUS: avs_readdata <= snapshot_mmio_bank[2];
@@ -889,6 +902,32 @@ module nes_diagnostic_subsystem #(
                         avs_readdata <= snapshot_mmio_bank[91];
                     DIAG_REG_HDMI_AUDIO_LAST_ERROR:
                         avs_readdata <= snapshot_mmio_bank[92];
+                    DIAG_REG_USBC_ATTACHED:
+                        avs_readdata <= snapshot_mmio_bank[93];
+                    DIAG_REG_USBC_PD_CONTRACT_VALID:
+                        avs_readdata <= snapshot_mmio_bank[94];
+                    DIAG_REG_USBC_NEGOTIATED_MV:
+                        avs_readdata <= snapshot_mmio_bank[95];
+                    DIAG_REG_USBC_NEGOTIATED_MA:
+                        avs_readdata <= snapshot_mmio_bank[96];
+                    DIAG_REG_USBC_INPUT_POWER_MW:
+                        avs_readdata <= snapshot_mmio_bank[97];
+                    DIAG_REG_USBC_POWER_GOOD:
+                        avs_readdata <= snapshot_mmio_bank[98];
+                    DIAG_REG_USBC_RAILS_READY:
+                        avs_readdata <= snapshot_mmio_bank[99];
+                    DIAG_REG_USBC_STARTUP_STATE:
+                        avs_readdata <= snapshot_mmio_bank[100];
+                    DIAG_REG_USBC_FAULT_STATUS:
+                        avs_readdata <= snapshot_mmio_bank[101];
+                    DIAG_REG_USBC_FAULT_COUNT:
+                        avs_readdata <= snapshot_mmio_bank[102];
+                    DIAG_REG_USBC_DETACH_COUNT:
+                        avs_readdata <= snapshot_mmio_bank[103];
+                    DIAG_REG_USBC_RECOVERY_COUNT:
+                        avs_readdata <= snapshot_mmio_bank[104];
+                    DIAG_REG_USBC_PROVENANCE:
+                        avs_readdata <= snapshot_mmio_bank[105];
                     default: avs_readdata <= 32'h0000_0000;
                 endcase
             end

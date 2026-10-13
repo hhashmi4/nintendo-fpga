@@ -75,7 +75,7 @@ class OfflineDiagnosticBackend(DiagnosticBackend):
             regs.REG_VERSION: regs.MMIO_VERSION,
             regs.REG_BUILD_ID: regs.MMIO_BUILD_ID,
             regs.REG_CAPABILITIES: regs.MMIO_CAPABILITIES,
-            regs.REG_AVAILABILITY: regs.MMIO_AVAILABILITY,
+            regs.REG_AVAILABILITY: regs.MMIO_AVAILABILITY & ~regs.AVAILABLE_USBC_POWER,
             regs.REG_CPU_INSTRUCTIONS: 0xFFFF_FFFF,
             regs.REG_AUDIO_STATUS: 1 << 5,  # muted; not a physical result
             regs.REG_FAULT_CLEAR_MASK: 0xFFFF_FFFF,

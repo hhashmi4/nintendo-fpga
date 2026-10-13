@@ -4,8 +4,8 @@
   "span_bytes": 512,
   "magic": "0x4e455344",
   "version_major": 1,
-  "version_minor": 2,
-  "build_id": "0x0006000d",
+  "version_minor": 3,
+  "build_id": "0x0006000e",
   "trace_depth": 16,
   "capabilities": {
     "ATOMIC_SNAPSHOT": 0,
@@ -15,7 +15,8 @@
     "CLOCK_HEARTBEATS": 4,
     "OFFLINE_MODEL": 5,
     "HDMI_TX": 6,
-    "HDMI_AUDIO": 7
+    "HDMI_AUDIO": 7,
+    "USBC_POWER": 8
   },
   "availability": {
     "CPU_CYCLES": 0,
@@ -31,7 +32,8 @@
     "CARTRIDGE": 10,
     "CPU_INSTRUCTIONS": 11,
     "HDMI_TX": 12,
-    "HDMI_AUDIO": 13
+    "HDMI_AUDIO": 13,
+    "USBC_POWER": 14
   },
   "control_bits": {
     "SNAPSHOT": 0,
@@ -40,7 +42,8 @@
     "TRACE_TRIGGER": 3,
     "TRACE_FREEZE": 4,
     "TRACE_CLEAR": 5,
-    "HDMI_AUDIO_FAULT_CLEAR": 6
+    "HDMI_AUDIO_FAULT_CLEAR": 6,
+    "USBC_FAULT_CLEAR": 7
   },
   "registers": {
     "MAGIC": "0x000",
@@ -117,7 +120,20 @@
     "HDMI_AUDIO_FIFO_UNDERRUNS": "0x11c",
     "HDMI_AUDIO_FIFO_OVERRUNS": "0x120",
     "HDMI_AUDIO_RECONNECT_COUNT": "0x124",
-    "HDMI_AUDIO_LAST_ERROR": "0x128"
+    "HDMI_AUDIO_LAST_ERROR": "0x128",
+    "USBC_ATTACHED": "0x12c",
+    "USBC_PD_CONTRACT_VALID": "0x130",
+    "USBC_NEGOTIATED_MV": "0x134",
+    "USBC_NEGOTIATED_MA": "0x138",
+    "USBC_INPUT_POWER_MW": "0x13c",
+    "USBC_POWER_GOOD": "0x140",
+    "USBC_RAILS_READY": "0x144",
+    "USBC_STARTUP_STATE": "0x148",
+    "USBC_FAULT_STATUS": "0x14c",
+    "USBC_FAULT_COUNT": "0x150",
+    "USBC_DETACH_COUNT": "0x154",
+    "USBC_RECOVERY_COUNT": "0x158",
+    "USBC_PROVENANCE": "0x15c"
   },
   "faults": {
     "CLOCK_UNLOCKED": 1,

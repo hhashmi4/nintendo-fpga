@@ -689,8 +689,10 @@ build/verilator/hdmi_rgb_output_phase6c/hdmi_rgb_output_tb
 python3 scripts/verify_hdmi_transmitter.py \
     "$HDMI_CONTROLLER_RESULTS" "$HDMI_RGB_RESULTS"
 
+bash scripts/test_usbc_power.sh
+
 if [[ "$SIM_PROFILE" == "--fast" ]]; then
-    echo "FAST RTL smoke passed: platform, Phase 5A-5G APU, Phase 4F-A/B/C loading, Phase 5M diagnostics, and Phase 6C HDMI"
+    echo "FAST RTL smoke passed: platform, Phase 5A-5G APU, Phase 4F-A/B/C loading, Phase 5M diagnostics, Phase 6C HDMI, and Phase 6E power"
     exit 0
 fi
 
