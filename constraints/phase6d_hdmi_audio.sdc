@@ -103,6 +103,11 @@ set_min_delay 0.000 -from [get_clocks {CLOCK_50}] -to $fabric_to_codec_stage
 set audio_reset_stages [get_registers {*audio_reset_generator|sync_ff[*] *audio_reset_synchronizer|sync_ff[*]}]
 set_false_path -from [get_clocks {CLOCK_50}] -to $audio_reset_stages
 set_false_path -from [get_ports {SOURCE_RESET}] -to $audio_reset_stages
+# Phase 6G returns the consumer reset epoch to the producer's reset
+# synchronizer. Only its asynchronous clear crosses; release flops stay timed.
+set_false_path -from $codec_clock -to [get_registers {
+    *pcm_source|stream_reset_generator|sync_ff[*]
+}]
 set_false_path -to [get_registers -nowarn {
     *controller|audio_controller|audio_lock_sync[0]
     *pcm_source|audio_pll_lock_sync[0]

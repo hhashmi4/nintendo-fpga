@@ -1460,4 +1460,29 @@ or `.venv/bin/python -m verification.usbc_video` to validate the configuration.
 
 No production RTL, pins, constraints or MMIO registers change. Physical DP
 is NOT TESTED; 4K entries are future bandwidth references, not supported output
-modes. Phase 6G is not started.
+modes.
+
+## Phase 6G — System integration and reliability
+
+Phase 6G coordinates cartridge, framebuffer, debugger and audio reset epochs;
+rejects incomplete video frames; aligns HDMI reconnects to frame origin; and
+prevents counter resets from creating false diagnostic faults. Existing CPU,
+PPU, APU, DMA, Mapper 0, both controller registers, VGA, LINE OUT, HPS loading
+and Developer Mode remain covered by the complete regression.
+
+The new system test replays software-generated HPS loads through the production
+top, runs original audio/two-controller ROMs, and checks full VGA/720p frames,
+serialized PCM, replacement, resets, hotplug and fault recovery. Independent
+Python models and deterministic randomized tests cover frame ownership and
+diagnostic counter epochs. Full verification includes this suite:
+
+```sh
+PATH="$PWD/.venv/bin:$PATH" scripts/test.sh
+PATH="$PWD/.venv/bin:$PATH" scripts/test_system_integration.sh
+```
+
+See [Phase 6G integration, measurements and bring-up plan](docs/phase6g-system-integration.md).
+The physical production image remains VGA/WM8731; HDMI is a separate logical
+qualification target and USB-C power remains an isolated observer. The board
+is unavailable: no physical DE1-SoC, HDMI or USB-C validation is claimed.
+No Phase 6H, 7, 8 or 9 work is included.

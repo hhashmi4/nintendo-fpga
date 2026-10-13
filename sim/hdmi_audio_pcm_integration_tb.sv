@@ -25,6 +25,18 @@ module hdmi_audio_pcm_integration_tb;
     logic hd_bclk, hd_lr, hd_data, primed, started = 0;
     logic [31:0] sent, under, over, wm_under, wm_over;
     integer pcm_count = 0, hd_count = 0, wm_count = 0;
+    integer fabric_cycles = 0;
+    logic [31:0] previous_sent_gray = 0, previous_under_gray = 0;
+    always @(negedge audio_clk) begin
+        if ($test$plusargs("phase6g_reset")) begin
+            if (!source.audio_reset) begin
+                assert ($onehot0(previous_sent_gray ^ source.audio_transmitted_gray));
+                assert ($onehot0(previous_under_gray ^ source.audio_underrun_gray));
+            end
+            previous_sent_gray = source.audio_transmitted_gray;
+            previous_under_gray = source.audio_underrun_gray;
+        end
+    end
 
     always @(scl or sda) begin
         if (sda_previous && !sda && scl_previous && scl && !transaction) begin
@@ -67,6 +79,7 @@ module hdmi_audio_pcm_integration_tb;
     /* verilator lint_on PINCONNECTEMPTY */
 
     always @(posedge clk) begin
+        fabric_cycles++;
         if (pcm_reset) started <= 0;
         else if (primed) started <= 1;
         if (!pcm_reset && pcm_valid) begin
@@ -156,6 +169,45 @@ module hdmi_audio_pcm_integration_tb;
         assert(pcm_reset && hdmi_reset && codec_done && hd_data == 0 && wm_data == 0 && sent == 0);
         source_reset = 0;
         $display("Phase 6D codec restart and source reset passed: fresh silence, both consumers reset, no stale samples");
+        if ($test$plusargs("phase6g_reset")) begin
+            // Pulse widths include less than one 12 MHz period. The fabric
+            // must wait for the consumer to clear its pointer before prefill.
+            for (integer epoch = 0; epoch < 32; epoch++) begin
+                @(negedge clk); source_reset = 1; tick = 0;
+                repeat (1 + epoch % 4) @(negedge clk);
+                source_reset = 0;
+                assert (pcm_reset);
+                wait (!pcm_reset);
+                assert (!source.audio_reset && !source.prefill_complete);
+                for (integer cycle = 0; cycle < 20000 + epoch*13; cycle++) begin
+                    @(negedge clk); tick = 0; phase += 315;
+                    if (phase >= 8800) begin phase -= 8800; tick = 1; end
+                    assert (hd_data == 0 && wm_data == 0);
+                end
+                assert (sent > 8 && under == 0 && over == 0 && wm_under == 0 && wm_over == 0);
+            end
+            tick = 0;
+            repeat (40000) @(negedge clk);
+            assert (under > 0 && wm_under > 0 && hd_data == 0 && wm_data == 0);
+            source_reset = 1;
+            @(negedge clk); source_reset = 0;
+            wait (!pcm_reset);
+            repeat (20) @(negedge clk);
+            assert (under == 0 && wm_under == 0 && !source.prefill_complete);
+            // Losing lock reinitializes the actual codec sequencer. Only the
+            // lock indication is injected; no replacement serializer is used.
+            force source.audio_pll_locked = 1'b0;
+            repeat (20) @(negedge clk);
+            assert (pcm_reset && hdmi_reset && !codec_done && hd_data == 0 && wm_data == 0);
+            release source.audio_pll_locked;
+            wait (codec_done && !pcm_reset);
+            for (integer cycle = 0; cycle < 20000; cycle++) begin
+                @(negedge clk); tick = 0; phase += 315;
+                if (phase >= 8800) begin phase -= 8800; tick = 1; end
+            end
+            assert (sent > 8 && under == 0 && wm_under == 0 && wm_over == 0 && over == 0);
+            $display("PASS: Phase6G audio cycles=%0d, 32 short reset epochs, starvation, PLL loss, codec recovery and registered Gray transitions; mismatches=0", fabric_cycles);
+        end
         $finish;
     end
     initial begin

@@ -108,6 +108,7 @@ module de1_soc_nes_vga_top #(
     logic runtime_loader_reset;
     logic nes_functional_reset;
     logic video_reset;
+    logic video_content_reset;
     logic test_pattern;
     logic freeze_capture;
     logic test_pattern_sys;
@@ -411,13 +412,13 @@ module de1_soc_nes_vga_top #(
     logic [18:0] debug_pause_heartbeat;
 
     nes_debug_command_cdc debugger_mailbox (
-        .source_clk(pixel_clk), .source_reset(video_reset),
+        .source_clk(pixel_clk), .source_reset(video_content_reset),
         .source_valid(debugger_request_valid),
         .source_command(debugger_request_command),
         .source_ready(debugger_request_ready), .source_busy(debugger_request_busy),
         .source_ack(debugger_ack), .source_ack_sequence(debugger_ack_sequence),
         .source_ack_state(debugger_ack_state), .source_ack_result(debugger_ack_result),
-        .destination_clk(CLOCK_50), .destination_reset(system_reset),
+        .destination_clk(CLOCK_50), .destination_reset(nes_functional_reset),
         .destination_valid(debugger_command_valid),
         .destination_command(debugger_command),
         .destination_sequence(debugger_command_sequence),
@@ -531,6 +532,14 @@ module de1_soc_nes_vga_top #(
         .clk(pixel_clk),
         .async_reset_n(reset_request_n),
         .reset(video_reset)
+    );
+
+    // Cartridge/HPS resets invalidate both endpoints of content and command
+    // mailboxes. Keep the VGA raster/PLL alive while content restarts black.
+    reset_sync video_content_reset_generator (
+        .clk(pixel_clk),
+        .async_reset_n(!video_reset && !nes_functional_reset),
+        .reset(video_content_reset)
     );
 
 `ifdef ALTERA_SYNTHESIS
@@ -767,6 +776,16 @@ module de1_soc_nes_vga_top #(
             runtime_activation_in_progress)
     );
 
+    // Quartus Standard treats package-qualified enum constants inside port
+    // expressions as implicit nets. Resolve comparisons in ordinary assigns
+    // so synthesis and simulation use the same diagnostic conditions.
+    logic diagnostic_debugger_paused, diagnostic_debugger_step;
+    assign diagnostic_debugger_paused =
+        debugger_status.state == nes_debugger_pkg::DBG_PAUSED;
+    assign diagnostic_debugger_step = debugger_command_done &&
+        debugger_command >= nes_debugger_pkg::DBG_STEP_I &&
+        debugger_command <= nes_debugger_pkg::DBG_STEP_F;
+
     nes_diagnostic_subsystem diagnostics (
         .fabric_clk(CLOCK_50),
         .fabric_reset(diagnostic_reset),
@@ -782,11 +801,8 @@ module de1_soc_nes_vga_top #(
         .cpu_irq(apu_irq),
         .cpu_nmi_event(ppu_nmi_event),
         .cpu_pc(cpu_debug_pc),
-        .debugger_paused(
-            debugger_status.state == nes_debugger_pkg::DBG_PAUSED),
-        .debugger_step_event(debugger_command_done &&
-            debugger_command >= nes_debugger_pkg::DBG_STEP_I &&
-            debugger_command <= nes_debugger_pkg::DBG_STEP_F),
+        .debugger_paused(diagnostic_debugger_paused),
+        .debugger_step_event(diagnostic_debugger_step),
         .ppu_frame_event(ppu_frame_start),
         .ppu_scanline(ppu_debug_scanline),
         .ppu_dot(ppu_debug_dot),
@@ -1228,7 +1244,7 @@ module de1_soc_nes_vga_top #(
         .write_range_error(write_range_error),
         .write_sequence_error(write_sequence_error),
         .read_clk(pixel_clk),
-        .read_reset(video_reset),
+        .read_reset(video_content_reset),
         .read_frame_end(vga_frame_end),
         .read_address(framebuffer_address),
         .read_pixel(framebuffer_pixel),
@@ -1380,7 +1396,7 @@ module de1_soc_nes_vga_top #(
         .source_capture_accepted(debug_source_capture_accepted),
         .source_busy(debug_source_busy),
         .destination_clk(pixel_clk),
-        .destination_reset(video_reset),
+        .destination_reset(video_content_reset),
         .destination_frame_start(vga_frame_start),
         .destination_update(debug_destination_update),
         .destination_valid(debug_destination_valid),

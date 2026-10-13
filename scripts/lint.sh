@@ -247,6 +247,7 @@ SHARED_VIDEO_RTL_FILES=(
 
 verilator --lint-only --Wall \
     --top-module nes_digital_video_pipeline \
+    rtl/platform/reset_sync.sv \
     "${SHARED_VIDEO_RTL_FILES[@]}"
 
 verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \

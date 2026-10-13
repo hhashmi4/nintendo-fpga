@@ -23,25 +23,36 @@ module hdmi_rgb_output (
 );
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
     logic [1:0] video_enable_sync;
+    logic frame_enabled;
+    logic output_enabled;
 
     always_ff @(posedge pixel_clk) begin
         if (pixel_reset) begin
             video_enable_sync <= 2'b00;
             frame_toggle <= 1'b0;
+            frame_enabled <= 1'b0;
         end else begin
             video_enable_sync <= {video_enable_sync[0], video_enable_async};
+            if (!video_enable_sync[1])
+                frame_enabled <= 1'b0;
+            else if (pipeline_frame_start)
+                frame_enabled <= 1'b1;
             if (video_enable_sync[1] && pipeline_frame_start)
                 frame_toggle <= !frame_toggle;
         end
     end
 
     assign tx_pixel_clock = !pixel_clk;
-    assign tx_rgb = video_enable_sync[1] && pipeline_de ?
+    // Reconnect may arrive anywhere in a raster. Start with its first pixel;
+    // disconnect/reset still suppress DE without waiting for frame end.
+    assign output_enabled = !pixel_reset && video_enable_sync[1] &&
+                            (frame_enabled || pipeline_frame_start);
+    assign tx_rgb = output_enabled && pipeline_de ?
                     pipeline_rgb : 24'h000000;
     assign tx_hsync = pipeline_hsync;
     assign tx_vsync = pipeline_vsync;
-    assign tx_data_enable = video_enable_sync[1] && pipeline_de;
-    assign tx_frame_start = video_enable_sync[1] && pipeline_frame_start;
+    assign tx_data_enable = output_enabled && pipeline_de;
+    assign tx_frame_start = output_enabled && pipeline_frame_start;
 
 `ifndef SYNTHESIS
     always_ff @(posedge pixel_clk) begin

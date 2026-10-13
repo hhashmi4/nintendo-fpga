@@ -518,6 +518,32 @@ module nes_diagnostic_phase5m_tb #(parameter bit POWER_AVAILABLE = 1'b1);
                   trace_newest_payload);
         $fclose(metrics_file);
 
+        // Phase 6G: saturating audio totals may decrease on a functional or
+        // codec reset while this diagnostic block intentionally stays alive.
+        if ($test$plusargs("phase6g_counters")) begin : counter_epochs
+            integer vector_file, parsed, rows;
+            logic [31:0] under_count, over_count;
+            logic [1:0] expected_events;
+            vector_file = $fopen("build/phase6g/vectors/counters.txt", "r");
+            check_result(vector_file != 0, "Phase6G counter vectors exist");
+            rows = 0;
+            while (!$feof(vector_file)) begin
+                parsed = $fscanf(vector_file, "%h %h %h\n",
+                                 under_count, over_count, expected_events);
+                if (parsed != 3) $fatal(1, "malformed counter vector");
+                @(negedge fabric_clk);
+                audio_fifo_underruns = under_count;
+                audio_fifo_overruns = over_count;
+                #1;
+                if ({dut.detected_faults[DIAG_FAULT_AUDIO_FIFO_OVERRUN_BIT],
+                     dut.detected_faults[DIAG_FAULT_AUDIO_FIFO_UNDERRUN_BIT]} != expected_events)
+                    $fatal(1, "Phase6G counter reset/event mismatch row=%0d", rows);
+                rows++;
+            end
+            $fclose(vector_file);
+            $display("PASS: Phase6G diagnostic counter epochs cycles=%0d mismatches=0", rows);
+        end
+
         if (failure_count == 0) begin
             $display("Phase 5M diagnostic MMIO/CDC test passed");
             $finish;

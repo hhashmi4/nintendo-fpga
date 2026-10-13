@@ -54,6 +54,7 @@ module nes_audio_output #(
     logic [1:0] audio_pll_lock_sync;
     logic audio_reset;
     logic pipeline_reset;
+    logic stream_reset;
     logic resampler_valid;
     logic signed [31:0] filtered_sample;
     logic resampler_busy;
@@ -167,7 +168,7 @@ module nes_audio_output #(
 
     nes_audio_resampler sample_converter (
         .clk(clk),
-        .reset(pipeline_reset),
+        .reset(stream_reset),
         .input_tick(input_tick),
         .mixed_audio(mixed_audio),
         .sample_valid(resampler_valid),
@@ -179,7 +180,7 @@ module nes_audio_output #(
 
     nes_audio_conditioner conditioner (
         .clk(clk),
-        .reset(pipeline_reset),
+        .reset(stream_reset),
         .sample_valid(resampler_valid),
         .filtered_sample(filtered_sample),
         .test_tone_enable(test_tone_enable),
@@ -189,8 +190,8 @@ module nes_audio_output #(
     );
 
     assign pcm_output_sample = pcm_sample;
-    assign pcm_output_valid = pcm_valid;
-    assign pcm_output_reset = pipeline_reset;
+    assign pcm_output_valid = pcm_valid && !stream_reset;
+    assign pcm_output_reset = stream_reset;
 
     reset_sync audio_reset_generator (
         .clk(audio_clk),
@@ -198,9 +199,19 @@ module nes_audio_output #(
         .reset(audio_reset)
     );
 
+    // A short functional reset can end before a 12 MHz edge. Keep the
+    // producer, FIFO write pointer and returning diagnostic synchronizers
+    // reset until the consumer has cleared its old epoch and released reset.
+    // audio_reset depends only on pipeline_reset, so this has no reset loop.
+    reset_sync stream_reset_generator (
+        .clk(clk),
+        .async_reset_n(!pipeline_reset && !audio_reset),
+        .reset(stream_reset)
+    );
+
     audio_async_fifo #(.WIDTH(16), .DEPTH(32)) sample_fifo (
         .write_clk(clk),
-        .write_reset(pipeline_reset),
+        .write_reset(stream_reset),
         .write_enable(pcm_valid),
         .write_data(pcm_sample),
         .full(fifo_full),
@@ -222,7 +233,7 @@ module nes_audio_output #(
     // inserting a stop/start cycle.
     assign prefill_ready = fifo_write_level >= 6'd4;
     always_ff @(posedge clk) begin
-        if (pipeline_reset)
+        if (stream_reset)
             prefill_complete <= 1'b0;
         else if (prefill_ready)
             prefill_complete <= 1'b1;
@@ -250,19 +261,23 @@ module nes_audio_output #(
         .underrun_event(serializer_underrun_event)
     );
 
-    assign audio_transmitted_gray = binary_to_gray(audio_transmitted_binary);
-    assign audio_underrun_gray = binary_to_gray(audio_underrun_binary);
-
     always_ff @(posedge audio_clk) begin
         if (audio_reset) begin
             audio_transmitted_binary <= '0;
             audio_underrun_binary <= '0;
+            audio_transmitted_gray <= '0;
+            audio_underrun_gray <= '0;
         end else begin
-            if (serializer_transmitted_event && !(&audio_transmitted_binary))
-                audio_transmitted_binary <= audio_transmitted_binary + 1'b1;
-            if ((serializer_underrun_event || fifo_underflow_event) &&
-                !(&audio_underrun_binary))
-                audio_underrun_binary <= audio_underrun_binary + 1'b1;
+            // Register Gray codes at their source: combinational conversion
+            // can glitch during a multi-bit carry in the binary counter.
+            if (serializer_transmitted_event) begin
+                audio_transmitted_binary <= saturating_increment(audio_transmitted_binary);
+                audio_transmitted_gray <= binary_to_gray(saturating_increment(audio_transmitted_binary));
+            end
+            if (serializer_underrun_event || fifo_underflow_event) begin
+                audio_underrun_binary <= saturating_increment(audio_underrun_binary);
+                audio_underrun_gray <= binary_to_gray(saturating_increment(audio_underrun_binary));
+            end
         end
     end
 
@@ -300,19 +315,32 @@ module nes_audio_output #(
             diag_fifo_occupancy <= {10'd0, fifo_write_level};
             diag_muted <= mute_sync[1];
 
-            if (pcm_valid) begin
+            if (stream_reset) begin
+                transmitted_gray_sync1 <= '0;
+                transmitted_gray_sync2 <= '0;
+                underrun_gray_sync1 <= '0;
+                underrun_gray_sync2 <= '0;
+                mute_sync <= '1;
+                diag_samples_transmitted <= '0;
+                diag_fifo_underruns <= '0;
+                previous_underrun_synced <= '0;
+                diag_fifo_occupancy <= '0;
+                diag_muted <= 1'b1;
+            end
+
+            if (pcm_valid && !stream_reset) begin
                 diag_samples_generated <=
                     saturating_increment(diag_samples_generated);
                 rate_sample_count <= rate_sample_count + 1'b1;
             end
-            if (fifo_overflow_event)
+            if (fifo_overflow_event && !stream_reset)
                 diag_fifo_overruns <= saturating_increment(diag_fifo_overruns);
-            if (saturation_event)
+            if (saturation_event && !stream_reset)
                 diag_saturation_count <=
                     saturating_increment(diag_saturation_count);
 
             if (rate_clock_count == 26'd49_999_999) begin
-                diag_sample_rate <= rate_sample_count + 32'(pcm_valid);
+                diag_sample_rate <= rate_sample_count + 32'(pcm_valid && !stream_reset);
                 rate_clock_count <= '0;
                 rate_sample_count <= '0;
             end else begin
@@ -325,7 +353,7 @@ module nes_audio_output #(
                 diag_last_fault <= 8'h12;
             else if (fifo_overflow_event)
                 diag_last_fault <= 8'h11;
-            else if (underrun_synced != previous_underrun_synced)
+            else if (!stream_reset && underrun_synced > previous_underrun_synced)
                 diag_last_fault <= 8'h10;
         end
     end
