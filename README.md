@@ -1434,9 +1434,30 @@ The supervisor adds bounded startup/recovery, sticky faults, saturating counters
 coherent status CDC, downstream power permissions and diagnostic schema 1.3.
 Production DE1-SoC power, reset, gameplay, VGA and codec behavior are preserved;
 its USB-C diagnostic bank reports unavailable. No physical PD negotiation,
-regulator control, production PCB, or Phase 6F implementation is included.
+regulator control or production PCB is included in Phase 6E.
 
 See [Phase 6E architecture and qualification](docs/phase6e-usbc-power.md) and
 [machine-readable power data](config/phase6e_power_architecture.json). Run focused
 verification with `PATH="$PWD/.venv/bin:$PATH" bash scripts/test_usbc_power.sh`.
 The separate logical Quartus target is `bash scripts/build_phase6e_power_quartus.sh`.
+
+## Phase 6F — USB-C video feasibility
+
+**DEFER onboard USB-C video; preserve HDMI as primary and the dedicated
+Phase 6E USB-C power inlet.** The proposed 5CSEMA5F31C6N has no native DP PHY
+or high-speed transceivers. Real external bridge candidates exist, but their
+audio, firmware, procurement and complete power budgets remain unqualified.
+The 9 V/3 A contract leaves 5.256 W of estimated derated input headroom;
+USB-C monitor power is not promised.
+
+The [feasibility study](docs/phase6f-usbc-video-feasibility.md) compares five
+architectures, documents official sources and component gaps, and defines
+future interfaces/diagnostics. The [machine-readable architecture](config/phase6f_usbc_video.json)
+has dependency-free schema validation and independent bandwidth, output,
+HPD/Alt Mode, fault and power models. Run
+`.venv/bin/python -m pytest tests/python/test_usbc_video.py -q` (101 tests),
+or `.venv/bin/python -m verification.usbc_video` to validate the configuration.
+
+No production RTL, pins, constraints or MMIO registers change. Physical DP
+is NOT TESTED; 4K entries are future bandwidth references, not supported output
+modes. Phase 6G is not started.
