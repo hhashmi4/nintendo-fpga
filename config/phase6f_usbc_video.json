@@ -1,0 +1,804 @@
+{
+  "schema_version": 1,
+  "phase": "6F",
+  "physical_implementation": false,
+  "decision": "DEFER",
+  "primary_output": "HDMI",
+  "sources": [
+    {
+      "id": "typec",
+      "title": "USB-IF Type-C Cable and Connector Specification",
+      "revision": "Release 2.5, publication 2026-04-08",
+      "locator": "HTML publication page; full archive not retrieved",
+      "url": "https://www.usb.org/document-library/usb-type-cr-cable-and-connector-specification-release-25",
+      "access": "PUBLICATION_ONLY",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "pd",
+      "title": "USB-IF USB Power Delivery",
+      "revision": "R3.2 V1.2, publication 2026-09-14",
+      "locator": "HTML document library; full archive not retrieved",
+      "url": "https://www.usb.org/document-library/usb-power-delivery",
+      "access": "PUBLICATION_ONLY",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "pd_intro",
+      "title": "USB-IF USB Developer Days: USB Power Delivery",
+      "revision": "2019-11-20",
+      "locator": "PDF pp. 7-12: roles, CC, contracts, VCONN, identity",
+      "url": "https://www.usb.org/sites/default/files/D2T2-1%20-%20USB%20Power%20Delivery.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "typec_tests",
+      "title": "USB-IF Type-C Functional Test Specification",
+      "revision": "0.91, 2024-03-03",
+      "locator": "PDF pp. 58-59 and 105-107; TD4.2.1 and TD4.10.2",
+      "url": "https://www.usb.org/sites/default/files/USB%20Type%20C%20Functional%20Test%20Specification%202024%2003%2003.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "vesa",
+      "title": "VESA DP Alt Mode over USB Type-C, USB DevDays",
+      "revision": "2019 presentation; some slides retain 2016 footer",
+      "locator": "PDF pp. 12, 21-24, 27-30",
+      "url": "https://vesa.org/wp-content/uploads/2019/10/USB-DevDays-2019-VESA-DP-Alt-Mode-over-USB-Type-C.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "vesa_access",
+      "title": "VESA standards access",
+      "revision": "HTML reviewed 2026-10-13",
+      "locator": "Free standards and member access; normative DP/Alt Mode not obtained",
+      "url": "https://vesa.org/vesa-standards/",
+      "access": "RESTRICTED_SPECIFICATION",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "altmode",
+      "title": "TI PD Alternate Mode: DisplayPort",
+      "revision": "SLVA844B, July 2018",
+      "locator": "PDF pp. 3-8, 14-16, 23",
+      "url": "https://www.ti.com/lit/an/slva844b/slva844b.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "fpga",
+      "title": "Altera Cyclone V Device Overview, device variants",
+      "revision": "683694; HTML updated 2026-03-16",
+      "locator": "HTML Table 3 (no pagination); SE versus SX/ST",
+      "url": "https://docs.altera.com/r/docs/683694/current/cyclone-v-device-overview/cyclone-v-device-variants-and-packages",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "fpga_package",
+      "title": "Altera Cyclone V Device Overview, SE package plan",
+      "revision": "683694; HTML updated 2026-03-16",
+      "locator": "HTML Table 11, A5/F896; old Intel PDF returned HTTP 403",
+      "url": "https://docs.altera.com/r/docs/683694/current/cyclone-v-device-overview/package-plan?contentId=vSUvxeFNfDD8gVha7pRcqw",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "fpga_io",
+      "title": "Altera Cyclone V Device Overview, summary",
+      "revision": "683694; HTML updated 2026-03-16",
+      "locator": "HTML Table 2, GPIO LVDS rates (family maxima, not DP PHY)",
+      "url": "https://docs.altera.com/r/docs/683694/current/cyclone-v-device-overview/summary-of-cyclone-v-features",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "dp_training",
+      "title": "Altera DisplayPort IP User Guide",
+      "revision": "25.3, 2026-08-27",
+      "locator": "HTML section 4.3.5; no pagination",
+      "url": "https://docs.altera.com/r/docs/683273/25.3/displayport-ip-user-guide/displayport-link-training-flow",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "dp_audio",
+      "title": "Altera DisplayPort IP User Guide",
+      "revision": "25.3, 2026-08-27",
+      "locator": "HTML section 5.2.3; no pagination",
+      "url": "https://docs.altera.com/r/docs/683273/25.3/displayport-ip-user-guide/audio-and-secondary-stream-encoder-path",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "timings",
+      "title": "Linux upstream DRM EDID standardized timing tables",
+      "revision": "v6.12",
+      "locator": "drm_dmt_modes ID 0x44; edid_cea_modes VIC 4,16,95,97; source code, no pages",
+      "url": "https://raw.githubusercontent.com/torvalds/linux/v6.12/drivers/gpu/drm/drm_edid.c",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "adv7513",
+      "title": "Analog Devices ADV7513 data sheet",
+      "revision": "Rev. B",
+      "locator": "PDF pp. 1, 3-5, 11",
+      "url": "https://www.analog.com/media/en/technical-documentation/data-sheets/adv7513.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "anx9807",
+      "title": "Analogix ANX9807 preliminary product brief",
+      "revision": "AA-002639-TC-1, June 2015 (filename PB-1)",
+      "locator": "PDF pp. 1-2; full electrical/programming manual not obtained",
+      "url": "https://www.analogix.com/cn/system/files/AA-002639-PB-1-ANX9807_Product_Brief_0.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "lt6711",
+      "title": "Lontium LT6711 product brief",
+      "revision": "Rev. 1.1, copyright 2018-2021",
+      "locator": "PDF pp. 1-3; public file marked proprietary; full manual/firmware not obtained",
+      "url": "https://www.lontiumsemi.com/UploadFiles/2021-08/LT6711_Brief_R1.1.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "tps65987",
+      "title": "TI TPS65987D",
+      "revision": "SLVSES1D Rev. D, October 2022",
+      "locator": "PDF pp. 1, 43, 49",
+      "url": "https://www.ti.com/lit/ds/symlink/tps65987d.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "tps_lifecycle",
+      "title": "TI TPS65987D product page",
+      "revision": "HTML reviewed 2026-10-13",
+      "locator": "NOT RECOMMENDED FOR NEW DESIGNS; no pagination",
+      "url": "https://www.ti.com/product/TPS65987D",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "ccg3",
+      "title": "Infineon EZ-PD CCG3 datasheet",
+      "revision": "002-03288 Rev. *J, 2018-02-23",
+      "locator": "Printed pp. 1, 13, 21, 23-24; PDF has one cover page",
+      "url": "https://www.infineon.com/dgdl/Infineon-EZ-PD_CCG3_USB_Type-C_Controller_with_Power_Delivery-DataSheet-v11_00-EN.pdf?fileId=8ac78c8c7d0d8da4017d0ed8b45c5a56",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "ccg3_evm",
+      "title": "Infineon CY4531 CCG3 Evaluation Kit Guide",
+      "revision": "002-10218 Rev. *C",
+      "locator": "Printed p. 18, Table 3-3",
+      "url": "https://www.infineon.com/assets/row/public/documents/24/44/infineon-cy4531-ez-pd-ccg3-evaluation-kit-guide-usermanual-en.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "mux",
+      "title": "TI HD3SS460 datasheet",
+      "revision": "SLLSEM7D, January 2017",
+      "locator": "PDF pp. 1, 4, 6-8, 17-24",
+      "url": "https://www.ti.com/lit/ds/symlink/hd3ss460.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "esd",
+      "title": "TI TPDxEUSB30 datasheet",
+      "revision": "SLVSAC2G Rev. G, June 2021",
+      "locator": "PDF pp. 1, 4-7",
+      "url": "https://www.ti.com/lit/ds/symlink/tpd4eusb30.pdf",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "zynq",
+      "title": "AMD Multimedia User Guide",
+      "revision": "UG1449 v1.8, 2025-11-20",
+      "locator": "HTML DisplayPort Interface; no pagination",
+      "url": "https://docs.amd.com/r/en-US/ug1449-multimedia/DisplayPort-Interface",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "reverse_bridge",
+      "title": "ITE IT6564FN product page",
+      "revision": "Undated HTML reviewed 2026-10-13",
+      "locator": "Product information, direction and package; no pagination",
+      "url": "https://www.ite.com.tw/en/product/cate1/IT6564",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    },
+    {
+      "id": "adapter",
+      "title": "Club 3D CAC-1333 product sheet",
+      "revision": "November 3, 2022",
+      "locator": "PDF p. 1; HDMI source to USB-C display",
+      "url": "https://www.club-3d.com/web/image/29494",
+      "access": "REVIEWED_PUBLIC",
+      "reviewed": "2026-10-13"
+    }
+  ],
+  "components": [
+    {
+      "id": "hdmi",
+      "manufacturer": "Analog Devices",
+      "part_number": "ADV7513BSWZ",
+      "function": "HDMI transmitter",
+      "inputs": [
+        "RGB888",
+        "I2S"
+      ],
+      "outputs": [
+        "HDMI"
+      ],
+      "video_limit": "165 MHz; published 1080p",
+      "audio": "8-channel LPCM; project stereo 16-bit 48 kHz",
+      "power": "1.8 V and 3.3 V; existing Phase 6E allowance",
+      "control": "I2C",
+      "package": "64-lead LQFP",
+      "reference_clock": "Video pixel clock; selected I2S mode needs no MCLK",
+      "qualification": "PROVISIONAL",
+      "sources": [
+        "adv7513"
+      ],
+      "availability": "Manufacturer documented; stock, lifecycle and lead time unverified",
+      "cost_usd": null,
+      "cost_basis": "No authorized quantity/date quote obtained",
+      "unresolved": [
+        "Physical 720p/audio qualification",
+        "Procurement and lifetime"
+      ]
+    },
+    {
+      "id": "rgb_dp",
+      "manufacturer": "Analogix",
+      "part_number": "ANX9807",
+      "function": "Parallel RGB to DP",
+      "inputs": [
+        "24-bit SDR LVCMOS",
+        "18-bit DDR"
+      ],
+      "outputs": [
+        "DP 1.2",
+        "eDP"
+      ],
+      "video_limit": "270 Mpixel/s; two lanes up to 5.4 Gbit/s; brief literally says 2500x1600@60",
+      "audio": "UNKNOWN: brief has no audio input/support claim",
+      "power": "1.2 V / 2.5 V; <210 mW at QXGA, not a worst-case design limit",
+      "control": "Slave I2C",
+      "package": "81-ball BGA, 8x8 mm, 0.8 mm pitch",
+      "reference_clock": "XTAL shown; frequency/tolerance unknown",
+      "qualification": "DOCUMENTATION RESTRICTED",
+      "sources": [
+        "anx9807"
+      ],
+      "availability": "Manufacturer documented; stock, lifecycle and lead time unverified",
+      "cost_usd": null,
+      "cost_basis": "No authorized quantity/date quote obtained",
+      "unresolved": [
+        "Audio is a blocking gap",
+        "Full datasheet/registers",
+        "Clock and IO timing",
+        "External-DP versus eDP qualification"
+      ]
+    },
+    {
+      "id": "hdmi_dp",
+      "manufacturer": "Lontium",
+      "part_number": "LT6711A",
+      "function": "HDMI to DP with Type-C control/mux",
+      "inputs": [
+        "HDMI 2.0"
+      ],
+      "outputs": [
+        "DP 1.2",
+        "eDP 1.4",
+        "USB-C DP Alt Mode"
+      ],
+      "video_limit": "4K60 chip claim; four lanes RBR/HBR/HBR2; current FPGA/HDMI path only 720p",
+      "audio": "Brief advertises eight sound channels; exact PCM formats and mute behavior unqualified",
+      "power": "1.2 V / 1.8 V / 3.3 V; 1000 mW at 4K60, conditions/max unspecified",
+      "control": "Firmware/programming interface and register manual not qualified",
+      "package": "QFN64, 7.5x7.5 mm",
+      "reference_clock": "27 MHz crystal; tolerance/layout unqualified",
+      "qualification": "DOCUMENTATION RESTRICTED",
+      "sources": [
+        "lt6711"
+      ],
+      "availability": "Manufacturer documented; stock, lifecycle and lead time unverified",
+      "cost_usd": null,
+      "cost_basis": "No authorized quantity/date quote obtained",
+      "unresolved": [
+        "Full datasheet and firmware license",
+        "Audio conversion and EDID propagation",
+        "PD source policy and protection",
+        "Maximum power",
+        "Stock and lifecycle"
+      ]
+    },
+    {
+      "id": "pd_old",
+      "manufacturer": "Texas Instruments",
+      "part_number": "TPS65987D",
+      "function": "PD and DP Alt Mode policy controller",
+      "inputs": [
+        "CC1/CC2",
+        "Host I2C"
+      ],
+      "outputs": [
+        "Mux control",
+        "Power-path control",
+        "HPD policy"
+      ],
+      "video_limit": "No video PHY; resolution not applicable",
+      "audio": "Does not transport audio",
+      "power": "3.3 V or VBUS supply; board maximum unknown",
+      "control": "I2C/GPIO/configuration tool",
+      "package": "56-pin VQFN, 7x7 mm",
+      "reference_clock": "Internal control clock; no DP link clock",
+      "qualification": "REJECTED",
+      "sources": [
+        "tps65987",
+        "tps_lifecycle"
+      ],
+      "availability": "NRND on manufacturer page; existing customers only",
+      "cost_usd": null,
+      "cost_basis": "No authorized quantity/date quote obtained",
+      "unresolved": [
+        "NRND: reject for new production design"
+      ]
+    },
+    {
+      "id": "pd",
+      "manufacturer": "Infineon",
+      "part_number": "CYPD3125-40LQXIT",
+      "function": "CCG3 programmable Type-C/PD controller",
+      "inputs": [
+        "CC1/CC2",
+        "Host I2C"
+      ],
+      "outputs": [
+        "Mux control",
+        "HPD",
+        "Power-path control"
+      ],
+      "video_limit": "No video PHY; resolution not applicable",
+      "audio": "Does not transport audio",
+      "power": "VSYS 3.0-5.5 V in DFP/DRP/gate-driver modes (2.7-5.5 V UFP); 25 mA typical at 5 V under datasheet Table 4 conditions = 125 mW, not maximum; VCONN separate",
+      "control": "I2C/SWD; qualified firmware required",
+      "package": "40-pin QFN",
+      "reference_clock": "Internal oscillator; no DP link clock",
+      "qualification": "PROVISIONAL",
+      "sources": [
+        "ccg3",
+        "ccg3_evm"
+      ],
+      "availability": "Manufacturer documented; stock, lifecycle and lead time unverified",
+      "cost_usd": null,
+      "cost_basis": "No authorized quantity/date quote obtained",
+      "unresolved": [
+        "Source Alt Mode firmware/toolchain and license",
+        "Lifecycle/stock",
+        "Role policy and max consumption"
+      ]
+    },
+    {
+      "id": "mux",
+      "manufacturer": "Texas Instruments",
+      "part_number": "HD3SS460IRHRT",
+      "function": "Passive lane orientation and SBU switch",
+      "inputs": [
+        "DP lanes",
+        "AUX"
+      ],
+      "outputs": [
+        "Reversible Type-C lane/SBU routing"
+      ],
+      "video_limit": "DP 1.2a 5.4 Gbit/s/lane; no retiming",
+      "audio": "Transparent to DP packets",
+      "power": "3.3 V nominal; 0.6 mA typical active = 1.98 mW; maximum requires electrical table/application",
+      "control": "POL/AMSEL/EN GPIO",
+      "package": "28-pin WQFN, 3.5x5.5 mm",
+      "reference_clock": "None",
+      "qualification": "PROVISIONAL",
+      "sources": [
+        "mux"
+      ],
+      "availability": "Manufacturer documented; stock, lifecycle and lead time unverified",
+      "cost_usd": null,
+      "cost_basis": "No authorized quantity/date quote obtained",
+      "unresolved": [
+        "Channel insertion loss/eye budget",
+        "Orientation maps with chosen controller",
+        "Package/PCB qualification"
+      ]
+    },
+    {
+      "id": "esd",
+      "manufacturer": "Texas Instruments",
+      "part_number": "TPD4EUSB30DQAR",
+      "function": "Four-channel ESD diode array",
+      "inputs": [
+        "High-speed conductors"
+      ],
+      "outputs": [
+        "Protected conductors"
+      ],
+      "video_limit": "Published for 5 Gbit/s USB; HBR2/HBR3 not automatically qualified",
+      "audio": "Not applicable",
+      "power": "Passive; leakage only, maximum system contribution unknown",
+      "control": "None",
+      "package": "10-pin USON DQA",
+      "reference_clock": "None",
+      "qualification": "PROVISIONAL",
+      "sources": [
+        "esd"
+      ],
+      "availability": "Manufacturer documented; stock, lifecycle and lead time unverified",
+      "cost_usd": null,
+      "cost_basis": "No authorized quantity/date quote obtained",
+      "unresolved": [
+        "DP channel SI qualification",
+        "Separate CC/SBU short-to-VBUS and VBUS protection",
+        "Enough arrays for every conductor"
+      ]
+    },
+    {
+      "id": "wrong_direction",
+      "manufacturer": "ITE",
+      "part_number": "IT6564FN",
+      "function": "DP-to-HDMI/VGA bridge",
+      "inputs": [
+        "DP 1.2a"
+      ],
+      "outputs": [
+        "HDMI 2.0",
+        "VGA"
+      ],
+      "video_limit": "4K60 DP input",
+      "audio": "LPCM documented, wrong conversion direction",
+      "power": "Not investigated after direction rejection",
+      "control": "Embedded MCU/ISP",
+      "package": "64-pin QFN, 9x9 mm",
+      "reference_clock": "Not investigated",
+      "qualification": "REJECTED",
+      "sources": [
+        "reverse_bridge"
+      ],
+      "availability": "Manufacturer documented; stock, lifecycle and lead time unverified",
+      "cost_usd": null,
+      "cost_basis": "No authorized quantity/date quote obtained",
+      "unresolved": [
+        "Cannot convert HDMI source into DP"
+      ]
+    }
+  ],
+  "architectures": [
+    {
+      "id": "A",
+      "name": "HDMI-only production",
+      "decision": "CONDITIONAL GO",
+      "qualification": "PROVISIONAL",
+      "required_components": [
+        "hdmi"
+      ],
+      "interfaces": [
+        "RGB888",
+        "I2S",
+        "HDMI",
+        "USB-C power"
+      ],
+      "incremental_input_peak_mw": 0,
+      "incremental_bom_usd": 0,
+      "cost_basis": "Increment relative to A; E user accessory cost excluded and unknown",
+      "risk": "MEDIUM",
+      "risks": [
+        "Existing HDMI physical qualification remains"
+      ]
+    },
+    {
+      "id": "B",
+      "name": "HDMI plus active HDMI-to-DP and Type-C source",
+      "decision": "CONDITIONAL GO",
+      "qualification": "PROVISIONAL",
+      "required_components": [
+        "hdmi",
+        "hdmi_dp"
+      ],
+      "interfaces": [
+        "HDMI",
+        "DP",
+        "CC",
+        "AUX",
+        "USB-C power"
+      ],
+      "incremental_input_peak_mw": null,
+      "incremental_bom_usd": null,
+      "cost_basis": "Increment relative to A; E user accessory cost excluded and unknown",
+      "risk": "HIGH",
+      "risks": [
+        "Bridge firmware and audio qualification",
+        "HDMI switching or distribution needed; no passive split",
+        "Unknown total peak power/cost"
+      ]
+    },
+    {
+      "id": "C",
+      "name": "Shared RGB feeding independent HDMI and DP transmitters",
+      "decision": "CONDITIONAL GO",
+      "qualification": "PROVISIONAL",
+      "required_components": [
+        "hdmi",
+        "rgb_dp",
+        "pd",
+        "mux",
+        "esd"
+      ],
+      "interfaces": [
+        "RGB888",
+        "I2S pending DP support",
+        "DP",
+        "CC",
+        "AUX"
+      ],
+      "incremental_input_peak_mw": null,
+      "incremental_bom_usd": null,
+      "cost_basis": "Increment relative to A; E user accessory cost excluded and unknown",
+      "risk": "HIGH",
+      "risks": [
+        "ANX9807 audio undocumented",
+        "Parallel fanout loading and timing",
+        "Shared framebuffer read ownership"
+      ]
+    },
+    {
+      "id": "D",
+      "name": "Migrate to native-DP FPGA/SoC",
+      "decision": "NO-GO",
+      "qualification": "PROVISIONAL",
+      "required_components": [],
+      "interfaces": [
+        "Native DP",
+        "CC",
+        "AUX"
+      ],
+      "incremental_input_peak_mw": null,
+      "incremental_bom_usd": null,
+      "cost_basis": "Increment relative to A; E user accessory cost excluded and unknown",
+      "risk": "HIGH",
+      "risks": [
+        "New FPGA/SoC package/toolchain/DDR/boot/MMIO/PLL work",
+        "Native DP still needs Type-C controller and protection"
+      ]
+    },
+    {
+      "id": "E",
+      "name": "HDMI with user-supplied active converter",
+      "decision": "CONDITIONAL GO",
+      "qualification": "PROVISIONAL",
+      "required_components": [
+        "hdmi"
+      ],
+      "interfaces": [
+        "HDMI",
+        "External adapter USB-C"
+      ],
+      "incremental_input_peak_mw": 0,
+      "incremental_bom_usd": 0,
+      "cost_basis": "Increment relative to A; E user accessory cost excluded and unknown",
+      "risk": "MEDIUM",
+      "risks": [
+        "Converter must be HDMI-source to USB-C-display direction",
+        "External power and monitor matrix",
+        "No bundled compatibility guarantee"
+      ]
+    }
+  ],
+  "modes": [
+    {
+      "id": "720p60",
+      "width": 1280,
+      "height": 720,
+      "total_width": 1650,
+      "total_height": 750,
+      "pixel_clock_hz": 74250000,
+      "bits_per_pixel": 24,
+      "timing": "CTA VIC 4",
+      "source": "timings",
+      "implemented_scanout": true,
+      "raster_bits_s": 1782000000,
+      "active_pixels_s": 55296000.0,
+      "blanking_fraction": 0.2552727272727273
+    },
+    {
+      "id": "1080p60",
+      "width": 1920,
+      "height": 1080,
+      "total_width": 2200,
+      "total_height": 1125,
+      "pixel_clock_hz": 148500000,
+      "bits_per_pixel": 24,
+      "timing": "CTA VIC 16",
+      "source": "timings",
+      "implemented_scanout": false,
+      "raster_bits_s": 3564000000,
+      "active_pixels_s": 124416000.0,
+      "blanking_fraction": 0.1621818181818182
+    },
+    {
+      "id": "1200p60rb",
+      "width": 1920,
+      "height": 1200,
+      "total_width": 2080,
+      "total_height": 1235,
+      "pixel_clock_hz": 154000000,
+      "bits_per_pixel": 24,
+      "timing": "VESA DMT 0x44 reduced blanking; 59.950 Hz",
+      "source": "timings",
+      "implemented_scanout": false,
+      "raster_bits_s": 3696000000,
+      "active_pixels_s": 138125194.64341328,
+      "blanking_fraction": 0.10308315166614757
+    },
+    {
+      "id": "2160p30",
+      "width": 3840,
+      "height": 2160,
+      "total_width": 4400,
+      "total_height": 2250,
+      "pixel_clock_hz": 297000000,
+      "bits_per_pixel": 24,
+      "timing": "CTA VIC 95; future reference only",
+      "source": "timings",
+      "implemented_scanout": false,
+      "raster_bits_s": 7128000000,
+      "active_pixels_s": 248832000.0,
+      "blanking_fraction": 0.1621818181818182
+    },
+    {
+      "id": "2160p60",
+      "width": 3840,
+      "height": 2160,
+      "total_width": 4400,
+      "total_height": 2250,
+      "pixel_clock_hz": 594000000,
+      "bits_per_pixel": 24,
+      "timing": "CTA VIC 97; future reference only",
+      "source": "timings",
+      "implemented_scanout": false,
+      "raster_bits_s": 14256000000,
+      "active_pixels_s": 497664000.0,
+      "blanking_fraction": 0.1621818181818182
+    }
+  ],
+  "units": {
+    "pixel_clock": "Hz",
+    "bandwidth": "bit/s",
+    "link_rate": "Mbit/s per lane",
+    "power": "mW",
+    "cost": "USD",
+    "time": "s"
+  },
+  "fpga": {
+    "production_candidate": "5CSEMA5F31C6N",
+    "existing_quartus_device": "5CSEMA5F31C6",
+    "hssi_lanes": 0,
+    "native_dp": false,
+    "sources": [
+      "fpga",
+      "fpga_package",
+      "fpga_io"
+    ]
+  },
+  "bandwidth": {
+    "encoding": "8b10b",
+    "efficiency_num": 8,
+    "efficiency_den": 10,
+    "screening_reserve_ppm": 30000,
+    "reserve_status": "PROJECT_ASSUMPTION_NOT_PROTOCOL_REQUIREMENT",
+    "audio_payload_bits_s": 1536000,
+    "i2s_wire_bits_s": 3072000,
+    "lane_rates_mbps": [
+      1620,
+      2700,
+      5400,
+      8100
+    ],
+    "nes_source": {
+      "width": 256,
+      "height": 240,
+      "ppu_clock_hz_num": 59062500,
+      "ppu_clock_hz_den": 11,
+      "dots_per_line": 341,
+      "lines_per_frame": 262,
+      "odd_rendered_frame_dots_skipped": 1,
+      "status": "INTERNAL_INDEXED_STREAM_NOT_DISPLAY_MODE"
+    }
+  },
+  "power": {
+    "baseline_input_design_mw": 18894,
+    "preferred_mv": 9000,
+    "preferred_ma": 3000,
+    "derated_capacity_mw": 24150,
+    "remaining_mw": 5256,
+    "status": "ESTIMATED_PHASE6E",
+    "complete_dp_increment_mw": null,
+    "complete_dp_budget_mw": null,
+    "known_component_points": [
+      {
+        "component": "hdmi_dp",
+        "mw": 1000,
+        "basis": "Vendor 4K60 operating point, not maximum"
+      },
+      {
+        "component": "rgb_dp",
+        "mw": 210,
+        "basis": "Vendor less-than QXGA point, not maximum"
+      },
+      {
+        "component": "mux",
+        "mw": 1.98,
+        "basis": "3.3 V times typical 0.6 mA"
+      },
+      {
+        "component": "pd",
+        "mw": 125,
+        "basis": "5 V times 25 mA typical, Table 4 conditions; excludes sourced IO/VCONN load"
+      }
+    ]
+  },
+  "connector_policy": {
+    "selected_option": 3,
+    "power_inlet": "UNCHANGED_PHASE6E_SINK_ONLY",
+    "future_video_option": 1,
+    "combined_port": "DEFER_REQUIRES_NEW_POWER_POLICY",
+    "monitor_power_guaranteed": false
+  },
+  "diagnostics": {
+    "schema_version": 1,
+    "storage": "MODEL_ONLY_NO_MMIO_ALLOCATION",
+    "existing_mmio_version": "1.3",
+    "fields": {
+      "USBC_VIDEO_SUPPORTED": "Build has a qualified DP architecture; false for this production build",
+      "USBC_VIDEO_AVAILABLE": "Status adapter is implemented and fresh; false for this production build",
+      "USBC_VIDEO_CONNECTED": "Observed Type-C attachment, independent of HPD/link readiness",
+      "USBC_ALT_MODE_ACTIVE": "Entered DP Alt Mode; does not imply trained main link",
+      "USBC_DP_LINK_READY": "External transmitter reports trained, validated current mode with HPD high",
+      "USBC_DP_LANE_COUNT": "Trained lane count 1/2/4, zero when not ready",
+      "USBC_DP_LINK_RATE": "Trained per-lane raw rate in Mbit/s, zero when not ready",
+      "USBC_VIDEO_FAULT": "Sticky normalized fault reason; explicit recovery/reset semantics",
+      "USBC_VIDEO_QUALIFICATION": "UNSUPPORTED or SIMULATED in model; no physical PASS"
+    }
+  },
+  "decision_criteria": [
+    "Qualified 720p60 RGB888 and stereo 48 kHz/16-bit audio end to end",
+    "Public or contractually obtainable programming documentation and firmware rights",
+    "Authorized stock/lifecycle/quantity quote",
+    "Complete worst-case increment within 5256 mW derated headroom including losses and exported power",
+    "Both orientations, cable/monitor matrix, HPD/EDID/DPCD/recovery and SI/compliance pass",
+    "Measured low latency and thermal margin"
+  ],
+  "unresolved": [
+    "Full normative DP/Alt Mode standards and current USB compliance review",
+    "No hardware available; every physical result NOT TESTED",
+    "No complete DP BOM price or peak consumption",
+    "ANX9807 audio/clock/electrical details",
+    "LT6711A firmware and role/audio qualification",
+    "Current 720p PLL fits 74.242424 MHz rather than nominal 74.25 MHz",
+    "1920x1200 monitor must accept advertised 720p; no automatic native-mode support",
+    "Phase 9 stack-up, SI, power sequence, protection, manufacturing and compliance"
+  ]
+}
