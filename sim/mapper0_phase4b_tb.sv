@@ -1,6 +1,9 @@
 `timescale 1ns/1ps
 
 module mapper0_phase4b_tb;
+    logic unused_phase7a_irq_0;
+    logic unused_phase7a_irq_1;
+    logic unused_phase7a_irq_2;
     logic clk = 1'b0;
     logic reset = 1'b1;
     logic [15:0] cpu_address = 16'h0000;
@@ -46,6 +49,9 @@ module mapper0_phase4b_tb;
         .PRG_INIT_FILE ("build/cartridge/phase4b_map_nrom128.prg.hex"),
         .CHR_INIT_FILE ("build/cartridge/phase4b_map_nrom128.chr.hex")
     ) nrom128 (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .irq(unused_phase7a_irq_0),
         .clk(clk), .reset(reset),
         .cpu_address(cpu_address), .cpu_read(cpu_read),
         .cpu_write(cpu_write), .cpu_write_data(cpu_write_data),
@@ -75,6 +81,9 @@ module mapper0_phase4b_tb;
         .PRG_INIT_FILE ("build/cartridge/phase4b_map_nrom256.prg.hex"),
         .CHR_INIT_FILE ("build/cartridge/phase4b_map_nrom256.chr.hex")
     ) nrom256 (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .irq(unused_phase7a_irq_1),
         .clk(clk), .reset(reset),
         .cpu_address(cpu_address), .cpu_read(cpu_read),
         .cpu_write(cpu_write), .cpu_write_data(cpu_write_data),
@@ -97,6 +106,9 @@ module mapper0_phase4b_tb;
         .MIRRORING_MODE(2'd1),
         .PRG_INIT_FILE ("build/cartridge/phase4b_chrram_nrom128.prg.hex")
     ) ram_cartridge (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .irq(unused_phase7a_irq_2),
         .clk(clk), .reset(reset),
         .cpu_address(cpu_address), .cpu_read(cpu_read),
         .cpu_write(cpu_write), .cpu_write_data(cpu_write_data),

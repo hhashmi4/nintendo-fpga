@@ -33,6 +33,9 @@ module nes_core (
     output logic [7:0]  controller_cpu_write_data,
     input  logic [7:0]  controller_cpu_read_data,
 
+    output logic [13:0] mapper_ppu_address,
+    output logic        mapper_ppu_read,
+    output logic        mapper_ppu_write,
     output logic [12:0] chr_addr,
     output logic        chr_read,
     output logic        chr_write,
@@ -365,6 +368,9 @@ module nes_core (
 
     /* verilator lint_off PINMISSING */
     ppu_sprite_core ppu (
+        .mapper_ppu_address(mapper_ppu_address),
+        .mapper_ppu_read(mapper_ppu_read),
+        .mapper_ppu_write(mapper_ppu_write),
         .clk                    (clk),
         .reset                  (reset),
         .ppu_enable             (ppu_enable),

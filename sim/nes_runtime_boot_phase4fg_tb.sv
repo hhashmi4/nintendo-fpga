@@ -1,6 +1,10 @@
 `timescale 1ns/1ps
 
 module nes_runtime_boot_phase4fg_tb;
+    logic unused_phase7a_mapper_irq_0;
+    logic [13:0] unused_phase7a_mapper_ppu_address_1;
+    logic unused_phase7a_mapper_ppu_read_2;
+    logic unused_phase7a_mapper_ppu_write_3;
     import nes_runtime_loader_pkg::*;
     import nes_runtime_loader_mmio_pkg::*;
 
@@ -237,6 +241,9 @@ module nes_runtime_boot_phase4fg_tb;
             "build/cartridge/phase4b_boot_nrom128.chr.hex"),
         .ACTIVATION_RESET_CYCLES(4)
     ) cartridge (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .mapper_irq(unused_phase7a_mapper_irq_0),
         .clk(destination_clk), .reset(destination_reset),
         .command_valid(gated_destination_valid),
         .command(destination_command), .command_target(destination_target),
@@ -302,6 +309,9 @@ module nes_runtime_boot_phase4fg_tb;
 
     /* verilator lint_off PINMISSING */
     nes_core nes (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_1),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_2),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_3),
         .clk(destination_clk), .reset(functional_reset),
         .nes_enable(nes_ppu_ce), .irq(1'b0),
         .mirroring_mode(mirroring_mode), .cart_cpu_address(cart_cpu_address),

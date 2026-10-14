@@ -33,6 +33,13 @@ module nes_cartridge_runtime_mux #(
     input  logic                                      manifest_chr_is_ram,
     input  logic [1:0]                                manifest_mirroring,
 
+    input  logic        cpu_cycle_tick,
+    input  logic        ppu_cycle_tick,
+    input  logic [13:0] ppu_bus_address,
+    input  logic        ppu_bus_read,
+    input  logic        ppu_bus_write,
+    output logic                                      mapper_irq,
+
     input  logic [15:0]                               cpu_address,
     input  logic                                      cpu_read,
     input  logic                                      cpu_write,
@@ -113,6 +120,9 @@ module nes_cartridge_runtime_mux #(
     logic runtime_debug_chr_read;
     logic runtime_debug_chr_write;
 
+    logic legacy_irq;
+    logic runtime_irq;
+    logic [1:0] runtime_mirroring;
     logic legacy_selected;
     logic runtime_bus_enabled;
 
@@ -127,7 +137,9 @@ module nes_cartridge_runtime_mux #(
                       legacy_nrom_256;
     assign chr_is_ram = runtime_active ? active_chr_is_ram :
                                          legacy_chr_is_ram;
-    assign mirroring_mode = runtime_active ? active_mirroring :
+    assign mapper_irq = !reset && !nes_hold_reset &&
+                        (runtime_active ? runtime_irq : legacy_irq);
+    assign mirroring_mode = runtime_active ? runtime_mirroring :
                                              legacy_mirroring;
 
     assign cpu_read_data = runtime_active ? runtime_cpu_read_data :
@@ -165,8 +177,14 @@ module nes_cartridge_runtime_mux #(
         .PRG_INIT_FILE (LEGACY_PRG_INIT_FILE),
         .CHR_INIT_FILE (LEGACY_CHR_INIT_FILE)
     ) legacy_cartridge (
+        .cpu_cycle_tick(cpu_cycle_tick),
+        .ppu_cycle_tick(ppu_cycle_tick),
+        .ppu_bus_address(ppu_bus_address),
+        .ppu_bus_read(ppu_bus_read),
+        .ppu_bus_write(ppu_bus_write),
+        .irq(legacy_irq),
         .clk                     (clk),
-        .reset                   (reset),
+        .reset                   (reset || nes_hold_reset),
         .cpu_address             (cpu_address),
         .cpu_read                (cpu_read && legacy_selected &&
                                   !nes_hold_reset),
@@ -203,6 +221,12 @@ module nes_cartridge_runtime_mux #(
         .ACTIVATION_ENABLE      (1'b1),
         .ACTIVATION_RESET_CYCLES(ACTIVATION_RESET_CYCLES)
     ) runtime_cartridge (
+        .cpu_cycle_tick(cpu_cycle_tick),
+        .ppu_cycle_tick(ppu_cycle_tick),
+        .ppu_bus_address(ppu_bus_address),
+        .ppu_bus_read(ppu_bus_read),
+        .ppu_bus_write(ppu_bus_write),
+        .mapper_irq(runtime_irq), .mapper_mirroring(runtime_mirroring),
         .clk                    (clk),
         .reset                  (reset),
         .command_valid          (command_valid),

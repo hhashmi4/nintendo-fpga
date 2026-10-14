@@ -20,6 +20,9 @@ module ppu_sprite_core (
     output logic        oam_write_enable,
 
     input  logic [1:0]  mirroring_mode,
+    output logic [13:0] mapper_ppu_address,
+    output logic        mapper_ppu_read,
+    output logic        mapper_ppu_write,
     output logic [12:0] chr_addr,
     output logic        chr_read,
     output logic        chr_write,

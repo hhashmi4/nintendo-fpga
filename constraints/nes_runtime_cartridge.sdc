@@ -6,11 +6,13 @@ set_false_path -from [get_ports {
     reset command_valid command[*] command_target[*] command_address[*]
     command_data[*] manifest_valid manifest_mapper[*] manifest_prg_bytes[*]
     manifest_chr_bytes[*] manifest_chr_is_ram manifest_mirroring[*]
+    cpu_cycle_tick ppu_cycle_tick ppu_bus_address[*] ppu_bus_read ppu_bus_write
     nrom_256 chr_is_ram cpu_address[*] cpu_read cpu_write
     cpu_write_data[*] chr_address[*] chr_read chr_write chr_write_data[*]
 }]
 
 set_false_path -to [get_ports {
+    mapper_mirroring[*] mapper_irq
     command_ready command_accepted cpu_read_data[*] chr_read_data[*]
     loader_state[*] loader_busy loader_completed loader_error
     loader_error_code[*] nes_hold_reset debug_prg_address[*]

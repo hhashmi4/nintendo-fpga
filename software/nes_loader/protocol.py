@@ -11,6 +11,7 @@ from enum import IntEnum
 
 
 MAPPER_0 = 0
+SUPPORTED_MAPPERS = frozenset({MAPPER_0})
 PRG_NROM128_BYTES = 0x4000
 PRG_NROM256_BYTES = 0x8000
 CHR_ROM_BYTES = 0x2000
@@ -82,7 +83,7 @@ def manifest_error(manifest: Manifest) -> LoaderErrorCode:
 
     if manifest.mirroring not in (Mirroring.VERTICAL, Mirroring.HORIZONTAL):
         return LoaderErrorCode.INVALID_MANIFEST
-    if manifest.mapper != MAPPER_0:
+    if manifest.mapper not in SUPPORTED_MAPPERS:
         return LoaderErrorCode.UNSUPPORTED_MAPPER
     if manifest.prg_bytes not in (PRG_NROM128_BYTES, PRG_NROM256_BYTES):
         return LoaderErrorCode.UNSUPPORTED_PRG

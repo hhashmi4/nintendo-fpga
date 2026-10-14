@@ -1,6 +1,8 @@
 `timescale 1ns/1ps
 
 module nes_runtime_image_phase4fc_tb;
+    logic unused_phase7a_mapper_irq_0;
+    logic [1:0] unused_phase7a_mapper_mirroring_1;
     import nes_runtime_loader_pkg::*;
 
     localparam integer PRG_NROM128_COUNT =
@@ -113,7 +115,13 @@ module nes_runtime_image_phase4fc_tb;
 
     nes_runtime_cartridge #(
         .ACTIVATION_ENABLE(1'b0)
-    ) dut (.*);
+    ) dut (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .mapper_irq(unused_phase7a_mapper_irq_0),
+        .mapper_mirroring(unused_phase7a_mapper_mirroring_1),
+        .*
+    );
 
     nes_runtime_loader backpressure_dut (
         .clk                  (clk),

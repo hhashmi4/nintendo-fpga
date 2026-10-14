@@ -1,6 +1,10 @@
 `timescale 1ns/1ps
 
 module nes_runtime_activation_phase4fd_tb;
+    logic unused_phase7a_mapper_irq_0;
+    logic [13:0] unused_phase7a_mapper_ppu_address_1;
+    logic unused_phase7a_mapper_ppu_read_2;
+    logic unused_phase7a_mapper_ppu_write_3;
     import nes_runtime_loader_pkg::*;
 
     logic clk = 1'b0;
@@ -83,6 +87,9 @@ module nes_runtime_activation_phase4fd_tb;
 
     /* verilator lint_off PINMISSING */
     nes_core nes (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_1),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_2),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_3),
         .clk(clk),
         .reset(functional_reset),
         .nes_enable(debugger_authorized),
@@ -124,6 +131,9 @@ module nes_runtime_activation_phase4fd_tb;
             "build/cartridge/phase4b_boot_nrom128.chr.hex"),
         .ACTIVATION_RESET_CYCLES(4)
     ) cartridge (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .mapper_irq(unused_phase7a_mapper_irq_0),
         .clk(clk),
         .reset(reset),
         .command_valid(command_valid),

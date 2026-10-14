@@ -59,6 +59,8 @@ verilator --binary --timing --Wall -Wno-fatal \
     rtl/ppu/ppu_sprite_core.sv \
     rtl/nes_core.sv \
     rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     sim/nes_apu_audio_phase5j_tb.sv

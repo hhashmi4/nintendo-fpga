@@ -19,6 +19,9 @@ module ppu_phase3e_tb;
     logic [7:0] oam_write_data;
     logic oam_write_enable;
     logic [1:0] mirroring_mode = 2'd0;
+    logic [13:0] mapper_ppu_address;
+    logic mapper_ppu_read;
+    logic mapper_ppu_write;
     logic [12:0] chr_addr;
     logic chr_read;
     logic chr_write;
@@ -232,6 +235,12 @@ module ppu_phase3e_tb;
             assert (int'(renderer_memory_grant) == values[18]);
             assert (int'(renderer_cpu_collision) == values[19]);
             assert (int'(dut.memory_access_address) == values[20]);
+            // Phase 7A observation is checked against the independent Python
+            // bus vectors, including nametable/palette activity and stalls.
+            assert (int'(mapper_ppu_address) == values[20]);
+            assert (mapper_ppu_read == (!reset &&
+                    (values[14] != 0 || values[16] != 0) && values[15] == 0));
+            assert (mapper_ppu_write == (!reset && values[15] != 0));
             assert (int'(dut.memory_read_data) == values[21]);
             assert (int'(memory_region) == values[22]);
             assert (int'(chr_addr) == values[23]);

@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from .ines import RuntimeImage
-from .protocol import LoaderCommand, Manifest, RuntimeStatus, Target
+from .protocol import (
+    LoaderCommand, LoaderErrorCode, Manifest, RuntimeStatus, Target, manifest_error,
+)
 from .transport import RuntimeLoaderTransport, TransportError
 
 
@@ -66,6 +68,25 @@ def execute_load_plan(
     timeouts: RuntimeLoaderTimeouts = RuntimeLoaderTimeouts(),
 ) -> LoadResult:
     """Execute BEGIN, sequential payloads, COMMIT, validate, and ACTIVATE."""
+
+    # Public dataclasses can also be constructed without the iNES parser.
+    # Reject an invalid plan before BEGIN can hold an active cartridge or
+    # overwrite its single payload store. Transport failures after BEGIN
+    # retain the existing FPGA safe-stop/reload semantics.
+    integer_fields = (plan.manifest.mapper, plan.manifest.prg_bytes,
+                      plan.manifest.chr_bytes, plan.manifest.mirroring)
+    if (any(not isinstance(value, int) or isinstance(value, bool)
+            for value in integer_fields) or
+            not isinstance(plan.manifest.chr_is_ram, bool)):
+        raise RuntimeLoadError("preflight failed: invalid manifest field types")
+    if not isinstance(plan.prg_bytes, bytes) or not isinstance(plan.chr_bytes, bytes):
+        raise RuntimeLoadError("preflight failed: payloads must be immutable bytes")
+    error = manifest_error(plan.manifest)
+    if error != LoaderErrorCode.NONE:
+        raise RuntimeLoadError(f"preflight failed: {error.name}")
+    if (len(plan.prg_bytes) != plan.manifest.prg_bytes or
+            len(plan.chr_bytes) != plan.manifest.chr_bytes):
+        raise RuntimeLoadError("preflight failed: payload lengths disagree with manifest")
 
     accepted = 0
     stage = "BEGIN"

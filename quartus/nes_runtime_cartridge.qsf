@@ -5,7 +5,9 @@ set_global_assignment -name TOP_LEVEL_ENTITY nes_runtime_cartridge
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_cartridge_storage.sv
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_mapper0.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_mapper0_address.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_mapper.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_mapper.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_cartridge.sv
 set_global_assignment -name SDC_FILE ../constraints/nes_runtime_cartridge.sdc
 set_global_assignment -name VERILOG_MACRO "ALTERA_SYNTHESIS=1"
@@ -75,3 +77,12 @@ set_instance_assignment -name VIRTUAL_PIN ON -to debug_chr_read
 set_instance_assignment -name VIRTUAL_PIN ON -to debug_chr_write
 
 set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"
+
+# Phase 7A logical observation and mapper status boundary.
+set_instance_assignment -name VIRTUAL_PIN ON -to cpu_cycle_tick
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_cycle_tick
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_bus_address[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_bus_read
+set_instance_assignment -name VIRTUAL_PIN ON -to ppu_bus_write
+set_instance_assignment -name VIRTUAL_PIN ON -to mapper_mirroring[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to mapper_irq

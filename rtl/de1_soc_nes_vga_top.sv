@@ -122,6 +122,12 @@ module de1_soc_nes_vga_top #(
     logic cart_cpu_write;
     logic [7:0] cart_cpu_write_data;
     logic [7:0] cart_cpu_read_data;
+    logic [13:0] mapper_ppu_address;
+    logic mapper_ppu_read;
+    logic mapper_ppu_write;
+    logic mapper_irq;
+    logic nes_irq;
+    assign nes_irq = apu_irq || mapper_irq;
     logic [12:0] chr_address;
     logic chr_read;
     logic chr_write;
@@ -798,7 +804,7 @@ module de1_soc_nes_vga_top #(
         .cpu_cycle_event(nes_core_cpu_cycle_slot),
         .cpu_progress_event(nes_core_cpu_enable),
         .cpu_stalled(dma_debug_cpu_stall),
-        .cpu_irq(apu_irq),
+        .cpu_irq(nes_irq),
         .cpu_nmi_event(ppu_nmi_event),
         .cpu_pc(cpu_debug_pc),
         .debugger_paused(diagnostic_debugger_paused),
@@ -985,10 +991,13 @@ module de1_soc_nes_vga_top #(
     /* verilator lint_off PINCONNECTEMPTY */
     /* verilator lint_off PINMISSING */
     nes_core nes (
+        .mapper_ppu_address(mapper_ppu_address),
+        .mapper_ppu_read(mapper_ppu_read),
+        .mapper_ppu_write(mapper_ppu_write),
         .clk(CLOCK_50),
         .reset(nes_functional_reset),
         .nes_enable(nes_ppu_ce && debugger_authorized),
-        .irq(apu_irq),
+        .irq(nes_irq),
         .mirroring_mode(cartridge_mirroring_mode),
         .cart_cpu_address(cart_cpu_address),
         .cart_cpu_read(cart_cpu_read),
@@ -1173,6 +1182,11 @@ module de1_soc_nes_vga_top #(
         .LEGACY_PRG_INIT_FILE (PRG_INIT_FILE),
         .LEGACY_CHR_INIT_FILE (CHR_INIT_FILE)
     ) cartridge (
+        .cpu_cycle_tick(nes_core_cpu_cycle_slot),
+        .ppu_cycle_tick(nes_core_ppu_enable),
+        .ppu_bus_address(mapper_ppu_address),
+        .ppu_bus_read(mapper_ppu_read), .ppu_bus_write(mapper_ppu_write),
+        .mapper_irq(mapper_irq),
         .clk(CLOCK_50),
         .reset(runtime_loader_reset),
         .command_valid(runtime_command_valid),
