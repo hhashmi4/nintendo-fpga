@@ -19,6 +19,7 @@ module nes_console_control #(
     input logic [31:0] video_response,
     output logic [31:0] video_request, status,
     output logic core_hold, inhibit_game,
+    output logic focus,
     output logic [7:0] game_buttons, navigation
 );
     localparam logic [3:0] INIT=0, MENU=1, LOADING=2, STARTING=3,
@@ -40,7 +41,7 @@ module nes_console_control #(
     assign input_owner = state == GAME ? 2'd1 : state == DEVELOPER ? 2'd2 : 2'd0;
     assign game_buttons = state == GAME && input_armed ? buttons : 8'd0;
     assign navigation = input_armed && (state == MENU || state == DEVELOPER ||
-                        state == ERROR) ? buttons & ~previous_buttons : 8'd0;
+                        state == ERROR || state == LOADING) ? buttons & ~previous_buttons : 8'd0;
     assign desired_source = (state == STARTING || state == GAME) ? 2'd1 :
                             state == DEVELOPER ? 2'd2 : 2'd0;
     assign status = {epoch, error_code, loader_state, runtime_active, available,
@@ -69,16 +70,17 @@ module nes_console_control #(
             next_epoch = epoch + 16'd1;
             next_error = 4'd15;
         end
-        if (state == MENU && navigation[3] && available) begin
+        if (state == MENU && (navigation[3] || (navigation[0] && !focus)) && available) begin
             next_state = STARTING;
             next_epoch = epoch + 16'd1;
             next_error = 0;
         end
-        if ((state == MENU || state == ERROR) && navigation[2]) begin
+        if ((state == MENU || state == ERROR) && (navigation[2] ||
+            (state == MENU && navigation[0] && focus))) begin
             next_state = DEVELOPER;
             next_epoch = epoch + 16'd1;
         end
-        if (state == DEVELOPER && navigation[1]) begin
+        if ((state == DEVELOPER || state == ERROR || state == LOADING) && navigation[1]) begin
             next_state = RETURNING;
             next_epoch = epoch + 16'd1;
         end
@@ -155,6 +157,7 @@ module nes_console_control #(
             command_status <= 0;
             input_armed <= 0;
             previous_buttons <= 0;
+            focus <= 0;
         end else begin
             state <= next_state;
             epoch <= next_epoch;
@@ -175,6 +178,13 @@ module nes_console_control #(
                 timer <= timer + 1'b1;
             else timer <= 0;
             previous_buttons <= buttons;
+            // Stable presentation bit, captured with status by the existing mailbox.
+            // UP wins simultaneous UP/DOWN; no held-button repeat.
+            if (next_state != state || next_epoch != epoch) focus <= 0;
+            else if (state == MENU) begin
+                if (navigation[4]) focus <= 0;
+                else if (navigation[5]) focus <= 1;
+            end
             if (next_state != state || next_epoch != epoch)
                 input_armed <= 0;
             else if (buttons == 0)

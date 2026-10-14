@@ -5,7 +5,15 @@
 // snapshot bank. There is deliberately no NES pixel or live-core input. RGB
 // is registered so the character/glyph tree has one full pixel-clock period.
 module nes_debug_panel_renderer #(
-    parameter int unsigned STALE_FRAME_LIMIT = 4
+    parameter int unsigned STALE_FRAME_LIMIT = 4,
+    parameter logic [23:0] COLOR_BACKGROUND = 24'h081020,
+    parameter logic [23:0] COLOR_HEADER_BG  = 24'h102844,
+    parameter logic [23:0] COLOR_TEXT       = 24'hd0e0e8,
+    parameter logic [23:0] COLOR_HEADING    = 24'h50e8f0,
+    parameter logic [23:0] COLOR_SECTION    = 24'hf0d050,
+    parameter logic [23:0] COLOR_GOOD       = 24'h60f080,
+    parameter logic [23:0] COLOR_BAD        = 24'hff5060,
+    parameter logic [23:0] COLOR_BORDER     = 24'h287090
 ) (
     input  logic                                        pixel_clk,
     input  logic                                        reset,
@@ -24,14 +32,7 @@ module nes_debug_panel_renderer #(
 );
     import debug_font_pkg::*;
 
-    localparam logic [23:0] COLOR_BACKGROUND = 24'h081020;
-    localparam logic [23:0] COLOR_HEADER_BG  = 24'h102844;
-    localparam logic [23:0] COLOR_TEXT       = 24'hd0e0e8;
-    localparam logic [23:0] COLOR_HEADING    = 24'h50e8f0;
-    localparam logic [23:0] COLOR_SECTION    = 24'hf0d050;
-    localparam logic [23:0] COLOR_GOOD       = 24'h60f080;
-    localparam logic [23:0] COLOR_BAD        = 24'hff5060;
-    localparam logic [23:0] COLOR_BORDER     = 24'h287090;
+
 
     localparam logic [5:0] WORD_DEV_MODE = 6'd0;
     localparam logic [5:0] WORD_VALID    = 6'd1;

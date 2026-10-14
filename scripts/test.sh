@@ -30,5 +30,5 @@ scripts/test_debugger.sh
 echo "[5/6] Phase 6G complete-system startup, reset, A/V and fault recovery"
 scripts/test_system_integration.sh
 
-echo "[6/6] Phase 8A independent console ownership and production UI recovery"
+echo "[6/6] Phase 8 console ownership, boot visuals, animation and production recovery"
 scripts/test_console.sh

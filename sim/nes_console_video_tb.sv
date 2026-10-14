@@ -13,7 +13,10 @@ module nes_console_video_tb;
     logic [1:0] source;
     logic [7:0] displayed_buttons;
     int acknowledgements=0;
+    logic displayed_focus, displayed_valid;
+    logic focus=0;
     nes_console_video dut (
+        .focus(focus), .displayed_focus(displayed_focus), .displayed_valid(displayed_valid),
         .source_clk(fabric_clk), .source_reset(source_reset),
         .requested_status(requested), .buttons(buttons), .held_reset(held),
         .inhibit_game(inhibit), .source_ack(ack), .source_response(response),
@@ -24,10 +27,14 @@ module nes_console_video_tb;
         .game_visible(visible)
     );
     logic [1:0] previous_source=0;
-    logic previous_boundary=0;
+    logic previous_boundary=0, previous_focus=0, previous_valid=0;
     always @(negedge pixel_clk) begin
         if (!reset && source != previous_source && !previous_boundary)
             $fatal(1, "source changed outside raster boundary");
+        if (!reset && (displayed_focus != previous_focus || displayed_valid != previous_valid) && !previous_boundary)
+            $fatal(1,"presentation metadata changed outside raster boundary");
+        previous_focus=displayed_focus;
+        previous_valid=displayed_valid;
         previous_source = source;
     end
     always @(posedge pixel_clk) previous_boundary <= frame_end;
@@ -47,6 +54,12 @@ module nes_console_video_tb;
         settle_frame();
         if (source != 0 || displayed != requested || !display_reset)
             $fatal(1, "UI not live while NES is held reset");
+        assert(displayed_valid) else $fatal(1,"status never became valid");
+        focus=1;settle_frame();assert(displayed_focus);
+        focus=0;settle_frame();assert(!displayed_focus);
+        // Epoch zero is legal after wrap; validity is a separate display bit.
+        requested=32'h00000101;settle_frame();
+        assert(displayed_valid && displayed[31:16]==0);
         buttons=8'ha5; requested=32'h00020143;
         held=0; inhibit=0; content_reset=0;
         settle_frame();

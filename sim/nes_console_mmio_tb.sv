@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
 module nes_console_mmio_tb;
+    logic focus;
     logic hps_clk=0, fabric_clk=0;
     always #7 hps_clk=!hps_clk;
     always #10 fabric_clk=!fabric_clk;
@@ -42,7 +43,7 @@ module nes_console_mmio_tb;
         .command_result(result), .command_status(response_status),
         .video_ack(1'b1), .video_response(video_request),
         .video_request(video_request), .status(status), .core_hold(hold_core),
-        .inhibit_game(inhibit), .game_buttons(game_buttons), .navigation(navigation)
+        .inhibit_game(inhibit), .game_buttons(game_buttons), .navigation(navigation), .focus(focus)
     );
     task automatic write_word(input logic [31:0] value);
         @(negedge hps_clk); address=5'h10; writedata=value; wr=1;

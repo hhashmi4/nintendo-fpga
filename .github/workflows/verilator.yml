@@ -129,3 +129,14 @@ jobs:
       - name: FULL verification — complete Python, lint, RTL, and integration regression
         if: steps.verification_level.outputs.level == 'full'
         run: scripts/test.sh
+
+      - name: Preserve simulated console screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-visuals-${{ steps.verification_level.outputs.level }}
+          path: |
+            build/phase8b/*.png
+            build/phase8a/console-*.png
+          if-no-files-found: ignore
+          retention-days: 14

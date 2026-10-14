@@ -145,6 +145,7 @@ module phase6b_video_top #(
 
     generate if (CONSOLE_ENABLE) begin : console_qualification
         nes_console_720p_overlay overlay (
+            .focus(1'b0),
             .source_clk(CLOCK_50), .source_reset(source_reset),
             .requested_status(console_hold ? 32'h00010001 : 32'h00010154),
             .buttons(8'd0), .held_reset(console_hold), .inhibit_game(console_hold),

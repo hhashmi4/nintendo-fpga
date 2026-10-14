@@ -1551,3 +1551,37 @@ See the [Phase 8A architecture, protocol, qualification and hardware plan](docs/
 Physical board tests remain **pending**. HDMI is still a logical qualification
 target; no physical transmitter, controller transport, rich library UI,
 Phase 8B feature or Phase 7B mapper/storage work is included.
+
+
+## Phase 8B — boot experience and visual identity
+
+Phase 8B extends the Phase 8A independent renderer with a shared charcoal,
+purple/red and warm-white design system, a skippable 24-frame boot splash,
+frame-based loading activity, readable recovery messages, and a two-action
+menu shell. UP/DOWN focus Play or Developer Mode; A selects. START and SELECT
+retain their shortcuts. B returns from loading, recovery or Developer Mode
+through the existing supervisor handoff. It does not cancel or roll back an
+HPS cartridge transfer.
+
+The real Developer Mode panel retains its diagnostics with the console palette.
+VGA and the centered logical 720p canvas share drawing code, the existing font,
+and exact RGB values. No UI framebuffer, font ROM expansion, external SDRAM,
+mapper implementation or MMIO version change is added. The build-time
+reduced-motion hook removes the splash and freezes activity; runtime settings
+remain future work.
+
+See the [Phase 8B design, measurements, verification and hardware checklist](docs/phase8b-boot-visual-identity.md).
+`scripts/test_console.sh --unit` includes pixel, animation and navigation tests;
+the complete command adds production VGA/HDMI captures. Inspectable images are
+converted from simulated RTL output under ignored `build/phase8b/`.
+
+Final local qualification passes **2,443 Python tests**, clean lint and **116
+RTL/integration PASS records**, including 24,576,000 exact console pixel
+comparisons. Both full Quartus configurations close timing with zero TNS and
+no added M10Ks: production is 10,901 ALMs (+1.135 ns setup / +0.077 ns hold),
+and logical HDMI is 4,274 ALMs (+0.584 ns / +0.119 ns).
+
+Physical DE1-SoC validation remains **pending**, as does physical HDMI on a
+qualified carrier. Phase 8C still needs physical system/controller controls,
+serialized HPS library policy and hardware qualification. Full game-library,
+pairing, advanced settings and Developer Mode redesign are not implemented.
