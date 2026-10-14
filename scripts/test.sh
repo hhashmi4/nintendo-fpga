@@ -10,7 +10,7 @@ if ! python3 -m pytest --version >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "[1/5] Python references, Phase 5A-6G audio/video/diagnostics, and Phase 4F software tests"
+echo "[1/5] Python references, Phase 7A mapper contracts, audio/video/diagnostics, and software tests"
 python3 scripts/generate_runtime_loader_mmio_defs.py --check
 python3 scripts/generate_diagnostic_mmio_defs.py --check
 python3 scripts/generate_apu_audio_fir.py --check
@@ -20,7 +20,7 @@ python3 -m pytest
 echo "[2/5] Verilator RTL lint"
 scripts/lint.sh
 
-echo "[3/5] Verilator platform, CPU/PPU/system, Phase 5A-6E audio/video/diagnostics, and retained integration simulations"
+echo "[3/5] Verilator mapper framework, platform, CPU/PPU/system, audio/video/diagnostics, and retained integration simulations"
 scripts/sim.sh
 
 echo "[4/5] Phase 4E-E debugger command CDC, execution control, and playable integration"

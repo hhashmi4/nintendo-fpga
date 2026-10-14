@@ -1,6 +1,11 @@
 `timescale 1ns/1ps
 
 module nes_apu_cpu_phase5i_tb;
+    logic unused_phase7a_mapper_irq_0;
+    logic [1:0] unused_phase7a_mapper_mirroring_1;
+    logic [13:0] unused_phase7a_mapper_ppu_address_2;
+    logic unused_phase7a_mapper_ppu_read_3;
+    logic unused_phase7a_mapper_ppu_write_4;
     import cpu_pkg::*;
     import nes_apu_pkg::*;
     import nes_runtime_loader_pkg::*;
@@ -129,6 +134,9 @@ module nes_apu_cpu_phase5i_tb;
 
     /* verilator lint_off PINMISSING */
     nes_core nes (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_2),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_3),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_4),
         .clk(clk),
         .reset(functional_reset),
         .nes_enable(debugger_authorized),
@@ -260,6 +268,10 @@ module nes_apu_cpu_phase5i_tb;
         .ACTIVATION_ENABLE(1'b1),
         .ACTIVATION_RESET_CYCLES(4)
     ) cartridge (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .mapper_irq(unused_phase7a_mapper_irq_0),
+        .mapper_mirroring(unused_phase7a_mapper_mirroring_1),
         .clk(clk),
         .reset(reset),
         .command_valid(command_valid),

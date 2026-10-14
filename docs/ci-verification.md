@@ -72,3 +72,12 @@ FULL pull-request run. A warm Verilator cache should keep FAST near a few
 minutes, for an expected warm total near 42–55 minutes. The first run for a new
 cache key also builds the pinned toolchain, so a cold cycle may be closer to
 50–65 minutes. The exact hosted value is recorded by Actions.
+
+## Phase 7A mapper coverage
+
+`scripts/sim.sh` invokes `scripts/test_mapper_framework.sh` in both FAST and
+FULL profiles. The two bounded mapper benches cover exhaustive NROM mapping,
+unsupported IDs, permissions, reset and actual runtime replacement/failure.
+New software contract tests join the existing complete Python stage. The full
+retained gameplay, debugger, CDC and Phase 6G gate remains unchanged. No hosted
+Quartus job, additional workflow event or new duplicated full run is added.

@@ -29,6 +29,14 @@ module nes_runtime_cartridge #(
     input  logic                                      nrom_256,
     input  logic                                      chr_is_ram,
 
+    input  logic        cpu_cycle_tick,
+    input  logic        ppu_cycle_tick,
+    input  logic [13:0] ppu_bus_address,
+    input  logic        ppu_bus_read,
+    input  logic        ppu_bus_write,
+    output logic [1:0]                                mapper_mirroring,
+    output logic                                      mapper_irq,
+
     input  logic [15:0]                               cpu_address,
     input  logic                                      cpu_read,
     input  logic                                      cpu_write,
@@ -187,10 +195,23 @@ module nes_runtime_cartridge #(
         .activation_accepted  (loader_activation_accepted)
     );
 
-    nes_runtime_mapper0 mapper (
+    nes_runtime_mapper mapper (
+        .cpu_cycle_tick(cpu_cycle_tick),
+        .ppu_cycle_tick(ppu_cycle_tick),
+        .ppu_bus_address(ppu_bus_address),
+        .ppu_bus_read(ppu_bus_read),
+        .ppu_bus_write(ppu_bus_write),
+        .mapper_reset(ACTIVATION_ENABLE && nes_hold_reset),
+        .configuration_valid(!ACTIVATION_ENABLE || runtime_active),
+        .mapper_number(ACTIVATION_ENABLE ? active_mapper : 8'd0),
+        .prg_rom_bytes(ACTIVATION_ENABLE ? active_prg_bytes :
+                       (mapper_nrom_256 ? 16'd32768 : 16'd16384)),
+        .chr_rom_bytes(ACTIVATION_ENABLE ? active_chr_bytes :
+                       (mapper_chr_is_ram ? 16'd0 : 16'd8192)),
+        .initial_mirroring(ACTIVATION_ENABLE ? active_mirroring : 2'd0),
+        .mirroring_mode(mapper_mirroring), .irq(mapper_irq),
         .clk                  (clk),
         .reset                (reset),
-        .nrom_256             (mapper_nrom_256),
         .chr_is_ram           (mapper_chr_is_ram),
         .cpu_address          (cpu_address),
         .cpu_read             (cpu_read),

@@ -10,7 +10,7 @@ import stat
 
 from .protocol import (
     CHR_ROM_BYTES,
-    MAPPER_0,
+    SUPPORTED_MAPPERS,
     PRG_NROM128_BYTES,
     PRG_NROM256_BYTES,
     Manifest,
@@ -191,7 +191,7 @@ def _validate_runtime_header(header: INESHeader) -> tuple[CHRType, Mirroring]:
 
     if header.console_variant:
         raise UnsupportedINESImage("VS System and PlayChoice-10 images are unsupported")
-    if header.mapper != MAPPER_0:
+    if header.mapper not in SUPPORTED_MAPPERS:
         raise UnsupportedINESImage(
             f"Mapper {header.mapper} is not supported; runtime hardware supports "
             "Mapper 0"

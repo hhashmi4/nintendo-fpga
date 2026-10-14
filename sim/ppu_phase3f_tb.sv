@@ -1,6 +1,9 @@
 `timescale 1ns/1ps
 
 module ppu_phase3f_tb;
+    logic [13:0] unused_phase7a_mapper_ppu_address_0;
+    logic unused_phase7a_mapper_ppu_read_1;
+    logic unused_phase7a_mapper_ppu_write_2;
     logic clk = 1'b0;
     logic reset;
     logic ppu_enable;
@@ -210,7 +213,12 @@ module ppu_phase3f_tb;
     logic old_done;
     logic retained_observation_parity;
 
-    ppu_sprite_core dut (.*);
+    ppu_sprite_core dut (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_0),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_1),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_2),
+        .*
+    );
     assign chr_read_data = chr_memory[chr_addr];
     always #5 clk <= !clk;
     always_ff @(posedge clk) begin

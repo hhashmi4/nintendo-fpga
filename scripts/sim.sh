@@ -10,6 +10,8 @@ if [[ "$SIM_PROFILE" != "full" && "$SIM_PROFILE" != "--fast" ]]; then
     exit 2
 fi
 
+scripts/test_mapper_framework.sh
+
 mkdir -p \
     build/sim \
     build/verilator/platform \
@@ -579,7 +581,9 @@ verilator --binary --timing --trace-fst --Wall \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader.sv \
     rtl/cartridge/nes_runtime_cartridge_storage.sv \
-    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
+    rtl/cartridge/nes_runtime_mapper.sv \
     rtl/cartridge/nes_runtime_cartridge.sv \
     sim/nes_runtime_cartridge_phase4fb_tb.sv
 
@@ -598,7 +602,9 @@ verilator --binary --timing --trace-fst --Wall \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader.sv \
     rtl/cartridge/nes_runtime_cartridge_storage.sv \
-    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
+    rtl/cartridge/nes_runtime_mapper.sv \
     rtl/cartridge/nes_runtime_cartridge.sv \
     sim/nes_runtime_image_phase4fc_tb.sv
 
@@ -733,6 +739,8 @@ verilator --binary --timing --trace-fst --Wall \
     --Mdir build/verilator/mapper0_phase4b \
     --top-module mapper0_phase4b_tb \
     -o mapper0_phase4b_tb \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     sim/mapper0_phase4b_tb.sv
@@ -1201,6 +1209,8 @@ verilator --binary --timing --trace-fst --Wall \
     --top-module nes_phase4b_boot_tb \
     -o nes_phase4b_boot_tb \
     "${NES_PHASE3J_RTL_FILES[@]}" \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     sim/nes_phase4b_boot_tb.sv
@@ -1219,10 +1229,12 @@ verilator --binary --timing --trace-fst --Wall \
     -o nes_runtime_activation_phase4fd_tb \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     rtl/cartridge/nes_runtime_cartridge_storage.sv \
-    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_mapper.sv \
     rtl/cartridge/nes_runtime_cartridge.sv \
     rtl/cartridge/nes_cartridge_runtime_mux.sv \
     "${NES_PHASE3J_RTL_FILES[@]}" \
@@ -1252,7 +1264,9 @@ verilator --binary --timing --trace-fst --Wall -Wno-fatal \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader.sv \
     rtl/cartridge/nes_runtime_cartridge_storage.sv \
-    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
+    rtl/cartridge/nes_runtime_mapper.sv \
     rtl/cartridge/nes_runtime_cartridge.sv \
     "${NES_PHASE3J_RTL_FILES[@]}" \
     rtl/controller/nes_controller.sv \
@@ -1284,7 +1298,9 @@ verilator --binary --timing --trace-fst --Wall -Wno-fatal \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader.sv \
     rtl/cartridge/nes_runtime_cartridge_storage.sv \
-    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
+    rtl/cartridge/nes_runtime_mapper.sv \
     rtl/cartridge/nes_runtime_cartridge.sv \
     "${NES_PHASE3J_RTL_FILES[@]}" \
     rtl/controller/nes_controller.sv \
@@ -1359,10 +1375,12 @@ verilator --binary --timing --trace-fst --Wall \
     rtl/loader/nes_runtime_loader_mmio.sv \
     rtl/loader/nes_runtime_loader_cdc.sv \
     rtl/loader/nes_runtime_loader.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     rtl/cartridge/nes_runtime_cartridge_storage.sv \
-    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_mapper.sv \
     rtl/cartridge/nes_runtime_cartridge.sv \
     rtl/cartridge/nes_cartridge_runtime_mux.sv \
     sim/nes_runtime_boot_phase4fg_tb.sv
@@ -1385,6 +1403,8 @@ verilator --binary --timing --trace-fst --Wall \
     -o nes_phase4c_controller_tb \
     "${NES_PHASE3J_RTL_FILES[@]}" \
     rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     sim/nes_phase4c_controller_tb.sv
@@ -1403,6 +1423,8 @@ verilator --binary --timing --trace-fst --Wall \
     -o nes_phase4d_dma_integration_tb \
     "${NES_PHASE3J_RTL_FILES[@]}" \
     rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     sim/nes_phase4d_dma_integration_tb.sv
@@ -1447,6 +1469,8 @@ verilator --binary --timing --trace-fst --Wall \
     rtl/debug/nes_debugger.sv \
     rtl/controller/controller_input_sync.sv \
     rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     sim/nes_phase4db_playable_tb.sv
@@ -1943,6 +1967,8 @@ verilator --binary --timing --Wall -Wno-fatal \
     "${NES_PHASE3J_RTL_FILES[@]}" \
     rtl/controller/controller_input_sync.sv \
     rtl/controller/nes_controller.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
     rtl/cartridge/nes_mapper0.sv \
     rtl/cartridge/nes_cartridge.sv \
     "${VIDEO_PHASE3K_RTL_FILES[@]}" \
@@ -1982,10 +2008,12 @@ PHASE4EC_TOP_RTL_FILES=(
     rtl/loader/nes_runtime_loader_mmio.sv
     rtl/loader/nes_runtime_loader_cdc.sv
     rtl/loader/nes_runtime_loader.sv
+    rtl/cartridge/nes_mapper0_address.sv
+    rtl/cartridge/nes_mapper.sv
     rtl/cartridge/nes_mapper0.sv
     rtl/cartridge/nes_cartridge.sv
     rtl/cartridge/nes_runtime_cartridge_storage.sv
-    rtl/cartridge/nes_runtime_mapper0.sv
+    rtl/cartridge/nes_runtime_mapper.sv
     rtl/cartridge/nes_runtime_cartridge.sv
     rtl/cartridge/nes_cartridge_runtime_mux.sv
     rtl/diagnostic/hex7seg.sv

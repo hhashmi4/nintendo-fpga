@@ -14,6 +14,13 @@ module nes_cartridge #(
     input  logic        clk,
     input  logic        reset,
 
+    input  logic        cpu_cycle_tick,
+    input  logic        ppu_cycle_tick,
+    input  logic [13:0] ppu_bus_address,
+    input  logic        ppu_bus_read,
+    input  logic        ppu_bus_write,
+    output logic        irq,
+
     input  logic [15:0] cpu_address,
     input  logic        cpu_read,
     input  logic        cpu_write,
@@ -42,15 +49,17 @@ module nes_cartridge #(
     output logic        debug_chr_read,
     output logic        debug_chr_write
 );
-    assign cartridge_present = 1'b1;
+    assign cartridge_present = MAPPER_NUMBER == 0 &&
+        (PRG_ROM_BYTES == 16384 || PRG_ROM_BYTES == 32768);
     assign mapper_number = 8'(MAPPER_NUMBER);
     assign nrom_256 = PRG_ROM_BYTES == 32768;
     assign chr_is_ram = CHR_IS_RAM;
-    assign mirroring_mode = MIRRORING_MODE;
 
     generate
-        if (MAPPER_NUMBER == 0) begin : mapper0_selected
+        if (MAPPER_NUMBER == 0 &&
+            (PRG_ROM_BYTES == 16384 || PRG_ROM_BYTES == 32768)) begin : mapper0_selected
             nes_mapper0 #(
+                .MIRRORING_MODE(MIRRORING_MODE),
                 .PRG_ROM_BYTES (PRG_ROM_BYTES),
                 .CHR_IS_RAM    (CHR_IS_RAM),
                 .PRG_RAM_ENABLE(PRG_RAM_ENABLE),
@@ -61,6 +70,8 @@ module nes_cartridge #(
             );
         end else begin : unsupported_mapper
             always_comb begin
+                irq = 1'b0;
+                mirroring_mode = 2'd0;
                 cpu_read_data = 8'h00;
                 chr_read_data = 8'h00;
                 debug_prg_address = 15'h0000;

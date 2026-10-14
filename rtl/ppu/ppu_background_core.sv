@@ -22,6 +22,9 @@ module ppu_background_core (
     output logic        oam_write_enable,
 
     input  logic [1:0]  mirroring_mode,
+    output logic [13:0] mapper_ppu_address,
+    output logic        mapper_ppu_read,
+    output logic        mapper_ppu_write,
     output logic [12:0] chr_addr,
     output logic        chr_read,
     output logic        chr_write,
@@ -305,6 +308,10 @@ module ppu_background_core (
         .bg_opaque                   (bg_opaque),
         .bg_index                    (bg_index)
     );
+
+    assign mapper_ppu_address = memory_access_address;
+    assign mapper_ppu_read = !reset && memory_access_valid && !memory_access_write;
+    assign mapper_ppu_write = !reset && memory_access_valid && memory_access_write;
 
     ppu_memory memory (
         .clk                          (clk),

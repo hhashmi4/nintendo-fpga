@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 module nes_debugger_system_tb;
+    logic [13:0] unused_phase7a_mapper_ppu_address_0;
+    logic unused_phase7a_mapper_ppu_read_1;
+    logic unused_phase7a_mapper_ppu_write_2;
     import cpu_pkg::*;
     import nes_debugger_pkg::*;
     import nes_debug_snapshot_pkg::*;
@@ -43,6 +46,9 @@ module nes_debugger_system_tb;
     /* verilator lint_off PINMISSING */
     /* verilator lint_off PINCONNECTEMPTY */
     nes_core nes (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_0),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_1),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_2),
         .clk(clk), .reset(reset), .nes_enable(authorized), .irq(1'b0),
         .mirroring_mode(2'd0), .cart_cpu_address(cart_address),
         .cart_cpu_read_data(rom[cart_address]), .apu_cpu_read_data(8'd0),

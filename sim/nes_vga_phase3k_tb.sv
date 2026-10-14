@@ -1,6 +1,9 @@
 `timescale 1ns/1ps
 
 module nes_vga_phase3k_tb;
+    logic [13:0] unused_phase7a_mapper_ppu_address_0;
+    logic unused_phase7a_mapper_ppu_read_1;
+    logic unused_phase7a_mapper_ppu_write_2;
     logic system_clk = 1'b0;
     logic pixel_clk = 1'b0;
     logic reset = 1'b1;
@@ -82,6 +85,9 @@ module nes_vga_phase3k_tb;
     /* verilator lint_off PINCONNECTEMPTY */
     /* verilator lint_off PINMISSING */
     nes_core nes (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_0),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_1),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_2),
         .clk(system_clk),
         .reset(reset),
         .nes_enable(nes_ppu_ce),

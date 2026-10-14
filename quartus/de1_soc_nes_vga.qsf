@@ -61,10 +61,12 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_mmio.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader_cdc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/loader/nes_runtime_loader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_mapper0_address.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_mapper.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_mapper0.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_cartridge.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_cartridge_storage.sv
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_mapper0.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_mapper.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_runtime_cartridge.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cartridge/nes_cartridge_runtime_mux.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/diagnostic/hex7seg.sv

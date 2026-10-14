@@ -1,6 +1,10 @@
 `timescale 1ns/1ps
 
 module nes_phase4b_boot_tb;
+    logic [13:0] unused_phase7a_mapper_ppu_address_0;
+    logic unused_phase7a_mapper_ppu_read_1;
+    logic unused_phase7a_mapper_ppu_write_2;
+    logic unused_phase7a_irq_3;
     logic clk = 1'b0;
     logic reset = 1'b1;
     logic [1:0] cartridge_mirroring;
@@ -40,6 +44,9 @@ module nes_phase4b_boot_tb;
 
     /* verilator lint_off PINMISSING */
     nes_core dut (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_0),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_1),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_2),
         .clk(clk),
         .reset(reset),
         .nes_enable(1'b1),
@@ -77,6 +84,9 @@ module nes_phase4b_boot_tb;
         .PRG_INIT_FILE ("build/cartridge/phase4b_boot_nrom128.prg.hex"),
         .CHR_INIT_FILE ("build/cartridge/phase4b_boot_nrom128.chr.hex")
     ) cartridge (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .irq(unused_phase7a_irq_3),
         .clk(clk), .reset(reset),
         .cpu_address(cart_cpu_address), .cpu_read(cart_cpu_read),
         .cpu_write(cart_cpu_write), .cpu_write_data(cart_cpu_write_data),

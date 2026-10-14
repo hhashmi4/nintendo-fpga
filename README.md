@@ -1406,7 +1406,7 @@ before use.
 - `rtl/cpu` — CPU state, ALU, addressing, decoder, and shared instruction sequencer
 - `rtl/ppu` — PPU timing, CPU registers, memory map, and integrated cores
 - `rtl/system` — NES CPU address decoder, system bus, and internal CPU RAM
-- `rtl/cartridge` — build-time and runtime Mapper 0/NROM cartridge storage
+- `rtl/cartridge` — shared mapper framework and build-time/runtime NROM storage
 - `rtl/controller` — NES serial protocol and physical-input synchronizer
 - `rtl/dma` — coordinated standalone OAM and DMC DMA timing engines
 - `rtl/apu` — APU frame/status logic, five channels, and nonlinear mixer
@@ -1486,3 +1486,21 @@ The physical production image remains VGA/WM8731; HDMI is a separate logical
 qualification target and USB-C power remains an isolated observer. The board
 is unavailable: no physical DE1-SoC, HDMI or USB-C validation is claimed.
 No Phase 6H, 7, 8 or 9 work is included.
+
+## Phase 7A — cartridge mapper framework
+
+The shared mapper boundary centralizes NROM translation, ownership/permissions,
+configuration validation, mirroring and inactive Mapper-0 IRQ. Existing PRG/CHR
+memories and synchronous bus timing are retained. Full logical PPU activity
+and CPU/PPU enable observations reach the mapper boundary for future stateful
+implementations; only Mapper 0 reports support.
+
+Software rejects invalid manually constructed load plans before any transport
+operation. Loader MMIO v1.0 and diagnostic MMIO v1.3 remain unchanged. New
+deterministic mapper tests run in both FAST and FULL verification.
+
+See [Phase 7A interfaces, verification and limitations](docs/phase7a-mapper-framework.md),
+the [baseline assessment](docs/phase7a-mapper-assessment.md), and
+the [pending Welland checklist](docs/phase7a-welland-validation.md).
+Phase 7B requires a separate storage/loading decision; no future mapper is
+implemented or advertised here.

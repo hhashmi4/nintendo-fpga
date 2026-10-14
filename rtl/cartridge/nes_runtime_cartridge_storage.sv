@@ -2,7 +2,7 @@
 
 // Runtime-writable Mapper-0 payload storage. Loader addresses are byte
 // offsets within the maximum supported NROM payloads; CPU address mapping is
-// deliberately kept in nes_runtime_mapper0.
+// deliberately kept in the mapper framework.
 module nes_runtime_cartridge_storage (
     input  logic                                      clk,
     input  logic                                      reset,

@@ -1,6 +1,10 @@
 `timescale 1ns/1ps
 
 module nes_apu_audio_phase5j_tb;
+    logic [13:0] unused_phase7a_mapper_ppu_address_0;
+    logic unused_phase7a_mapper_ppu_read_1;
+    logic unused_phase7a_mapper_ppu_write_2;
+    logic unused_phase7a_irq_3;
     import cpu_pkg::*;
     import nes_apu_pkg::*;
     import nes_system_pkg::*;
@@ -90,6 +94,9 @@ module nes_apu_audio_phase5j_tb;
 
     /* verilator lint_off PINMISSING */
     nes_core nes (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_0),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_1),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_2),
         .clk(clk),
         .reset(functional_reset),
         .nes_enable(debugger_authorized),
@@ -182,6 +189,9 @@ module nes_apu_audio_phase5j_tb;
         .MIRRORING_MODE(2'd0),
         .PRG_INIT_FILE("build/sim/phase5j_silence.prg.hex")
     ) cartridge (
+        .cpu_cycle_tick(1'b0), .ppu_cycle_tick(1'b0),
+        .ppu_bus_address(14'd0), .ppu_bus_read(1'b0), .ppu_bus_write(1'b0),
+        .irq(unused_phase7a_irq_3),
         .clk(clk),
         .reset(functional_reset),
         .cpu_address(cart_cpu_address),

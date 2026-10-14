@@ -207,6 +207,8 @@ verilator --lint-only --Wall \
     "${NES_RTL_FILES[@]}"
 
 CARTRIDGE_RTL_FILES=(
+    rtl/cartridge/nes_mapper0_address.sv
+    rtl/cartridge/nes_mapper.sv
     rtl/cartridge/nes_mapper0.sv
     rtl/cartridge/nes_cartridge.sv
 )
@@ -300,7 +302,9 @@ verilator --lint-only --Wall \
     rtl/loader/nes_runtime_loader_pkg.sv \
     rtl/loader/nes_runtime_loader.sv \
     rtl/cartridge/nes_runtime_cartridge_storage.sv \
-    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_mapper0_address.sv \
+    rtl/cartridge/nes_mapper.sv \
+    rtl/cartridge/nes_runtime_mapper.sv \
     rtl/cartridge/nes_runtime_cartridge.sv
 
 verilator --lint-only --Wall \
@@ -309,7 +313,7 @@ verilator --lint-only --Wall \
     rtl/loader/nes_runtime_loader.sv \
     "${CARTRIDGE_RTL_FILES[@]}" \
     rtl/cartridge/nes_runtime_cartridge_storage.sv \
-    rtl/cartridge/nes_runtime_mapper0.sv \
+    rtl/cartridge/nes_runtime_mapper.sv \
     rtl/cartridge/nes_runtime_cartridge.sv \
     rtl/cartridge/nes_cartridge_runtime_mux.sv
 
@@ -401,7 +405,7 @@ PHASE3K_RTL_FILES=(
     rtl/loader/nes_runtime_loader.sv
     "${CARTRIDGE_RTL_FILES[@]}"
     rtl/cartridge/nes_runtime_cartridge_storage.sv
-    rtl/cartridge/nes_runtime_mapper0.sv
+    rtl/cartridge/nes_runtime_mapper.sv
     rtl/cartridge/nes_runtime_cartridge.sv
     rtl/cartridge/nes_cartridge_runtime_mux.sv
     "${CONTROLLER_RTL_FILES[@]}"

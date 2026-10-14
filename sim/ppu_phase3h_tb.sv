@@ -1,6 +1,9 @@
 `timescale 1ns/1ps
 
 module ppu_phase3h_tb;
+    logic [13:0] unused_phase7a_mapper_ppu_address_0;
+    logic unused_phase7a_mapper_ppu_read_1;
+    logic unused_phase7a_mapper_ppu_write_2;
     logic clk = 1'b0;
     logic reset;
     logic ppu_enable;
@@ -67,6 +70,9 @@ module ppu_phase3h_tb;
 
     /* verilator lint_off PINMISSING */
     ppu_sprite_core dut (
+        .mapper_ppu_address(unused_phase7a_mapper_ppu_address_0),
+        .mapper_ppu_read(unused_phase7a_mapper_ppu_read_1),
+        .mapper_ppu_write(unused_phase7a_mapper_ppu_write_2),
         .clk                       (clk),
         .reset                     (reset),
         .ppu_enable                (ppu_enable),
