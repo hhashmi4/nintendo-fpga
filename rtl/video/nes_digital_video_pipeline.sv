@@ -36,6 +36,10 @@ module nes_digital_video_pipeline (
     output logic        line_end,
     output logic [10:0] scan_x,
     output logic [9:0]  scan_y,
+    output logic [10:0] render_x,
+    output logic [9:0]  render_y,
+    output logic        render_active,
+    output logic        ownership_frame_end,
     output logic [7:0]  source_nes_x,
     output logic [7:0]  source_nes_y,
 
@@ -55,6 +59,7 @@ module nes_digital_video_pipeline (
     logic [8:0] framebuffer_pixel;
     logic framebuffer_frame_end;
     logic framebuffer_source_reset, framebuffer_pixel_reset;
+    assign ownership_frame_end = framebuffer_frame_end;
 
     // Either endpoint losing its epoch invalidates ownership at both ends.
     // Reset only content on a source restart; the raster continues running.
@@ -115,6 +120,7 @@ module nes_digital_video_pipeline (
         .line_end(line_end),
         .scan_x(scan_x),
         .scan_y(scan_y),
+        .render_x(render_x), .render_y(render_y), .render_active(render_active),
         .source_nes_x(source_nes_x),
         .source_nes_y(source_nes_y),
         .active_video(active_video),

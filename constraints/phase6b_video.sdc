@@ -28,11 +28,12 @@ set_false_path -to $framebuffer_cdc_first_stage_registers
 # timed. RESET_N asserts asynchronously into reset synchronizers.
 set async_control_first_stages [get_registers {
     *capture_freeze_sync[0]
+    *console_hold_sync[0]
     *pipeline|video|test_pattern_sync[0]
     *pipeline|video|developer_layout_sync[0]
 }]
 set_false_path -from [get_ports {
-    DEVELOPER_LAYOUT TEST_PATTERN CAPTURE_FREEZE
+    DEVELOPER_LAYOUT TEST_PATTERN CAPTURE_FREEZE CONSOLE_HOLD
 }] -to $async_control_first_stages
 set_false_path -from [get_ports {RESET_N}]
 

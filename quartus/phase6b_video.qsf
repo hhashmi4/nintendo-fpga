@@ -10,6 +10,11 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_framebuffer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_720p_video.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/nes_digital_video_pipeline.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_pll.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/debug_font_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_mailbox.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_renderer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_720p_overlay.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/phase6b_video_top.sv
 set_global_assignment -name SDC_FILE ../constraints/phase6b_video.sdc
 set_global_assignment -name VERILOG_MACRO "ALTERA_SYNTHESIS=1"
@@ -26,6 +31,7 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RESET_N
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DEVELOPER_LAYOUT
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to TEST_PATTERN
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CAPTURE_FREEZE
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CONSOLE_HOLD
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VIDEO_*
 
 set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"

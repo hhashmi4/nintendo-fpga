@@ -50,6 +50,7 @@ module phase6c_hdmi_top (
         .DEVELOPER_LAYOUT(DEVELOPER_LAYOUT),
         .TEST_PATTERN(TEST_PATTERN),
         .CAPTURE_FREEZE(CAPTURE_FREEZE),
+        .CONSOLE_HOLD(1'b0),
         .VIDEO_PCLK(pipeline_pclk),
         .VIDEO_HSYNC(pipeline_hsync),
         .VIDEO_VSYNC(pipeline_vsync),

@@ -287,6 +287,11 @@ verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
 
 verilator --lint-only --Wall -Wno-PINCONNECTEMPTY -Wno-UNUSEDSIGNAL \
     -Wno-UNUSEDPARAM --top-module phase6d_hdmi_audio_top \
+    rtl/debug/debug_font_pkg.sv \
+    rtl/console/nes_console_mailbox.sv \
+    rtl/console/nes_console_renderer.sv \
+    rtl/console/nes_console_video.sv \
+    rtl/console/nes_console_720p_overlay.sv \
     rtl/platform/reset_sync.sv \
     "${SHARED_VIDEO_RTL_FILES[@]}" \
     rtl/video/video_720p_pll.sv rtl/video/phase6b_video_top.sv \
@@ -427,6 +432,11 @@ PHASE3K_RTL_FILES=(
     rtl/debug/nes_debugger_pkg.sv
     rtl/debug/nes_debug_command_cdc.sv
     rtl/debug/nes_debugger.sv
+    rtl/console/nes_console_control.sv
+    rtl/console/nes_console_mailbox.sv
+    rtl/console/nes_console_mmio.sv
+    rtl/console/nes_console_renderer.sv
+    rtl/console/nes_console_video.sv
     rtl/de1_soc_nes_vga_top.sv
 )
 

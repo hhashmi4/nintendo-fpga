@@ -37,7 +37,12 @@ module nes_digital_video_pipeline_tb;
     always #10 source_clk = !source_clk;
     always #6.734 pixel_clk = !pixel_clk;
 
+    logic [10:0] unused_render_x;
+    logic [9:0] unused_render_y;
+    logic unused_render_active, unused_ownership_frame_end;
     nes_digital_video_pipeline dut (
+        .render_x(unused_render_x), .render_y(unused_render_y),
+        .render_active(unused_render_active), .ownership_frame_end(unused_ownership_frame_end),
         .source_clk(source_clk),
         .source_reset(source_reset),
         .source_frame_start(source_frame_start),

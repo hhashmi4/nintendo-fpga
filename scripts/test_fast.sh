@@ -21,3 +21,4 @@ scripts/lint.sh
 
 echo "[FAST 3/3] Mapper framework and retained platform/APU/runtime-loader/diagnostic/HDMI RTL smoke"
 scripts/sim.sh --fast
+scripts/test_console.sh --unit

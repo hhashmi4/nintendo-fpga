@@ -27,6 +27,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--diagnostic-contract", type=Path, required=True)
+    parser.add_argument("--console-contract", type=Path)
     parser.add_argument("--qsys", type=Path, required=True)
     parser.add_argument("--regmap", type=Path, required=True)
     args = parser.parse_args()
@@ -88,6 +89,21 @@ def main() -> None:
     diagnostic_offset = validate_bridge(
         "diagnostic_mmio_bridge", diagnostic_contract, "9"
     )
+    if args.console_contract:
+        console_contract = json.loads(args.console_contract.read_text(encoding="utf-8"))
+        console_offset = validate_bridge("console_mmio_bridge", console_contract, "5")
+        console_end = console_offset + integer(console_contract["span_bytes"])
+        for existing_offset, existing_contract in (
+            (qsys_offset, contract), (diagnostic_offset, diagnostic_contract)
+        ):
+            if max(console_offset, existing_offset) < min(
+                console_end, existing_offset + integer(existing_contract["span_bytes"])
+            ):
+                raise ValueError("console MMIO overlaps an existing aperture")
+        if (console_end > 0x200000 or integer(console_contract["hps_lightweight_window_base"])
+                != integer(contract["hps_lightweight_window_base"])):
+            raise ValueError("console MMIO lies outside the HPS lightweight window")
+        print(f"Validated HPS console MMIO map: slave_offset={console_offset:#x}, span=32 bytes")
 
     loader_end = qsys_offset + integer(contract["span_bytes"])
     diagnostic_end = diagnostic_offset + integer(diagnostic_contract["span_bytes"])

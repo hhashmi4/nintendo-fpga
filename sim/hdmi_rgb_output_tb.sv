@@ -36,6 +36,7 @@ module hdmi_rgb_output_tb;
 
     /* verilator lint_off PINCONNECTEMPTY */
     nes_720p_video video (
+        .render_x(), .render_y(), .render_active(),
         .pixel_clk(pixel_clk),
         .reset(pixel_reset),
         .test_pattern_async(1'b0),

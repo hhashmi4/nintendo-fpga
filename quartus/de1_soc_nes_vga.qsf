@@ -87,6 +87,11 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_pll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_command_cdc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_control.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_mailbox.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_mmio.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_renderer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_video.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/de1_soc_nes_vga_top.sv
 set_global_assignment -name QIP_FILE ../build/qsys_nes_hps_loader_system/synthesis/nes_hps_loader_system.qip
 set_global_assignment -name SDC_FILE ../constraints/de1_soc_nes_vga.sdc

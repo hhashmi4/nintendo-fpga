@@ -45,6 +45,7 @@ module phase6g_system_tb;
 
     /* verilator lint_off PINMISSING */
     de1_soc_nes_vga_top #(
+        .LEGACY_AUTORUN(1'b1),
         .PRG_INIT_FILE("build/cartridge/phase4db_playable_nrom128.prg.hex"),
         .CHR_INIT_FILE("build/cartridge/phase4db_playable_nrom128.chr.hex")
     ) dut (
@@ -108,6 +109,7 @@ module phase6g_system_tb;
     logic hd_bclk, hd_lr, hd_data;
     /* verilator lint_off PINMISSING */
     nes_digital_video_pipeline video (
+        .render_x(), .render_y(), .render_active(), .ownership_frame_end(),
         .source_clk(clk), .source_reset(dut.nes_functional_reset),
         .source_frame_start(dut.ppu_frame_start), .source_pixel_valid(dut.pixel_valid),
         .source_pixel_x(dut.pixel_x), .source_pixel_y(dut.pixel_y),

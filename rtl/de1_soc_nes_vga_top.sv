@@ -4,6 +4,9 @@
 // advanced by an NTSC-rate clock enable; the VGA reader uses a PLL-derived
 // 25.2 MHz clock and crosses only through nes_framebuffer's handoff protocol.
 module de1_soc_nes_vga_top #(
+    // Compatibility profile for retained pre-console regression.
+    // The production default always boots the independent console menu.
+    parameter bit LEGACY_AUTORUN = 1'b0,
     parameter logic DEVELOPER_MODE_DEFAULT = 1'b0,
     parameter logic [2:0] DEVELOPER_PAGE_DEFAULT = 3'd0,
     parameter string PRG_INIT_FILE =
@@ -168,6 +171,25 @@ module de1_soc_nes_vga_top #(
     logic diagnostic_mmio_waitrequest;
     logic [31:0] diagnostic_mmio_readdata;
     logic diagnostic_mmio_readdatavalid;
+    logic [4:0] console_mmio_address;
+    logic console_mmio_read, console_mmio_write;
+    logic [31:0] console_mmio_writedata, console_mmio_readdata;
+    logic [3:0] console_mmio_byteenable;
+    logic console_mmio_waitrequest, console_mmio_readdatavalid;
+    logic console_submit, console_channel_ready, console_channel_ack;
+    logic [31:0] console_request_word, console_command_word, console_command_status;
+    logic [33:0] console_channel_response;
+    logic console_command_valid, console_command_done;
+    logic [1:0] console_command_result;
+    logic [31:0] console_status, console_video_request, console_video_response;
+    logic console_video_ack, console_hold, console_inhibit, console_game_visible;
+    logic [7:0] console_game_buttons, console_navigation, console_display_buttons;
+    logic [31:0] console_display_status;
+    logic [1:0] console_video_source;
+    logic console_display_reset;
+    logic [23:0] console_rgb, legacy_rgb;
+    logic effective_developer_mode;
+    logic console_loader_begin;
     logic runtime_source_submit;
     nes_runtime_loader_pkg::loader_command_t runtime_source_command;
     nes_runtime_loader_pkg::loader_target_t runtime_source_target;
@@ -473,7 +495,7 @@ module de1_soc_nes_vga_top #(
     nes_audio_output audio_output (
         .clk(CLOCK_50),
         .reset(system_reset),
-        .source_reset(nes_functional_reset),
+        .source_reset(nes_functional_reset || (!LEGACY_AUTORUN && console_status[3:0] != 4'd4)),
         .input_tick(unused_apu_ce),
         .mixed_audio(apu_mixed_audio),
         .test_tone_enable(test_pattern_sys),
@@ -647,6 +669,16 @@ module de1_soc_nes_vga_top #(
         .diagnostic_mmio_read(diagnostic_mmio_read),
         .diagnostic_mmio_byteenable(diagnostic_mmio_byteenable),
         .diagnostic_mmio_debugaccess(),
+        .console_mmio_waitrequest(console_mmio_waitrequest),
+        .console_mmio_readdata(console_mmio_readdata),
+        .console_mmio_readdatavalid(console_mmio_readdatavalid),
+        .console_mmio_burstcount(),
+        .console_mmio_writedata(console_mmio_writedata),
+        .console_mmio_address(console_mmio_address),
+        .console_mmio_write(console_mmio_write),
+        .console_mmio_read(console_mmio_read),
+        .console_mmio_byteenable(console_mmio_byteenable),
+        .console_mmio_debugaccess(),
         .reset_reset_n(KEY0)
     );
 `else
@@ -664,6 +696,11 @@ module de1_soc_nes_vga_top #(
     assign diagnostic_mmio_write = 1'b0;
     assign diagnostic_mmio_writedata = 32'h00000000;
     assign diagnostic_mmio_byteenable = 4'b1111;
+    assign console_mmio_address = 0;
+    assign console_mmio_read = 0;
+    assign console_mmio_write = 0;
+    assign console_mmio_writedata = 0;
+    assign console_mmio_byteenable = 4'hf;
 `endif
 
     reset_sync hps_mmio_reset_generator (
@@ -685,7 +722,63 @@ module de1_soc_nes_vga_top #(
     // hold is generated in this same 50 MHz domain, so the complete NES sees
     // deterministic synchronous reset release after active metadata settles.
     assign nes_functional_reset = system_reset || runtime_loader_reset ||
-                                  runtime_nes_hold_reset;
+                                  runtime_nes_hold_reset || (!LEGACY_AUTORUN && console_hold);
+
+    nes_console_mmio #(.ENABLED(!LEGACY_AUTORUN)) console_registers (
+        .clk(hps_mmio_clk), .reset(hps_mmio_reset),
+        .avs_address(console_mmio_address), .avs_read(console_mmio_read),
+        .avs_write(console_mmio_write), .avs_writedata(console_mmio_writedata),
+        .avs_byteenable(console_mmio_byteenable),
+        .avs_waitrequest(console_mmio_waitrequest), .avs_readdata(console_mmio_readdata),
+        .avs_readdatavalid(console_mmio_readdatavalid),
+        .submit(console_submit), .request_word(console_request_word),
+        .channel_ready(console_channel_ready), .channel_ack(console_channel_ack),
+        .channel_response(console_channel_response)
+    );
+    nes_console_mailbox #(.RESPONSE_BITS(34)) console_command_channel (
+        .source_clk(hps_mmio_clk), .source_reset(hps_mmio_reset),
+        .source_valid(console_submit), .source_data(console_request_word),
+        .source_ready(console_channel_ready), .source_ack(console_channel_ack),
+        .source_response(console_channel_response),
+        .destination_clk(CLOCK_50), .destination_reset(runtime_loader_reset),
+        .destination_valid(console_command_valid), .destination_data(console_command_word),
+        .destination_done(console_command_done),
+        .destination_response({console_command_result, console_command_status})
+    );
+    assign console_loader_begin = runtime_command_accepted &&
+        runtime_command == nes_runtime_loader_pkg::LOADER_COMMAND_BEGIN;
+    nes_console_control console_control (
+        .clk(CLOCK_50), .reset(system_reset), .bridge_reset(runtime_loader_reset),
+        .loader_begin(console_loader_begin),
+        .activation_accepted(runtime_activation_accepted),
+        .loader_hold(runtime_nes_hold_reset), .runtime_active(runtime_cartridge_active),
+        .loader_state(runtime_loader_state), .loader_error_code(runtime_loader_error_code),
+        .buttons(controller1_buttons), .command_valid(console_command_valid),
+        .command_word(console_command_word), .command_done(console_command_done),
+        .command_result(console_command_result), .command_status(console_command_status),
+        .video_ack(console_video_ack), .video_response(console_video_response),
+        .video_request(console_video_request), .status(console_status),
+        .core_hold(console_hold), .inhibit_game(console_inhibit),
+        .game_buttons(console_game_buttons), .navigation(console_navigation)
+    );
+    nes_console_video console_video (
+        .source_clk(CLOCK_50), .source_reset(system_reset),
+        .requested_status(console_video_request), .buttons(controller1_buttons),
+        .held_reset(nes_functional_reset), .inhibit_game(console_inhibit),
+        .source_ack(console_video_ack), .source_response(console_video_response),
+        .pixel_clk(pixel_clk), .pixel_reset(video_reset), .content_reset(video_content_reset),
+        .frame_end(vga_frame_end), .framebuffer_valid(framebuffer_valid),
+        .selected_source(console_video_source), .displayed_status(console_display_status),
+        .displayed_buttons(console_display_buttons), .displayed_reset(console_display_reset),
+        .game_visible(console_game_visible)
+    );
+    nes_console_renderer console_renderer (
+        .pixel_clk(pixel_clk), .reset(video_reset), .x(panel_render_x), .y(panel_render_y),
+        .active(panel_render_active), .status(console_display_status),
+        .buttons(console_display_buttons), .held_reset(console_display_reset), .rgb(console_rgb)
+    );
+    assign effective_developer_mode = LEGACY_AUTORUN ? developer_mode_enable :
+                                     console_video_source == 2'd2;
 
     nes_runtime_loader_mmio runtime_loader_mmio (
         .clk(hps_mmio_clk),
@@ -1152,7 +1245,7 @@ module de1_soc_nes_vga_top #(
     nes_controller controllers (
         .clk(CLOCK_50),
         .reset(nes_functional_reset),
-        .controller1_buttons(controller1_buttons),
+        .controller1_buttons(LEGACY_AUTORUN ? controller1_buttons : console_game_buttons),
         .controller2_buttons(8'h00),
         .cpu_port(controller_port),
         .cpu_read(controller_cpu_read),
@@ -1272,7 +1365,7 @@ module de1_soc_nes_vga_top #(
         .pixel_clk(pixel_clk),
         .reset(video_reset),
         .test_pattern(test_pattern),
-        .developer_layout(developer_mode_enable),
+        .developer_layout(effective_developer_mode),
         .framebuffer_valid(framebuffer_valid),
         .framebuffer_pixel(framebuffer_pixel),
         .framebuffer_address(framebuffer_address),
@@ -1446,10 +1539,25 @@ module de1_soc_nes_vga_top #(
         .panel_red(panel_vga_red),
         .panel_green(panel_vga_green),
         .panel_blue(panel_vga_blue),
-        .red(VGA_R),
-        .green(VGA_G),
-        .blue(VGA_B)
+        .red(legacy_rgb[23:16]),
+        .green(legacy_rgb[15:8]),
+        .blue(legacy_rgb[7:0])
     );
+
+    // RGB-only ownership; HS/VS/blanking and the existing clock stay intact.
+    always_comb begin
+        if (LEGACY_AUTORUN)
+            {VGA_R,VGA_G,VGA_B} = legacy_rgb;
+        else if (!active_video)
+            {VGA_R,VGA_G,VGA_B} = 24'd0;
+        else if (console_video_source == 2'd1)
+            {VGA_R,VGA_G,VGA_B} = console_game_visible ?
+                {normal_vga_red,normal_vga_green,normal_vga_blue} : 24'd0;
+        else if (console_video_source == 2'd2 && scan_x >= 10'd512)
+            {VGA_R,VGA_G,VGA_B} = {panel_vga_red,panel_vga_green,panel_vga_blue};
+        else
+            {VGA_R,VGA_G,VGA_B} = console_rgb;
+    end
 
     // Retain the panel output explicitly in the hard-disabled production
     // image so Phase 4E-D synthesis measures the implemented renderer.

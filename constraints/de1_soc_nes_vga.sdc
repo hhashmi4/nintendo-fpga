@@ -119,6 +119,19 @@ set_max_delay 20.000 \
 # invariant as the loader mailbox. The payload is held while the request/ack
 # toggle traverses three synchronizer stages; these finite bounds ensure that
 # every payload bit settles before the receiving bank captures it.
+
+# Phase 8A separate HPS command mailbox. Its payload banks remain stable
+# until the three-stage return handshake. Preserve finite routing bounds
+# instead of exempting the complete HPS/fabric clock relationship.
+set_false_path -to [get_registers {
+    *console_command_channel|request_sync[0]
+    *console_command_channel|acknowledge_sync[0]
+}]
+set_max_delay 20.000 -from [get_registers {*console_command_channel|request_bank*}] \
+    -to [get_registers {*console_command_channel|destination_data*}]
+set_max_delay 20.000 -from [get_registers {*console_command_channel|response_bank*}] \
+    -to [get_registers {*console_command_channel|source_response*}]
+
 set diagnostic_cdc_first_stage_registers [get_registers {
     *diagnostics|request_sync[0]
     *diagnostics|acknowledge_sync[0]

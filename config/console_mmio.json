@@ -1,0 +1,48 @@
+{
+  "hps_lightweight_window_base": "0xff200000",
+  "slave_offset": "0x00002000",
+  "span_bytes": 32,
+  "magic": "0x4e455343",
+  "version_major": 1,
+  "version_minor": 0,
+  "registers": {
+    "MAGIC": "0x00",
+    "VERSION": "0x04",
+    "CAPABILITIES": "0x08",
+    "BRIDGE": "0x0c",
+    "COMMAND": "0x10",
+    "RESPONSE": "0x14",
+    "RESULT": "0x18",
+    "COMPLETED": "0x1c"
+  },
+  "commands": {
+    "STATUS": 0,
+    "MENU": 1,
+    "LAUNCH": 2,
+    "DEVELOPER": 3,
+    "PREPARE_LOAD": 4,
+    "REPORT_ERROR": 5
+  },
+  "states": {
+    "INITIALIZING": 0,
+    "MENU": 1,
+    "LOADING": 2,
+    "STARTING": 3,
+    "GAME": 4,
+    "RETURNING": 5,
+    "ERROR": 6,
+    "DEVELOPER": 7
+  },
+  "results": {"OK": 0, "STALE": 1, "INVALID": 2, "UNAVAILABLE": 3},
+  "sources": {"SYSTEM": 0, "GAME": 1, "DEVELOPER": 2},
+  "status_fields": {
+    "state": [0, 4],
+    "input_owner": [4, 2],
+    "video_source": [6, 2],
+    "game_available": [8, 1],
+    "runtime_active": [9, 1],
+    "loader_state": [10, 2],
+    "error": [12, 4],
+    "epoch": [16, 16]
+  }
+}
