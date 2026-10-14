@@ -1487,6 +1487,15 @@ qualification target and USB-C power remains an isolated observer. The board
 is unavailable: no physical DE1-SoC, HDMI or USB-C validation is claimed.
 No Phase 6H, 7, 8 or 9 work is included.
 
+## Phase 7B — UxROM capacity decision pending
+
+The [Phase 7B capacity audit](docs/phase7b-capacity-assessment.md) identifies
+the storage and loader changes required before UxROM implementation. Runtime
+capacity remains 32 KiB PRG / 8 KiB CHR, and Mapper 2 remains unsupported.
+Conventional 256 KiB UOROM exceeds the current production M10K budget;
+an explicit backend and versioned loader decision is required. Phase 7B is
+not complete, and physical hardware validation remains pending.
+
 ## Phase 7A — cartridge mapper framework
 
 The shared mapper boundary centralizes NROM translation, ownership/permissions,
