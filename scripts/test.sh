@@ -10,22 +10,25 @@ if ! python3 -m pytest --version >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "[1/5] Python references, Phase 7A mapper contracts, audio/video/diagnostics, and software tests"
+echo "[1/6] Python references, Phase 7A mapper contracts, audio/video/diagnostics, and software tests"
 python3 scripts/generate_runtime_loader_mmio_defs.py --check
 python3 scripts/generate_diagnostic_mmio_defs.py --check
 python3 scripts/generate_apu_audio_fir.py --check
 python3 -m scripts.generate_audio_phase5k_coefficients --check
 python3 -m pytest
 
-echo "[2/5] Verilator RTL lint"
+echo "[2/6] Verilator RTL lint"
 scripts/lint.sh
 
-echo "[3/5] Verilator mapper framework, platform, CPU/PPU/system, audio/video/diagnostics, and retained integration simulations"
+echo "[3/6] Verilator mapper framework, platform, CPU/PPU/system, audio/video/diagnostics, and retained integration simulations"
 scripts/sim.sh
 
-echo "[4/5] Phase 4E-E debugger command CDC, execution control, and playable integration"
+echo "[4/6] Phase 4E-E debugger command CDC, execution control, and playable integration"
 scripts/test_debug_command_cdc.sh
 scripts/test_debugger.sh
 
-echo "[5/5] Phase 6G complete-system startup, reset, A/V and fault recovery"
+echo "[5/6] Phase 6G complete-system startup, reset, A/V and fault recovery"
 scripts/test_system_integration.sh
+
+echo "[6/6] Phase 8A independent console ownership and production UI recovery"
+scripts/test_console.sh

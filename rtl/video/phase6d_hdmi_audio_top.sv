@@ -103,12 +103,13 @@ module phase6d_hdmi_audio_top #(
     );
     /* verilator lint_on PINCONNECTEMPTY */
 
-    phase6b_video_top shared_video (
+    phase6b_video_top #(.CONSOLE_ENABLE(1'b1)) shared_video (
         .CLOCK_50(CLOCK_50),
         .RESET_N(RESET_N),
         .DEVELOPER_LAYOUT(DEVELOPER_LAYOUT),
         .TEST_PATTERN(TEST_PATTERN),
         .CAPTURE_FREEZE(CAPTURE_FREEZE),
+        .CONSOLE_HOLD(SOURCE_RESET),
         .VIDEO_PCLK(pipeline_pclk),
         .VIDEO_HSYNC(pipeline_hsync),
         .VIDEO_VSYNC(pipeline_vsync),

@@ -1513,3 +1513,41 @@ the [baseline assessment](docs/phase7a-mapper-assessment.md), and
 the [pending Welland checklist](docs/phase7a-welland-validation.md).
 Phase 7B requires a separate storage/loading decision; no future mapper is
 implemented or advertised here.
+
+## Phase 8A — independent console ownership
+
+The production image boots a system-owned status/menu screen with the NES
+held in reset. It reuses VGA timing, the debugger font and the existing indexed
+framebuffer path. A frame-boundary handoff admits gameplay only after a valid
+frame; return, loading and recovery silence audio and stop gameplay through
+the established reset sequence. Developer Mode retains the existing diagnostic
+panel and debugger controls.
+
+Console MMIO v1.0 at `0xff202000` is separate from unchanged loader v1.0 and
+diagnostic v1.3. The HPS control entry point reuses the existing game library
+and NROM loader:
+
+```sh
+python3 -m software.nes_console load /media/games/owned.nes
+python3 -m software.nes_console load GAME_ID --library /media/games
+python3 -m software.nes_console menu
+python3 -m software.nes_console launch
+python3 -m software.nes_console developer
+```
+
+In MENU, SW5 (START) launches the available cartridge and SW4 (SELECT) enters
+Developer Mode; SW3 (B) returns from Developer Mode. Release all buttons after
+each ownership handoff. Return from GAME uses the HPS system command; no game
+button chord is reserved. KEY0 remains a whole-system reset. A menu return
+restarts the game on the next launch, rather than saving execution state.
+
+`scripts/test_console.sh --unit` is included in FAST. FULL includes the default
+production top, actual HPS command/loader paths, independent VGA/HDMI pixel
+comparison, input handoff and recovery. The earlier gameplay/debugger benches
+retain their explicit `LEGACY_AUTORUN=1` compatibility profile; production
+uses the default zero. No retained test or timing gate is disabled.
+
+See the [Phase 8A architecture, protocol, qualification and hardware plan](docs/phase8a-console-architecture.md).
+Physical board tests remain **pending**. HDMI is still a logical qualification
+target; no physical transmitter, controller transport, rich library UI,
+Phase 8B feature or Phase 7B mapper/storage work is included.

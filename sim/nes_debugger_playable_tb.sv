@@ -203,6 +203,7 @@ module nes_debugger_playable_tb;
     end
 
     de1_soc_nes_vga_top #(
+        .LEGACY_AUTORUN(1'b1),
         .DEVELOPER_MODE_DEFAULT(1'b1),
         .PRG_INIT_FILE("build/cartridge/phase4db_playable_nrom128.prg.hex"),
         .CHR_INIT_FILE("build/cartridge/phase4db_playable_nrom128.chr.hex")

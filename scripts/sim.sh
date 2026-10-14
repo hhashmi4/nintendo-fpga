@@ -2033,6 +2033,11 @@ PHASE4EC_TOP_RTL_FILES=(
     rtl/audio/wm8731_i2s_tx.sv
     rtl/audio/audio_pll.sv
     rtl/audio/nes_audio_output.sv
+    rtl/console/nes_console_control.sv
+    rtl/console/nes_console_mailbox.sv
+    rtl/console/nes_console_mmio.sv
+    rtl/console/nes_console_renderer.sv
+    rtl/console/nes_console_video.sv
     rtl/de1_soc_nes_vga_top.sv
 )
 

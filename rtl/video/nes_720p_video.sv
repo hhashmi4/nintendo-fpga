@@ -24,6 +24,9 @@ module nes_720p_video (
     output logic        line_end,
     output logic [10:0] scan_x,
     output logic [9:0]  scan_y,
+    output logic [10:0] render_x,
+    output logic [9:0]  render_y,
+    output logic        render_active,
     output logic [7:0]  source_nes_x,
     output logic [7:0]  source_nes_y,
     output logic        active_video,
@@ -210,6 +213,9 @@ module nes_720p_video (
     assign framebuffer_frame_end = timing_frame_end;
     assign scan_x = output_x;
     assign scan_y = output_y;
+    assign render_x = delayed_x;
+    assign render_y = delayed_y;
+    assign render_active = delayed_active;
     assign source_nes_x = output_nes_x;
     assign source_nes_y = output_nes_y;
     assign active_video = output_active;
