@@ -89,6 +89,15 @@ module nes_console_system_tb;
 
 
     integer cycles=0, commands=0;
+    integer transition_cycle=0;
+    logic [3:0] observed_state=0;
+    always @(negedge clk) begin
+        if(!dut.system_reset && dut.console_status[3:0]!=observed_state) begin
+            $display("METRIC state=%0d next=%0d cycles=%0d at=%0d",
+                     observed_state,dut.console_status[3:0],cycles-transition_cycle,cycles);
+            observed_state=dut.console_status[3:0];transition_cycle=cycles;
+        end
+    end
     always @(posedge clk) cycles++;
     task automatic mmio_read(input logic [5:0] address, output logic [31:0] data);
         @(negedge hps_clk); av_address = address; av_read = 1;
@@ -218,6 +227,7 @@ module nes_console_system_tb;
         .ownership_frame_end(hd_boundary)
     );
     nes_console_720p_overlay hd_overlay (
+        .focus(dut.console_focus),
         .source_clk(clk), .source_reset(dut.system_reset),
         .requested_status(dut.console_video_request), .buttons(dut.controller1_buttons),
         .held_reset(dut.nes_functional_reset), .inhibit_game(dut.console_inhibit),
@@ -258,10 +268,14 @@ module nes_console_system_tb;
     end
     task automatic capture_ui;
         integer fd,meta,count;
-        // Wait two frames so both displayed status banks show stable MENU.
+        // Navigation already skipped the splash. Settle both status banks,
+        // then capture while the original boot window is still open: a
+        // released button must not allow the splash to reappear.
         repeat(3) @(posedge dut.vga_frame_start);
         @(negedge dut.pixel_clk);
         do @(negedge dut.pixel_clk); while(dut.scan_x!=0 || dut.scan_y!=0);
+        assert(dut.console_renderer.animation.boot_frames<24 && !dut.console_renderer.splash)
+            else $fatal(1,"menu capture must prove persistent skip inside boot window");
         fd=$fopen("build/phase8a/vga-ui.hex","w");
         meta=$fopen("build/phase8a/vga-ui-status.txt","w");
         $fdisplay(meta,"%h %h %h",dut.console_display_status,dut.console_display_buttons,dut.console_display_reset);
@@ -292,13 +306,67 @@ module nes_console_system_tb;
         $fclose(fd);hdmi_pixels=count;
         assert(count==921600);
     endtask
+    task automatic capture_splash;
+        integer fd,meta,count;
+        // Wait two frames so both displayed status banks show stable MENU.
+        repeat(3) @(posedge dut.vga_frame_start);
+        @(negedge dut.pixel_clk);
+        do @(negedge dut.pixel_clk); while(dut.scan_x!=0 || dut.scan_y!=0);
+        fd=$fopen("build/phase8b/vga-splash.hex","w");
+        meta=$fopen("build/phase8b/vga-splash-status.txt","w");
+        $fdisplay(meta,"%h %h %h %h %h %h",dut.console_display_status,dut.console_display_buttons,dut.console_display_reset,dut.console_display_focus,dut.console_renderer.splash,dut.console_renderer.phase);
+        $fclose(meta);
+        count=0;
+        repeat(420000) begin
+            if(vga_blank) begin
+                $fdisplay(fd,"%06h",{vga_r,vga_g,vga_b}); count++;
+                assert(dut.nes_functional_reset && !dut.pixel_valid);
+            end
+            @(negedge dut.pixel_clk);
+        end
+        $fclose(fd); vga_pixels=count;
+        assert(count==307200);
+        @(posedge tx_start); @(posedge tx_clk);
+        fd=$fopen("build/phase8b/hdmi-splash.hex","w");
+        meta=$fopen("build/phase8b/hdmi-splash-status.txt","w");
+        $fdisplay(meta,"%h %h %h %h %h %h",hd_overlay.displayed_status,hd_overlay.displayed_buttons,hd_overlay.displayed_reset,hd_overlay.displayed_focus,hd_overlay.renderer.splash,hd_overlay.renderer.phase);
+        $fclose(meta);count=0;
+        repeat(1237500) begin
+            assert(tx_de==(hd_x<1280 && hd_y<720));
+            assert(hd_hsync==(hd_x>=1390 && hd_x<1430));
+            assert(hd_vsync==(hd_y>=725 && hd_y<730));
+            if(tx_de) begin $fdisplay(fd,"%06h",hd_rgb);count++;end
+            else assert(hd_rgb==0);
+            @(posedge tx_clk);
+        end
+        $fclose(fd);hdmi_pixels=count;
+        assert(count==921600);
+    endtask
     initial begin : scenario
         logic [31:0] value;
+        integer started;
         logic [15:0] stale_epoch,paused_pc;
         repeat(20) @(negedge clk);key0=1;
         wait(!dut.hps_mmio_reset);
         wait_state(1,0);
         assert(!dut.runtime_cartridge_active && dut.nes_functional_reset);
+        assert(dut.console_renderer.splash) else $fatal(1,"MENU readiness delayed past splash");
+        capture_splash();
+        // A normal navigation press interrupts the optional boot animation.
+        started=cycles;buttons1=8'h20;
+        wait(dut.console_display_focus);
+        $display("METRIC focus_cycles=%0d",cycles-started);
+        assert(cycles-started<1700000) else $fatal(1,"focus exceeded two frame handoffs");
+        // Measure the emitted focus marker too, including beam travel to the
+        // Developer row, rather than calling a metadata commit a visible pixel.
+        do @(negedge dut.pixel_clk); while(dut.scan_x!=44 || dut.scan_y!=252);
+        assert({vga_r,vga_g,vga_b}==24'hf0e9dc)
+            else $fatal(1,"focused Developer marker not visible");
+        $display("METRIC focus_pixel_cycles=%0d",cycles-started);
+        assert(cycles-started<2110000) else $fatal(1,"visible focus latency exceeded bound");
+        assert(!dut.console_renderer.splash) else $fatal(1,"navigation failed to skip splash");
+        buttons1=0;repeat(20) @(negedge clk);buttons1=8'h10;
+        wait(!dut.console_display_focus);buttons1=0;
         capture_ui();
         assert(dut.audio_output.diag_muted);
         // Physical START launches the owned build-time ROM without HPS policy.
@@ -339,6 +407,11 @@ module nes_console_system_tb;
         mmio_write(MMIO_REG_COMMAND,0);
         wait_state(6,0);
         assert(dut.runtime_loader_error_code==8 && dut.nes_functional_reset);
+        buttons1=0;repeat(20) @(negedge clk);started=cycles;buttons1=8'h02;
+        wait_state(1,0);
+        $display("METRIC error_to_menu_cycles=%0d",cycles-started);
+        assert(cycles-started<1700000 && dut.nes_functional_reset);
+        buttons1=0;repeat(20) @(negedge clk);
         request_mode(3);wait_state(7,2);
         assert(!dut.debug_destination_valid && !dut.video_reset);
         request_mode(1);wait_state(1,0);
@@ -366,7 +439,14 @@ module nes_console_system_tb;
         repeat(20) @(negedge clk);bridge_reset=0;
         wait(!dut.hps_mmio_reset);wait_state(1,0);
         assert(dut.nes_functional_reset && !dut.console_game_visible);
-        for(int n=0;n<2;n++) begin
+        for(int n=0;n<3;n++) begin
+            if(n>0) assert(dut.console_renderer.splash);
+            if(n==2) begin
+                assert(dut.console_renderer.splash);
+                request_mode(4);wait_state(2,0);
+                wait(dut.console_display_status[3:0]==2);
+                assert(!dut.console_renderer.splash);
+            end
             key0=0;repeat(100) @(negedge clk);key0=1;
             wait(!dut.hps_mmio_reset);wait_state(1,0);
             assert(dut.nes_functional_reset && !dut.runtime_cartridge_active);

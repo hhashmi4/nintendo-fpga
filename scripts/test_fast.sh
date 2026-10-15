@@ -19,6 +19,6 @@ python3 -m pytest
 echo "[FAST 2/3] Complete Verilator RTL lint"
 scripts/lint.sh
 
-echo "[FAST 3/3] Mapper framework and retained platform/APU/runtime-loader/diagnostic/HDMI RTL smoke"
+echo "[FAST 3/3] Mapper/platform/APU/loader/diagnostic/HDMI smoke and console visuals/animation"
 scripts/sim.sh --fast
 scripts/test_console.sh --unit

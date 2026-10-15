@@ -2036,7 +2036,7 @@ PHASE4EC_TOP_RTL_FILES=(
     rtl/console/nes_console_control.sv
     rtl/console/nes_console_mailbox.sv
     rtl/console/nes_console_mmio.sv
-    rtl/console/nes_console_renderer.sv
+    rtl/console/nes_console_style_pkg.sv rtl/console/nes_console_animation.sv rtl/console/nes_console_renderer.sv
     rtl/console/nes_console_video.sv
     rtl/de1_soc_nes_vga_top.sv
 )

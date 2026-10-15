@@ -182,6 +182,7 @@ module de1_soc_nes_vga_top #(
     logic console_command_valid, console_command_done;
     logic [1:0] console_command_result;
     logic [31:0] console_status, console_video_request, console_video_response;
+    logic console_focus, console_display_focus, console_display_valid;
     logic console_video_ack, console_hold, console_inhibit, console_game_visible;
     logic [7:0] console_game_buttons, console_navigation, console_display_buttons;
     logic [31:0] console_display_status;
@@ -759,21 +760,23 @@ module de1_soc_nes_vga_top #(
         .video_ack(console_video_ack), .video_response(console_video_response),
         .video_request(console_video_request), .status(console_status),
         .core_hold(console_hold), .inhibit_game(console_inhibit),
-        .game_buttons(console_game_buttons), .navigation(console_navigation)
+        .game_buttons(console_game_buttons), .navigation(console_navigation), .focus(console_focus)
     );
     nes_console_video console_video (
         .source_clk(CLOCK_50), .source_reset(system_reset),
-        .requested_status(console_video_request), .buttons(controller1_buttons),
+        .requested_status(console_video_request), .buttons(controller1_buttons), .focus(console_focus),
         .held_reset(nes_functional_reset), .inhibit_game(console_inhibit),
         .source_ack(console_video_ack), .source_response(console_video_response),
         .pixel_clk(pixel_clk), .pixel_reset(video_reset), .content_reset(video_content_reset),
         .frame_end(vga_frame_end), .framebuffer_valid(framebuffer_valid),
         .selected_source(console_video_source), .displayed_status(console_display_status),
         .displayed_buttons(console_display_buttons), .displayed_reset(console_display_reset),
+        .displayed_focus(console_display_focus), .displayed_valid(console_display_valid),
         .game_visible(console_game_visible)
     );
     nes_console_renderer console_renderer (
-        .pixel_clk(pixel_clk), .reset(video_reset), .x(panel_render_x), .y(panel_render_y),
+        .pixel_clk(pixel_clk), .reset(video_reset), .frame_end(vga_frame_end),
+        .focus(console_display_focus), .status_valid(console_display_valid), .x(panel_render_x), .y(panel_render_y),
         .active(panel_render_active), .status(console_display_status),
         .buttons(console_display_buttons), .held_reset(console_display_reset), .rgb(console_rgb)
     );
@@ -1512,7 +1515,16 @@ module de1_soc_nes_vga_top #(
 
     // The compact renderer observes only the Phase 4E-A video-domain stable
     // bank. It has no NES-pixel input and no path back into execution.
-    nes_debug_panel_renderer debug_panel_renderer (
+    nes_debug_panel_renderer #(
+        .COLOR_BACKGROUND(LEGACY_AUTORUN ? 24'h081020 : nes_console_style_pkg::UI_BG),
+        .COLOR_HEADER_BG(LEGACY_AUTORUN ? 24'h102844 : nes_console_style_pkg::UI_SURFACE),
+        .COLOR_TEXT(LEGACY_AUTORUN ? 24'hd0e0e8 : nes_console_style_pkg::UI_TEXT),
+        .COLOR_HEADING(LEGACY_AUTORUN ? 24'h50e8f0 : nes_console_style_pkg::UI_TEXT),
+        .COLOR_SECTION(LEGACY_AUTORUN ? 24'hf0d050 : nes_console_style_pkg::UI_WARNING),
+        .COLOR_GOOD(LEGACY_AUTORUN ? 24'h60f080 : nes_console_style_pkg::UI_SUCCESS),
+        .COLOR_BAD(LEGACY_AUTORUN ? 24'hff5060 : nes_console_style_pkg::UI_ERROR),
+        .COLOR_BORDER(LEGACY_AUTORUN ? 24'h287090 : nes_console_style_pkg::UI_PURPLE)
+    ) debug_panel_renderer (
         .pixel_clk(pixel_clk),
         .reset(video_reset),
         .snapshot_valid(debug_destination_valid),

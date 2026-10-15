@@ -90,6 +90,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_control.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_mailbox.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_mmio.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_style_pkg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_animation.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_renderer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_video.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/de1_soc_nes_vga_top.sv

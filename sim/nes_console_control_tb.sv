@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
 module nes_console_control_tb;
+    logic focus;
     logic clk = 0;
     always #10 clk = !clk;
     logic reset = 1, bridge_reset = 0;
@@ -24,7 +25,7 @@ module nes_console_control_tb;
         .video_ack(video_ack), .video_response(video_response),
         .video_request(video_request), .status(status),
         .core_hold(core_hold), .inhibit_game(inhibit),
-        .game_buttons(game_buttons), .navigation(navigation)
+        .game_buttons(game_buttons), .navigation(navigation), .focus(focus)
     );
 
     task automatic tick;
@@ -188,6 +189,30 @@ module nes_console_control_tb;
                 check_state(expected_state);
             end
         end
+        // Phase 8B local navigation retains the existing arm/edge mechanism.
+        reset=1;buttons=0;loader_state=0;loader_hold=0;loader_error=0;
+        tick();reset=0;tick();display_ack(0);tick();
+        assert(!focus);
+        buttons=8'h20;tick();assert(focus);check_state(1);
+        repeat(10) tick();assert(focus); // held DOWN cannot repeat/select
+        buttons=0;tick();buttons=8'h30;tick();assert(!focus); // UP wins
+        buttons=0;tick();buttons=8'h20;tick();assert(focus);
+        buttons=0;tick();buttons=8'h01;tick();check_state(7);assert(!focus);
+        repeat(5) tick();check_state(7);assert(game_buttons==0);
+        buttons=0;tick();buttons=8'h02;tick();check_state(5);
+        display_ack(0);check_state(1);buttons=0;tick();
+        loader_hold=1;buttons=8'h01;tick();check_state(1); // disabled Play
+        buttons=0;tick();loader_hold=0;buttons=8'h01;tick();check_state(3);
+        display_ack(1);check_state(4);assert(game_buttons==0);
+        buttons=0;tick();buttons=8'h31;#1;assert(game_buttons==8'h31);
+        buttons=0;submit(1,status[31:16],0);display_ack(0);
+        submit(4,status[31:16],0);check_state(2);tick();
+        buttons=8'h02;tick();check_state(5);display_ack(0);check_state(1);
+        buttons=0;tick();submit(5,status[31:16],0);check_state(6);tick();
+        buttons=8'h02;tick();check_state(5);display_ack(0);check_state(1);
+        buttons=0;tick();
+        buttons=8'h21;tick();check_state(3); // A uses the previously stored focus
+        $display("PASS: Phase 8B focus navigation, held/released input, disabled Play, A selection, B loading/error recovery, unchanged armed game path");
         $display("PASS: Phase 8A supervisor all 48 state/command pairs, stale requests, input handoff, loading, recovery, developer and reset");
         $finish;
     end
