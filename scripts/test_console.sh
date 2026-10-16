@@ -5,7 +5,7 @@ mkdir -p build/phase8a build/phase8b build/verilator
 export PYTHONPATH=.
 FLAGS=(--binary --timing --assert --Wall -Wno-BLKSEQ -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM -j 4)
 RTL=(rtl/platform/reset_sync.sv rtl/debug/debug_font_pkg.sv rtl/console/nes_console_mailbox.sv
-     rtl/console/nes_console_control.sv rtl/console/nes_console_mmio.sv
+     rtl/console/nes_library_mmio.sv rtl/console/nes_library_control.sv rtl/console/nes_console_control.sv rtl/console/nes_console_mmio.sv
      rtl/console/nes_console_video.sv rtl/console/nes_console_style_pkg.sv rtl/console/nes_console_animation.sv rtl/console/nes_console_renderer.sv)
 python3 scripts/generate_console_vectors.py
 for unit in control mmio video animation renderer; do
@@ -15,10 +15,12 @@ for unit in control mmio video animation renderer; do
     "build/verilator/console_$unit/test"
 done
 python3 scripts/inspect_console_visuals.py
+scripts/test_library.sh
 if [[ "${1:-}" == --unit ]]; then exit 0; fi
 python3 scripts/prepare_phase4db_cartridge.py \
     roms/phase4db_playable_nrom128.nes build/cartridge/phase4db_playable_nrom128
 python3 scripts/generate_phase6g_system.py
+python3 scripts/generate_library_system.py
 mapfile -t SYSTEM_RTL < <(sed -n \
     's|^set_global_assignment -name SYSTEMVERILOG_FILE ../||p' \
     quartus/de1_soc_nes_vga.qsf quartus/phase6d_hdmi_audio.qsf | awk '!seen[$0]++')
@@ -27,3 +29,4 @@ verilator "${FLAGS[@]}" -Wno-PINCONNECTEMPTY \
     -o test "${SYSTEM_RTL[@]}" sim/nes_console_system_tb.sv
 stdbuf -oL build/verilator/console_system/test
 python3 scripts/verify_console_capture.py
+python3 scripts/verify_library_capture.py

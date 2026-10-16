@@ -8,6 +8,8 @@ module phase6d_hdmi_audio_top #(
     // by default until the documented profile and carrier are qualified.
     parameter bit ALLOW_UNQUALIFIED_AUDIO = 1'b0
 ) (
+    input logic [31:0] LIBRARY_WORD,
+    input logic LIBRARY_SHIFT,
     input  logic               CLOCK_50,
     input  logic               RESET_N,
     input  logic               DEVELOPER_LAYOUT,
@@ -104,6 +106,7 @@ module phase6d_hdmi_audio_top #(
     /* verilator lint_on PINCONNECTEMPTY */
 
     phase6b_video_top #(.CONSOLE_ENABLE(1'b1)) shared_video (
+        .LIBRARY_WORD(LIBRARY_WORD), .LIBRARY_SHIFT(LIBRARY_SHIFT),
         .CLOCK_50(CLOCK_50),
         .RESET_N(RESET_N),
         .DEVELOPER_LAYOUT(DEVELOPER_LAYOUT),

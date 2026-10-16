@@ -312,30 +312,51 @@ def inspect_ines_metadata(header_data: bytes, file_size: int) -> ImageInspection
     return ImageInspection(header, None, None, True, None)
 
 
-def inspect_ines_file(path: str | Path) -> ImageInspection:
-    """Read only the header of a regular iNES file for library display."""
+def file_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    """Detect replacement and mutation without trusting a pathname."""
+    return (metadata.st_dev, metadata.st_ino, metadata.st_size,
+            metadata.st_mtime_ns, metadata.st_ctime_ns)
 
-    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | os.O_NOFOLLOW
-    descriptor = os.open(path, flags)
-    with os.fdopen(descriptor, "rb") as stream:
-        metadata = os.fstat(stream.fileno())
-        if not stat.S_ISREG(metadata.st_mode):
-            raise INESFormatError("library entry is not a regular file")
+
+def _checked_file(path, *, dir_fd=None, follow_symlinks=False, expected=None):
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK
+    if not follow_symlinks:
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags, dir_fd=dir_fd)
+    stream = os.fdopen(descriptor, "rb")
+    metadata = os.fstat(descriptor)
+    if not stat.S_ISREG(metadata.st_mode):
+        stream.close()
+        raise INESFormatError("library entry is not a regular file")
+    if expected is not None and file_identity(metadata) != expected:
+        stream.close()
+        raise INESFormatError("selected file changed after discovery")
+    return stream, metadata
+
+
+def inspect_ines_file(path: str | Path, *, dir_fd=None, expected=None) -> ImageInspection:
+    """Read only a regular-file header, optionally relative to a pinned root."""
+    stream, metadata = _checked_file(path, dir_fd=dir_fd, expected=expected)
+    with stream:
         header_data = stream.read(INES_HEADER_SIZE)
+        if file_identity(os.fstat(stream.fileno())) != file_identity(metadata):
+            raise INESFormatError("file changed during inspection")
     return inspect_ines_metadata(header_data, metadata.st_size)
 
 
 def load_runtime_image(
-    path: str | Path, *, follow_symlinks: bool = True
+    path: str | Path, *, follow_symlinks: bool = True, dir_fd=None, expected=None
 ) -> RuntimeImage:
-    if follow_symlinks:
-        data = Path(path).read_bytes()
-    else:
-        flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | os.O_NOFOLLOW
-        descriptor = os.open(path, flags)
-        with os.fdopen(descriptor, "rb") as stream:
-            metadata = os.fstat(stream.fileno())
-            if not stat.S_ISREG(metadata.st_mode):
-                raise INESFormatError("library entry is not a regular file")
-            data = stream.read()
+    stream, metadata = _checked_file(path, dir_fd=dir_fd,
+                                    follow_symlinks=follow_symlinks, expected=expected)
+    with stream:
+        header = stream.read(INES_HEADER_SIZE)
+        inspection = inspect_ines_metadata(header, metadata.st_size)
+        if not inspection.supported:
+            raise UnsupportedINESImage(inspection.reason)
+        # The validated header limits this read to at most 32 KiB PRG + 8 KiB
+        # CHR. One extra byte detects growth without an unbounded allocation.
+        data = header + stream.read(metadata.st_size - INES_HEADER_SIZE + 1)
+        if file_identity(os.fstat(stream.fileno())) != file_identity(metadata):
+            raise INESFormatError("file changed during loading")
     return validate_runtime_image(parse_ines(data))

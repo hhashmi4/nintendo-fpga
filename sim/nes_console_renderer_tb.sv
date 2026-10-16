@@ -9,10 +9,12 @@ module nes_console_renderer_tb;
     logic [23:0] expected[0:307199], still_expected[0:307199];
     logic [39:0] fixtures[0:35];
     integer fd;
-    nes_console_renderer dut (.pixel_clk(clk), .reset(reset), .frame_end(boundary),
+    nes_console_renderer dut (
+        .library_packet(928'd0),.pixel_clk(clk), .reset(reset), .frame_end(boundary),
         .status_valid(status_valid), .x(x), .y(y), .active(active), .status(status), .buttons(buttons),
         .held_reset(1'b1), .focus(focus), .rgb(rgb));
     nes_console_renderer #(.REDUCED_MOTION(1)) reduced (
+        .library_packet(928'd0),
         .pixel_clk(clk), .reset(reset), .frame_end(boundary), .status_valid(status_valid),
         .x(x), .y(y), .active(active), .status(status), .buttons(buttons),
         .held_reset(1'b1), .focus(focus), .rgb(still_rgb));

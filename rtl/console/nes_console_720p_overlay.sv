@@ -5,6 +5,7 @@
 // is changed. A logical target has no rich gameplay debugger snapshot here.
 module nes_console_720p_overlay #(parameter bit REDUCED_MOTION=0) (
     input logic source_clk, source_reset,
+    input logic [927:0] library_packet,
     input logic [31:0] requested_status,
     input logic [7:0] buttons,
     input logic held_reset, inhibit_game, focus,
@@ -20,11 +21,13 @@ module nes_console_720p_overlay #(parameter bit REDUCED_MOTION=0) (
     output logic [1:0] selected_source
 );
     logic [31:0] displayed_status;
+    logic [927:0] displayed_library;
     logic [7:0] displayed_buttons;
     import nes_console_style_pkg::*;
     logic displayed_reset, displayed_focus, displayed_valid, game_visible;
     logic [23:0] ui_rgb;
     nes_console_video ownership (
+        .library_packet(library_packet), .displayed_library(displayed_library),
         .source_clk(source_clk), .source_reset(source_reset),
         .requested_status(requested_status), .buttons(buttons),
         .held_reset(held_reset), .inhibit_game(inhibit_game), .focus(focus),
@@ -37,6 +40,7 @@ module nes_console_720p_overlay #(parameter bit REDUCED_MOTION=0) (
         .game_visible(game_visible)
     );
     nes_console_renderer #(.REDUCED_MOTION(REDUCED_MOTION)) renderer (
+        .library_packet(displayed_library),
         .pixel_clk(pixel_clk), .reset(pixel_reset), .frame_end(frame_end),
         .focus(displayed_focus), .status_valid(displayed_valid),
         .x(10'(render_x - 11'(UI_HDMI_X))), .y(render_y - 10'(UI_HDMI_Y)),

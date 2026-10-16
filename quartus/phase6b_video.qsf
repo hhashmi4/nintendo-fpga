@@ -38,3 +38,7 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VIDEO_*
 
 set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
 set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"
+
+# Dynamic Phase 8C renderer qualification input; no board pins.
+set_instance_assignment -name VIRTUAL_PIN ON -to LIBRARY_WORD[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to LIBRARY_SHIFT

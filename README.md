@@ -1582,6 +1582,63 @@ no added M10Ks: production is 10,901 ALMs (+1.135 ns setup / +0.077 ns hold),
 and logical HDMI is 4,274 ALMs (+0.584 ns / +0.119 ns).
 
 Physical DE1-SoC validation remains **pending**, as does physical HDMI on a
-qualified carrier. Phase 8C still needs physical system/controller controls,
-serialized HPS library policy and hardware qualification. Full game-library,
-pairing, advanced settings and Developer Mode redesign are not implemented.
+qualified carrier. Phase 8C below adds the serialized library policy and UI.
+Physical system/controller controls, pairing, advanced settings and hardware
+qualification remain pending.
+
+## Phase 8C — game library and launch integration
+
+The independent FPGA menu now browses an HPS-discovered NES library. A bounded
+four-entry page uses the Phase 8B palette and font, with controller focus,
+paging, cartridge details, compatibility labels and real loading/error states.
+Only supported Mapper 0 records can request a load. HPS revalidates the exact
+file and uses the existing cartridge loader, reset sequence and frame-boundary
+gameplay admission. Failed or interrupted writes require a complete reload.
+If the menu reports RECOVERY after an abandoned transfer, press B and select
+again: the service has closed the old session without activating it.
+
+```sh
+export NES_LIBRARY_ROOT=/media/microsd/games
+python3 -m software.nes_console serve
+# Optional exact-filename -> display-title JSON:
+python3 -m software.nes_console serve --library /media/games --metadata titles.json
+python3 -m software.nes_console menu
+```
+
+Root-menu A/START opens the library. Inside, UP/DOWN moves one entry, LEFT/RIGHT
+moves four, A/START requests a supported game, and B returns. SELECT retains
+Developer Mode. Held buttons act once, and the existing release-to-arm rule
+prevents menu input leaking into gameplay. GAME retains authentic NES buttons;
+return uses the existing HPS `menu` command. Actual USB/system-button transport
+is still pending.
+
+Discovery preserves exact Unicode/spaced filename identities, deterministic
+ordering and safe directory-relative reads. The service displays at most 256
+entries, discloses truncation, rejects replaced/malformed files, and keeps
+unsupported cartridges visible. Optional titles cannot override compatibility.
+The existing font uses sanitized, clipped text; no cover-art transport is
+implied. Restart the service to rescan an updated directory.
+
+Library MMIO v1.0 adds a separate 64-byte aperture at `0xff203000`. Existing
+loader v1.0, console v1.0 and diagnostic v1.3 contracts remain unchanged. No UI
+framebuffer, cartridge capacity expansion, new mapper or external SDRAM is
+introduced. See the [Phase 8C architecture and qualification report](docs/phase8c-game-library.md)
+for the wire contract, launch/recovery policy and physical checklist.
+
+`scripts/test_library.sh` checks the real register/mailbox/navigation path and
+independent VGA/logical HDMI pixels. It is included in FAST and FULL through
+`scripts/test_console.sh`; FULL adds actual production-top library/loader/game
+execution and output captures. Inspectable frames under `build/phase8c/` are
+converted from simulated RTL output.
+
+Local qualification passes **2,528 Python tests**, clean lint, **122 PASS
+records / 121 simulation completions** across the full workflow stages, and
+18,432,000 independent library renderer pixels. The final production-top run
+passed 89,047,680 cycles, including interrupted-transfer recovery and two
+library-to-game launches; actual VGA/HDMI library captures matched 1,228,800
+pixels. The report records the final-stage rerun and fitted resource/timing
+comparison with Phase 8B.
+
+Physical DE1-SoC, HPS Linux/microSD, USB gamepad, converter display and audio
+validation remain **pending**. Phase 8D display adaptation, Phase 8E pairing
+and deferred Phase 7B mapper/storage work are not implemented here.

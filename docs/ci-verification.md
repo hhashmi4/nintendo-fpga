@@ -1,11 +1,11 @@
 # GitHub Actions verification policy
 
 The `FPGA Verification` workflow deliberately separates fast feedback from the
-complete pull-request gate. This avoids running the same 40–50 minute suite for
+complete pull-request gate. This avoids running the same long suite for
 both a feature-branch push and the pull request created from that commit. It
 does not remove tests from the authoritative local or pull-request regression.
 
-## Audit and baseline
+## Original verification-policy audit and baseline
 
 Before this change, every push on every branch and every pull request to
 `main` ran the same single `verification` job and `scripts/test.sh`. There was
@@ -26,7 +26,7 @@ feature push and pull-request events were duplicating the expensive full suite.
 
 | Event | Level | Command | Purpose |
 | --- | --- | --- | --- |
-| Feature-branch push | FAST | `scripts/test_fast.sh` | Complete Python tests, complete Verilator lint, and focused platform plus Phase 4F-A/B/C RTL smoke |
+| Feature-branch push | FAST | `scripts/test_fast.sh` | Complete Python/lint, mapper/platform/APU/loader/diagnostic/HDMI/power smoke, and console/library unit and pixel checks |
 | Pull request to `main` | FULL | `scripts/test.sh` | Required complete Python, lint, RTL, CPU, PPU, bus, cartridge, controller, DMA, video, Developer Mode, debugger, runtime-loader, and integration regression |
 | GitHub-generated PR merge pushed to `main` | FAST | `scripts/test_fast.sh` | Integrity check for a tree already covered by the full PR gate |
 | Direct or nonstandard push to `main` | FULL | `scripts/test.sh` | Fail-safe coverage if `main` changes without the normal protected-PR path |
@@ -35,8 +35,9 @@ feature push and pull-request events were duplicating the expensive full suite.
 
 The workflow keeps the existing `verification` job/check identity so the full
 pull-request gate remains compatible with branch protection. A 75-minute job
-timeout stops stuck simulations while leaving substantial margin above the
-observed 40–50 minute full runtime. Per-PR concurrency cancels an obsolete run
+timeout bounds stuck simulations. The verified Phase 8B FULL job took about
+60 minutes; the earlier 40–50 minute measurements above predate the retained
+Phase 8 suites. Per-PR concurrency cancels an obsolete run
 when a newer commit is pushed to the same PR; branch, tag, and manual runs use
 their Git ref as the concurrency key.
 
@@ -61,17 +62,19 @@ contain Intel's toolchain.
 ## Local verification
 
 `scripts/test.sh` remains the complete local regression and is unchanged as the
-FULL entry point. `scripts/sim.sh` still defaults to all simulations; its new
-`--fast` option runs only the platform and Phase 4F-A/B/C unit smoke used by
-FAST CI. The normal pre-push sequence remains the complete regression, complete
+FULL entry point. `scripts/sim.sh` still defaults to all simulations; its
+`--fast` option runs the bounded mapper/platform/APU/loader/diagnostic/HDMI/power
+smoke used by FAST CI. The normal pre-push sequence remains the complete regression, complete
 Verilator lint, Quartus build, and timing review.
 
-For a normal feature cycle, expected hosted usage changes from two full runs
-(about 90–100 Linux minutes) to one short FAST push run plus one 40–50 minute
-FULL pull-request run. A warm Verilator cache should keep FAST near a few
-minutes, for an expected warm total near 42–55 minutes. The first run for a new
-cache key also builds the pinned toolchain, so a cold cycle may be closer to
-50–65 minutes. The exact hosted value is recorded by Actions.
+Run FAST and FULL sequentially within one checkout: `sim.sh` cleans shared
+waveform/artifact paths even in FAST mode. Separate checkouts may run independently.
+
+A normal feature cycle uses one FAST push run and one FULL pull-request run.
+The [verified Phase 8B FULL job](https://github.com/hhashmi4/nintendo-fpga/actions/runs/38654694801)
+took 60 minutes 10 seconds with a warm toolchain cache. Phase 8C adds library
+verification; current durations must be read from Actions rather than inferred
+from the original audit. Cold runs also build the pinned Verilator toolchain.
 
 ## Phase 7A mapper coverage
 
@@ -81,3 +84,15 @@ unsupported IDs, permissions, reset and actual runtime replacement/failure.
 New software contract tests join the existing complete Python stage. The full
 retained gameplay, debugger, CDC and Phase 6G gate remains unchanged. No hosted
 Quartus job, additional workflow event or new duplicated full run is added.
+
+## Phase 8C library coverage
+
+FAST and FULL retain all prior checks. `test_console.sh` additionally invokes
+`test_library.sh`: actual library Avalon/mailbox transactions, transactional
+page validation, navigation and independent native/centered-720p renderer
+pixels. All Python discovery, filesystem-safety, wire-protocol and service
+launch/failure tests remain in the complete Python stage. FULL extends the
+existing default production-top bench with software-discovered page metadata,
+controller selection, actual loader streams and repeated generated NROM
+execution. CI archives `build/phase8c/*.png` alongside the prior console images.
+No commercial ROM, physical board, USB provider or HPS Linux kernel is required.

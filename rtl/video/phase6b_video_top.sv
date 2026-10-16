@@ -7,6 +7,8 @@
 module phase6b_video_top #(
     parameter bit CONSOLE_ENABLE = 1'b0
 ) (
+    input logic [31:0] LIBRARY_WORD,
+    input logic LIBRARY_SHIFT,
     input  logic       CLOCK_50,
     input  logic       RESET_N,
     input  logic       DEVELOPER_LAYOUT,
@@ -24,6 +26,11 @@ module phase6b_video_top #(
     output logic       VIDEO_LOCKED,
     output logic       VIDEO_ERROR
 );
+    logic [927:0] library_qualification;
+    always_ff @(posedge CLOCK_50) begin
+        if(source_reset) library_qualification<=0;
+        else if(LIBRARY_SHIFT) library_qualification<={LIBRARY_WORD,library_qualification[927:32]};
+    end
     logic pixel_clk, pll_locked;
     logic source_reset, pixel_reset;
     logic [7:0] source_x, source_y;
@@ -145,6 +152,7 @@ module phase6b_video_top #(
 
     generate if (CONSOLE_ENABLE) begin : console_qualification
         nes_console_720p_overlay overlay (
+        .library_packet(library_qualification),
             .focus(1'b0),
             .source_clk(CLOCK_50), .source_reset(source_reset),
             .requested_status(console_hold ? 32'h00010001 : 32'h00010154),

@@ -127,3 +127,7 @@ set_output_delay -clock $hdmi_audio_clock -min -1.0 [get_ports {HDMI_AUDIO_BCLK 
 set_output_delay -clock $codec_clock -max 5.0 [get_ports {AUD_BCLK AUD_DACLRCK AUD_DACDAT}]
 set_output_delay -clock $codec_clock -min -1.0 [get_ports {AUD_BCLK AUD_DACLRCK AUD_DACDAT}]
 set_false_path -to [get_ports {AUD_XCK}]
+
+# Synchronous logical-only library injection, timed rather than exempted.
+set_input_delay -clock CLOCK_50 -max 2.000 [get_ports {LIBRARY_WORD[*] LIBRARY_SHIFT}]
+set_input_delay -clock CLOCK_50 -min 0.000 [get_ports {LIBRARY_WORD[*] LIBRARY_SHIFT}]

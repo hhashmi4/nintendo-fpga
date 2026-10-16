@@ -87,6 +87,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/video/video_720p_pll.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debug_command_cdc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/debug/nes_debugger.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_library_mmio.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_library_control.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_control.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_mailbox.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/console/nes_console_mmio.sv
@@ -101,6 +103,9 @@ set_global_assignment -name VERILOG_MACRO "ALTERA_SYNTHESIS=1"
 
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY ../build/quartus_de1_soc_nes_vga/output_files
 set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+# Phase 8C: deterministic placement for the constrained VGA output mux.
+# Seed 1 missed setup by 0.038 ns; retain all existing clock/I/O constraints.
+set_global_assignment -name SEED 2
 set_global_assignment -name RESERVE_ALL_UNUSED_PINS "AS INPUT TRI-STATED"
 set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"
 set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256

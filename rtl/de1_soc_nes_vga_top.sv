@@ -171,6 +171,15 @@ module de1_soc_nes_vga_top #(
     logic diagnostic_mmio_waitrequest;
     logic [31:0] diagnostic_mmio_readdata;
     logic diagnostic_mmio_readdatavalid;
+    logic [5:0] library_mmio_address;
+    logic library_mmio_read, library_mmio_write, library_mmio_waitrequest, library_mmio_readdatavalid;
+    logic [31:0] library_mmio_writedata, library_mmio_readdata;
+    logic [3:0] library_mmio_byteenable;
+    logic library_submit, library_ready, library_ack, library_valid, library_done;
+    logic [95:0] library_request, library_command;
+    logic [127:0] library_response, library_result;
+    logic library_enabled, library_open, library_load, library_cancel;
+    logic [927:0] library_packet, displayed_library;
     logic [4:0] console_mmio_address;
     logic console_mmio_read, console_mmio_write;
     logic [31:0] console_mmio_writedata, console_mmio_readdata;
@@ -670,6 +679,13 @@ module de1_soc_nes_vga_top #(
         .diagnostic_mmio_read(diagnostic_mmio_read),
         .diagnostic_mmio_byteenable(diagnostic_mmio_byteenable),
         .diagnostic_mmio_debugaccess(),
+        .library_mmio_waitrequest(library_mmio_waitrequest),
+        .library_mmio_readdata(library_mmio_readdata),
+        .library_mmio_readdatavalid(library_mmio_readdatavalid),
+        .library_mmio_burstcount(), .library_mmio_writedata(library_mmio_writedata),
+        .library_mmio_address(library_mmio_address), .library_mmio_write(library_mmio_write),
+        .library_mmio_read(library_mmio_read), .library_mmio_byteenable(library_mmio_byteenable),
+        .library_mmio_debugaccess(),
         .console_mmio_waitrequest(console_mmio_waitrequest),
         .console_mmio_readdata(console_mmio_readdata),
         .console_mmio_readdatavalid(console_mmio_readdatavalid),
@@ -697,6 +713,11 @@ module de1_soc_nes_vga_top #(
     assign diagnostic_mmio_write = 1'b0;
     assign diagnostic_mmio_writedata = 32'h00000000;
     assign diagnostic_mmio_byteenable = 4'b1111;
+    assign library_mmio_address=0;
+    assign library_mmio_read=0;
+    assign library_mmio_write=0;
+    assign library_mmio_writedata=0;
+    assign library_mmio_byteenable=4'hf;
     assign console_mmio_address = 0;
     assign console_mmio_read = 0;
     assign console_mmio_write = 0;
@@ -748,7 +769,36 @@ module de1_soc_nes_vga_top #(
     );
     assign console_loader_begin = runtime_command_accepted &&
         runtime_command == nes_runtime_loader_pkg::LOADER_COMMAND_BEGIN;
+    nes_library_mmio #(.ENABLED(!LEGACY_AUTORUN)) library_registers (
+        .clk(hps_mmio_clk), .reset(hps_mmio_reset),
+        .avs_address(library_mmio_address), .avs_read(library_mmio_read),
+        .avs_write(library_mmio_write), .avs_writedata(library_mmio_writedata),
+        .avs_byteenable(library_mmio_byteenable), .avs_waitrequest(library_mmio_waitrequest),
+        .avs_readdata(library_mmio_readdata), .avs_readdatavalid(library_mmio_readdatavalid),
+        .submit(library_submit), .request_word(library_request),
+        .channel_ready(library_ready), .channel_ack(library_ack), .channel_response(library_response)
+    );
+    nes_console_mailbox #(.REQUEST_BITS(96), .RESPONSE_BITS(128)) library_command_channel (
+        .source_clk(hps_mmio_clk), .source_reset(hps_mmio_reset),
+        .source_valid(library_submit), .source_data(library_request),
+        .source_ready(library_ready), .source_ack(library_ack), .source_response(library_response),
+        .destination_clk(CLOCK_50), .destination_reset(runtime_loader_reset),
+        .destination_valid(library_valid), .destination_data(library_command),
+        .destination_done(library_done), .destination_response(library_result)
+    );
+    nes_library_control library_control (
+        .clk(CLOCK_50), .reset(runtime_loader_reset), .console_status(console_status),
+        .navigation(console_navigation), .focus(console_focus),
+        .ownership_change(console_loader_begin || runtime_activation_accepted ||
+                          (console_command_valid && console_command_word[3:0]!=0)),
+        .command_valid(library_valid), .command_word(library_command),
+        .command_done(library_done), .command_response(library_result),
+        .enabled(library_enabled), .opened(library_open), .load_request(library_load),
+        .cancel_request(library_cancel), .packet(library_packet)
+    );
     nes_console_control console_control (
+        .library_enabled(library_enabled), .library_open(library_open),
+        .library_load_request(library_load), .library_cancel(library_cancel),
         .clk(CLOCK_50), .reset(system_reset), .bridge_reset(runtime_loader_reset),
         .loader_begin(console_loader_begin),
         .activation_accepted(runtime_activation_accepted),
@@ -763,6 +813,7 @@ module de1_soc_nes_vga_top #(
         .game_buttons(console_game_buttons), .navigation(console_navigation), .focus(console_focus)
     );
     nes_console_video console_video (
+        .library_packet(library_packet), .displayed_library(displayed_library),
         .source_clk(CLOCK_50), .source_reset(system_reset),
         .requested_status(console_video_request), .buttons(controller1_buttons), .focus(console_focus),
         .held_reset(nes_functional_reset), .inhibit_game(console_inhibit),
@@ -775,6 +826,7 @@ module de1_soc_nes_vga_top #(
         .game_visible(console_game_visible)
     );
     nes_console_renderer console_renderer (
+        .library_packet(displayed_library),
         .pixel_clk(pixel_clk), .reset(video_reset), .frame_end(vga_frame_end),
         .focus(console_display_focus), .status_valid(console_display_valid), .x(panel_render_x), .y(panel_render_y),
         .active(panel_render_active), .status(console_display_status),

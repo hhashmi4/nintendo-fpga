@@ -162,6 +162,49 @@ module nes_console_system_tb;
         force dut.console_mmio_writedata=console_data;
         force dut.console_mmio_byteenable=4'hf;
     end
+    logic [5:0] library_address=0;
+    logic library_read=0,library_write=0;
+    logic [31:0] library_data=0;
+    always @* begin
+        force dut.library_mmio_address=library_address;
+        force dut.library_mmio_read=library_read;
+        force dut.library_mmio_write=library_write;
+        force dut.library_mmio_writedata=library_data;
+        force dut.library_mmio_byteenable=4'hf;
+    end
+    task automatic library_read_word(input logic [5:0] offset,output logic [31:0] value);
+        @(negedge hps_clk);library_address=offset;library_read=1;
+        @(negedge hps_clk);assert(dut.library_mmio_readdatavalid && !dut.library_mmio_waitrequest);
+        value=dut.library_mmio_readdata;library_read=0;
+    endtask
+    task automatic library_write_word(input logic [5:0] offset,input logic [31:0] value);
+        @(negedge hps_clk);library_address=offset;library_data=value;library_write=1;
+        @(negedge hps_clk);library_write=0;
+    endtask
+    task automatic library_request(input logic [7:0] op,input logic [31:0] data=0,input logic [7:0] index=0);
+        logic [31:0] count,value,epoch_word,revision_word;
+        for(int pass=0;pass<2;pass++) begin
+            library_read_word(28,epoch_word);library_read_word(36,revision_word);
+            library_read_word(24,count);
+            library_write_word(40,data);library_write_word(44,revision_word);
+            library_write_word(16,pass==0 ? 32'd0 : {epoch_word[31:16],index,op});
+            value=count;
+            for(int n=0;n<1000 && value==count;n++) library_read_word(24,value);
+            assert(value==count+1) else $fatal(1,"production library timeout");
+            library_read_word(20,value);assert(value==0) else $fatal(1,"production library op=%d result=%d",op,value);
+        end
+    endtask
+    task automatic publish_library(input integer page_number);
+        logic [31:0] words[0:27];
+        $readmemh($sformatf("build/phase8c/page-%0d.hex",page_number),words);
+        library_request(1,5);
+        for(int i=0;i<28;i++) library_request(2,words[i],8'(i));
+        library_request(3);
+    endtask
+    task automatic library_press(input logic [7:0] value);
+        buttons1=0;repeat(20) @(negedge clk);buttons1=value;
+        repeat(20) @(negedge clk);buttons1=0;repeat(20) @(negedge clk);
+    endtask
     task automatic console_read_word(input logic [4:0] offset, output logic [31:0] value);
         @(negedge hps_clk); console_address=offset; console_read=1;
         @(negedge hps_clk);
@@ -227,6 +270,7 @@ module nes_console_system_tb;
         .ownership_frame_end(hd_boundary)
     );
     nes_console_720p_overlay hd_overlay (
+        .library_packet(dut.library_packet),
         .focus(dut.console_focus),
         .source_clk(clk), .source_reset(dut.system_reset),
         .requested_status(dut.console_video_request), .buttons(dut.controller1_buttons),
@@ -294,6 +338,44 @@ module nes_console_system_tb;
         fd=$fopen("build/phase8a/hdmi-ui.hex","w");
         meta=$fopen("build/phase8a/hdmi-ui-status.txt","w");
         $fdisplay(meta,"%h %h %h",hd_overlay.displayed_status,hd_overlay.displayed_buttons,hd_overlay.displayed_reset);
+        $fclose(meta);count=0;
+        repeat(1237500) begin
+            assert(tx_de==(hd_x<1280 && hd_y<720));
+            assert(hd_hsync==(hd_x>=1390 && hd_x<1430));
+            assert(hd_vsync==(hd_y>=725 && hd_y<730));
+            if(tx_de) begin $fdisplay(fd,"%06h",hd_rgb);count++;end
+            else assert(hd_rgb==0);
+            @(posedge tx_clk);
+        end
+        $fclose(fd);hdmi_pixels=count;
+        assert(count==921600);
+    endtask
+    task automatic capture_library;
+        integer fd,meta,count;
+        // Navigation already skipped the splash. Settle both status banks,
+        // then capture while the original boot window is still open: a
+        // released button must not allow the splash to reappear.
+        repeat(3) @(posedge dut.vga_frame_start);
+        @(negedge dut.pixel_clk);
+        do @(negedge dut.pixel_clk); while(dut.scan_x!=0 || dut.scan_y!=0);
+        fd=$fopen("build/phase8c/vga-library.hex","w");
+        meta=$fopen("build/phase8c/vga-library-status.txt","w");
+        $fdisplay(meta,"%h %h",dut.console_display_status,dut.displayed_library);
+        $fclose(meta);
+        count=0;
+        repeat(420000) begin
+            if(vga_blank) begin
+                $fdisplay(fd,"%06h",{vga_r,vga_g,vga_b}); count++;
+                assert(dut.nes_functional_reset && !dut.pixel_valid);
+            end
+            @(negedge dut.pixel_clk);
+        end
+        $fclose(fd); vga_pixels=count;
+        assert(count==307200);
+        @(posedge tx_start); @(posedge tx_clk);
+        fd=$fopen("build/phase8c/hdmi-library.hex","w");
+        meta=$fopen("build/phase8c/hdmi-library-status.txt","w");
+        $fdisplay(meta,"%h %h",hd_overlay.displayed_status,hd_overlay.displayed_library);
         $fclose(meta);count=0;
         repeat(1237500) begin
             assert(tx_de==(hd_x<1280 && hd_y<720));
@@ -451,6 +533,56 @@ module nes_console_system_tb;
             wait(!dut.hps_mmio_reset);wait_state(1,0);
             assert(dut.nes_functional_reset && !dut.runtime_cartridge_active);
         end
+        // Phase 8C: real software discovery -> actual library MMIO -> local
+        // selection -> the same production loader/storage/CPU/video path.
+        publish_library(0);
+        library_press(1);assert(dut.library_open && dut.nes_functional_reset);
+        buttons1=8'h20;repeat(1000) @(negedge clk);buttons1=0;
+        repeat(20) @(negedge clk);
+        assert(dut.library_packet[7:0]==1); // held DOWN acts once
+        started=commands;library_press(1);
+        assert(dut.console_status[3:0]==1 && dut.library_packet[18:17]==0 && commands==started);
+        capture_library(); // selected unsupported mapper: actual VGA/HDMI pins
+        library_press(8'h20);assert(dut.library_packet[7:0]==2);
+        library_press(1);assert(commands==started && dut.console_status[3:0]==1); // corrupt ROM
+        library_press(8'h80);assert(dut.library_packet[7:0]==4 && !dut.library_packet[21]);
+        publish_library(1);assert(dut.library_packet[21]);
+        library_press(8'h40);assert(dut.library_packet[7:0]==0);publish_library(0);
+        // A partial library transfer has no rollback. Local cancellation must
+        // recover the independent menu before either complete reload below.
+        library_press(1);wait_state(2,0);
+        library_request(4);library_request(5,3);replay("game_a",64);
+        library_press(2);wait_state(1,0);
+        assert(!dut.library_open && dut.library_packet[30:27]==9 && dut.nes_functional_reset);
+        library_press(1);assert(dut.library_open);
+        library_press(1);wait_state(2,0);library_request(4);library_request(5,10);
+        mmio_write(MMIO_REG_TARGET,0);mmio_write(MMIO_REG_ADDRESS,0);mmio_write(MMIO_REG_WRITE_DATA,0);
+        mmio_write(MMIO_REG_COMMAND,32'd2); // existing COMMIT closes partial session
+        wait_state(6,0);assert(dut.library_packet[25:22]==10);
+        library_press(2);wait_state(1,0);library_press(1);
+        for(int launch=0;launch<2;launch++) begin
+            library_press(1);wait_state(2,0);
+            assert(dut.library_packet[18:17]==2);
+            buttons1=1; // held library A cannot leak into gameplay
+            library_request(4);library_request(5,2);library_request(5,3);
+            replay(launch==0 ? "game_a" : "reload_a");wait_state(1,0);library_request(5,4);
+            request_mode(2);wait_state(4,1);
+            assert(dut.controller_debug_live1==0);
+            wait(dut.nes.internal_cpu_ram.memory[11'h012]==8'hd1);
+            repeat(50000) @(negedge clk);
+            assert(dut.nes.internal_cpu_ram.memory[11'h032]==0)
+                else $fatal(1,"newly launched CPU did not poll released gameplay input");
+            library_press(8'h81);buttons1=8'h81;repeat(50000) @(negedge clk);
+            assert(dut.controller_debug_live1==8'h81 && dut.nes.internal_cpu_ram.memory[11'h032]==8'h81);
+            buttons1=0;request_mode(1);wait_state(1,0);
+        end
+        library_press(2);wait_state(1,0);assert(!dut.library_open);
+        library_press(4);wait_state(7,2);library_press(2);wait_state(1,0);
+        library_press(1);assert(dut.library_open);
+        bridge_reset=1;repeat(20) @(negedge clk);bridge_reset=0;
+        wait(!dut.hps_mmio_reset);wait_state(1,0);
+        assert(!dut.library_enabled && !dut.library_open && dut.nes_functional_reset);
+        $display("PASS: Phase 8C production library discovery/pages, held navigation, invalid/unsupported rejection, partial-transfer cancellation, 2 real loader launches, CPU signature, game input, menu/developer and bridge-reset recovery");
         assert(dut.audio_output.diag_fifo_underruns==0 && dut.audio_output.diag_fifo_overruns==0);
         $display("PASS: Phase 8A default production top cycles=%0d reset_epochs=%0d loader_commands=%0d VGA_pixels=%0d HDMI_pixels=%0d; boot/input/load/replacement/paused-CPU/developer/reset recovery",cycles,reset_epochs,commands,vga_pixels,hdmi_pixels);
         $finish;
