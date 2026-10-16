@@ -191,10 +191,10 @@ def test_per_file_permission_error_does_not_abort_scan(
     (root / "locked.nes").write_bytes(make_ines())
     original = library_module.inspect_ines_file
 
-    def inspect(path: Path):
+    def inspect(path: Path, **kwargs):
         if path.name == "locked.nes":
             raise PermissionError(13, "Permission denied", str(path))
-        return original(path)
+        return original(path, **kwargs)
 
     monkeypatch.setattr(library_module, "inspect_ines_file", inspect)
     by_id = {entry.game_id: entry for entry in GameLibrary(root).scan()}

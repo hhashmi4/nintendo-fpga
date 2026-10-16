@@ -432,7 +432,7 @@ PHASE3K_RTL_FILES=(
     rtl/debug/nes_debugger_pkg.sv
     rtl/debug/nes_debug_command_cdc.sv
     rtl/debug/nes_debugger.sv
-    rtl/console/nes_console_control.sv
+    rtl/console/nes_library_mmio.sv rtl/console/nes_library_control.sv rtl/console/nes_console_control.sv
     rtl/console/nes_console_mailbox.sv
     rtl/console/nes_console_mmio.sv
     rtl/console/nes_console_style_pkg.sv rtl/console/nes_console_animation.sv rtl/console/nes_console_renderer.sv

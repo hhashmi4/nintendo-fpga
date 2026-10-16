@@ -10,6 +10,7 @@ module nes_console_control #(
     input logic [1:0] loader_state,
     input logic [3:0] loader_error_code,
     input logic [7:0] buttons,
+    input logic library_enabled, library_open, library_load_request, library_cancel,
     input logic command_valid,
     input logic [31:0] command_word,
     output logic command_done,
@@ -30,7 +31,7 @@ module nes_console_control #(
     logic [1:0] selected_source, input_owner, desired_source;
     logic [1:0] next_result;
     logic [TIMER_BITS-1:0] timer;
-    logic bridge_was_reset, loader_was_error, command_seen;
+    logic bridge_was_reset, loader_was_error, command_seen, library_begin_pending, library_cancelled;
     logic input_armed;
     logic [7:0] previous_buttons;
     logic available, take_command;
@@ -58,7 +59,7 @@ module nes_console_control #(
         next_error = error_code;
         next_result = 2'd0;
         // Autonomous completions precede new intentions. Reset/load/fault
-        // arbitration below wins over all intentions in the same cycle.
+        // arbitration follows; library cancellation wins over load intentions.
         if (video_ack && video_response[31:16] == epoch) begin
             if ((state == INIT || state == RETURNING) && video_response[7:6] == 0)
                 next_state = MENU;
@@ -70,19 +71,22 @@ module nes_console_control #(
             next_epoch = epoch + 16'd1;
             next_error = 4'd15;
         end
-        if (state == MENU && (navigation[3] || (navigation[0] && !focus)) && available) begin
+        if (state == MENU && !library_enabled && (navigation[3] || (navigation[0] && !focus)) && available) begin
             next_state = STARTING;
             next_epoch = epoch + 16'd1;
             next_error = 0;
         end
         if ((state == MENU || state == ERROR) && (navigation[2] ||
-            (state == MENU && navigation[0] && focus))) begin
+            (state == MENU && !library_open && navigation[0] && focus))) begin
             next_state = DEVELOPER;
             next_epoch = epoch + 16'd1;
         end
         if ((state == DEVELOPER || state == ERROR || state == LOADING) && navigation[1]) begin
             next_state = RETURNING;
             next_epoch = epoch + 16'd1;
+        end
+        if (state == MENU && library_load_request) begin
+            next_state = LOADING; next_epoch = epoch + 16'd1; next_error = 0;
         end
         if (take_command) begin
             if (command_word[15:4] != 0 || command_word[3:0] > 5)
@@ -128,11 +132,19 @@ module nes_console_control #(
             next_error = 0;
             if (take_command && command_word[3:0] != 0) next_result = 2'd1;
         end
-        if (loader_state == 2'd3 && (!loader_was_error || loader_begin)) begin
+        // BEGIN sees the loader's pre-command state. In library mode inspect
+        // its result on the following clock, so a valid retry from ERROR is
+        // not mistaken for another failure. The legacy policy is unchanged.
+        if (loader_state == 2'd3 && (!loader_was_error || loader_begin || library_begin_pending) &&
+            !(library_enabled && loader_begin) && !library_cancelled) begin
             next_state = ERROR;
             next_epoch = epoch + 16'd1;
             next_error = loader_error_code;
             if (take_command && command_word[3:0] != 0) next_result = 2'd1;
+        end
+        if (library_cancel && (state == MENU || state == LOADING || state == ERROR)) begin
+            next_state = RETURNING; next_epoch = epoch + 16'd1;
+            if (take_command && command_word[3:0]!=0) next_result = 2'd1;
         end
         if (bridge_reset && !bridge_was_reset) begin
             next_state = INIT;
@@ -151,6 +163,8 @@ module nes_console_control #(
             timer <= 0;
             bridge_was_reset <= 0;
             loader_was_error <= 0;
+            library_begin_pending <= 0;
+            library_cancelled <= 0;
             command_seen <= 0;
             command_done <= 0;
             command_result <= 0;
@@ -164,6 +178,8 @@ module nes_console_control #(
             error_code <= next_error;
             bridge_was_reset <= bridge_reset;
             loader_was_error <= loader_state == 2'd3;
+            library_begin_pending <= library_enabled && loader_begin && !library_cancel;
+            library_cancelled <= library_cancel;
             command_seen <= command_valid;
             command_done <= take_command;
             if (take_command) begin
@@ -181,7 +197,7 @@ module nes_console_control #(
             // Stable presentation bit, captured with status by the existing mailbox.
             // UP wins simultaneous UP/DOWN; no held-button repeat.
             if (next_state != state || next_epoch != epoch) focus <= 0;
-            else if (state == MENU) begin
+            else if (state == MENU && !library_open) begin
                 if (navigation[4]) focus <= 0;
                 else if (navigation[5]) focus <= 1;
             end

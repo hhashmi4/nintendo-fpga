@@ -46,3 +46,7 @@ set_output_delay -clock $video_pixel_clock -min -1.000 \
 set_false_path -to [get_ports {VIDEO_PCLK VIDEO_LOCKED VIDEO_ERROR}]
 
 derive_clock_uncertainty
+
+# Synchronous logical-only library injection, timed rather than exempted.
+set_input_delay -clock CLOCK_50 -max 2.000 [get_ports {LIBRARY_WORD[*] LIBRARY_SHIFT}]
+set_input_delay -clock CLOCK_50 -min 0.000 [get_ports {LIBRARY_WORD[*] LIBRARY_SHIFT}]

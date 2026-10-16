@@ -126,3 +126,7 @@ set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_AUDIO_FIFO_UNDERRUNS[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_AUDIO_FIFO_OVERRUNS[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_AUDIO_RECONNECT_COUNT[*]
 set_instance_assignment -name VIRTUAL_PIN ON -to HDMI_AUDIO_LAST_ERROR[*]
+
+# Dynamic Phase 8C renderer qualification input; no board pins.
+set_instance_assignment -name VIRTUAL_PIN ON -to LIBRARY_WORD[*]
+set_instance_assignment -name VIRTUAL_PIN ON -to LIBRARY_SHIFT

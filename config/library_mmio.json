@@ -1,0 +1,32 @@
+{
+  "hps_lightweight_window_base": "0xff200000",
+  "slave_offset": "0x3000",
+  "span_bytes": 64,
+  "magic": "0x4e45534c",
+  "version_major": 1,
+  "version_minor": 0,
+  "limits": "0x18040100",
+  "registers": {
+    "MAGIC": "0x0",
+    "VERSION": "0x4",
+    "LIMITS": "0x8",
+    "BRIDGE": "0xc",
+    "COMMAND": "0x10",
+    "RESULT": "0x14",
+    "COMPLETED": "0x18",
+    "CONSOLE_STATUS": "0x1c",
+    "LIBRARY_STATUS": "0x20",
+    "REVISION": "0x24",
+    "DATA": "0x28",
+    "TOKEN": "0x2c"
+  },
+  "commands": {
+    "STATUS": 0,
+    "BEGIN_PAGE": 1,
+    "WORD": 2,
+    "COMMIT": 3,
+    "CLAIM": 4,
+    "STAGE": 5,
+    "DISABLE": 6
+  }
+}

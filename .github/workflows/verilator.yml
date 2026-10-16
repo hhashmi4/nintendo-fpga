@@ -137,6 +137,7 @@ jobs:
           name: console-visuals-${{ steps.verification_level.outputs.level }}
           path: |
             build/phase8b/*.png
+            build/phase8c/*.png
             build/phase8a/console-*.png
           if-no-files-found: ignore
           retention-days: 14

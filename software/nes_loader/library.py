@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import heapq
 from pathlib import Path, PurePath
 import stat
 import unicodedata
@@ -15,6 +16,7 @@ from .ines import (
     ImageInspection,
     RuntimeImage,
     inspect_ines_file,
+    file_identity,
     load_runtime_image,
 )
 
@@ -52,6 +54,8 @@ class LibraryEntry:
     path: Path
     inspection: ImageInspection | None
     invalid_reason: str | None = None
+    identity: tuple[int, ...] | None = None
+    root_identity: tuple[int, int] | None = None
 
     @property
     def filename(self) -> str:
@@ -134,6 +138,7 @@ class GameLibrary:
 
     def __init__(self, root: str | Path) -> None:
         self.configured_root = Path(root).expanduser()
+        self.truncated = False
 
     def _canonical_root(self) -> Path:
         try:
@@ -151,60 +156,63 @@ class GameLibrary:
             raise LibraryUnavailableError(f"library root is not a directory: {root}")
         return root
 
-    def scan(self) -> tuple[LibraryEntry, ...]:
-        root = self._canonical_root()
-        entries: list[LibraryEntry] = []
-        try:
-            with os.scandir(root) as directory:
-                for item in directory:
-                    if not item.name.casefold().endswith(".nes"):
-                        continue
-                    try:
-                        metadata = item.stat(follow_symlinks=False)
-                    except OSError as error:
-                        entries.append(
-                            LibraryEntry(
-                                root,
-                                item.name,
-                                root / item.name,
-                                None,
-                                f"cannot inspect file: {_os_error_text(error)}",
-                            )
-                        )
-                        continue
-                    if item.is_symlink() or not stat.S_ISREG(metadata.st_mode):
-                        continue
+    def scan(self, *, limit: int | None = None) -> tuple[LibraryEntry, ...]:
+        """Sort all eligible names with bounded memory when a limit is given.
 
-                    path = root / item.name
-                    try:
-                        inspection = inspect_ines_file(path)
-                    except INESError as error:
-                        entries.append(
-                            LibraryEntry(root, item.name, path, None, str(error))
-                        )
-                    except OSError as error:
-                        entries.append(
-                            LibraryEntry(
-                                root,
-                                item.name,
-                                path,
-                                None,
-                                f"cannot read file: {_os_error_text(error)}",
-                            )
-                        )
-                    else:
-                        entries.append(
-                            LibraryEntry(root, item.name, path, inspection)
-                        )
+        Only retained entries are opened. Directory enumeration remains O(N);
+        no recursive reads, shell expansion, or arbitrary filename assumptions.
+        """
+        if limit is not None and (type(limit) is not int or limit < 1):
+            raise ValueError("library limit must be a positive integer")
+        self.truncated = False
+        root = self._canonical_root()
+        entries = []
+        try:
+            root_stat = root.stat()
+            root_id = (root_stat.st_dev, root_stat.st_ino)
+            descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                opened = os.fstat(descriptor)
+                if (opened.st_dev, opened.st_ino) != root_id:
+                    raise LibraryUnavailableError("library changed while opening")
+                with os.scandir(descriptor) as directory:
+                    def eligible():
+                        for item in directory:
+                            if not item.name.casefold().endswith(".nes"):
+                                continue
+                            try:
+                                metadata = item.stat(follow_symlinks=False)
+                            except OSError as error:
+                                yield item.name, None, str(error)
+                                continue
+                            if stat.S_ISREG(metadata.st_mode):
+                                yield item.name, metadata, None
+                    def key(item):
+                        normalized = unicodedata.normalize("NFC", item[0])
+                        return normalized.casefold(), normalized, item[0]
+                    candidates = (sorted(eligible(), key=key) if limit is None
+                                  else heapq.nsmallest(limit + 1, eligible(), key=key))
+                if limit is not None:
+                    self.truncated = len(candidates) > limit
+                    candidates = candidates[:limit]
+                for name, metadata, error in candidates:
+                    identity = file_identity(metadata) if metadata else None
+                    inspection = None
+                    if error is None:
+                        try:
+                            inspection = inspect_ines_file(Path(name), dir_fd=descriptor,
+                                                           expected=identity)
+                        except (INESError, OSError) as failure:
+                            error = str(failure)
+                    entries.append(LibraryEntry(root, name, root / name, inspection,
+                                                error, identity, root_id))
+            finally:
+                os.close(descriptor)
         except FileNotFoundError as error:
-            raise LibraryNotFoundError(
-                f"library disappeared while scanning: {self.configured_root}"
-            ) from error
+            raise LibraryNotFoundError("library disappeared while scanning") from error
         except OSError as error:
-            raise LibraryUnavailableError(
-                f"cannot scan library {root}: {_os_error_text(error)}"
-            ) from error
-        return tuple(sorted(entries, key=_sort_key))
+            raise LibraryUnavailableError(f"cannot scan library {root}: {error}") from error
+        return tuple(entries)
 
     @staticmethod
     def _validate_game_id(game_id: str) -> None:
@@ -278,9 +286,20 @@ class GameLibrary:
             raise GameNotLoadableError(
                 f"selected game is {status}: {entry.game_id}: {reason}"
             )
-        path = self._safe_current_path(entry.game_id, entry.library_root)
+        self._safe_current_path(entry.game_id, entry.library_root)
         try:
-            return load_runtime_image(path, follow_symlinks=False)
+            descriptor = os.open(entry.library_root,
+                                 os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                metadata = os.fstat(descriptor)
+                if entry.root_identity is not None and (
+                    metadata.st_dev, metadata.st_ino
+                ) != entry.root_identity:
+                    raise INESError("library directory changed after discovery")
+                return load_runtime_image(entry.game_id, follow_symlinks=False,
+                                          dir_fd=descriptor, expected=entry.identity)
+            finally:
+                os.close(descriptor)
         except OSError as error:
             raise GameNotLoadableError(
                 f"cannot read selected game {entry.game_id}: "

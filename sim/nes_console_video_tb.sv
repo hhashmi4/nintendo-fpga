@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
 module nes_console_video_tb;
+    logic [927:0] unused_library;
     logic fabric_clk=0, pixel_clk=0;
     always #10 fabric_clk=!fabric_clk;
     always #7 pixel_clk=!pixel_clk;
@@ -16,6 +17,7 @@ module nes_console_video_tb;
     logic displayed_focus, displayed_valid;
     logic focus=0;
     nes_console_video dut (
+        .library_packet(928'd0), .displayed_library(unused_library),
         .focus(focus), .displayed_focus(displayed_focus), .displayed_valid(displayed_valid),
         .source_clk(fabric_clk), .source_reset(source_reset),
         .requested_status(requested), .buttons(buttons), .held_reset(held),

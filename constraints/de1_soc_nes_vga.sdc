@@ -132,6 +132,16 @@ set_max_delay 20.000 -from [get_registers {*console_command_channel|request_bank
 set_max_delay 20.000 -from [get_registers {*console_command_channel|response_bank*}] \
     -to [get_registers {*console_command_channel|source_response*}]
 
+# Library v1.0 uses the same held-bank three-stage protocol and finite bound.
+set_false_path -to [get_registers {
+    *library_command_channel|request_sync[0]
+    *library_command_channel|acknowledge_sync[0]
+}]
+set_max_delay 20.000 -from [get_registers {*library_command_channel|request_bank*}] \
+    -to [get_registers {*library_command_channel|destination_data*}]
+set_max_delay 20.000 -from [get_registers {*library_command_channel|response_bank*}] \
+    -to [get_registers {*library_command_channel|source_response*}]
+
 set diagnostic_cdc_first_stage_registers [get_registers {
     *diagnostics|request_sync[0]
     *diagnostics|acknowledge_sync[0]

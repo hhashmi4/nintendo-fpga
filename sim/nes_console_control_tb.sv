@@ -2,6 +2,7 @@
 
 module nes_console_control_tb;
     logic focus;
+    logic library_enabled=0, library_open=0, library_load_request=0, library_cancel=0;
     logic clk = 0;
     always #10 clk = !clk;
     logic reset = 1, bridge_reset = 0;
@@ -16,6 +17,7 @@ module nes_console_control_tb;
     logic [7:0] game_buttons, navigation;
 
     nes_console_control #(.START_TIMEOUT_CYCLES(100)) dut (
+        .library_enabled(library_enabled), .library_open(library_open), .library_load_request(library_load_request), .library_cancel(library_cancel),
         .clk(clk), .reset(reset), .bridge_reset(bridge_reset),
         .loader_begin(loader_begin), .activation_accepted(activated),
         .loader_hold(loader_hold), .runtime_active(runtime_active),
@@ -214,6 +216,67 @@ module nes_console_control_tb;
         buttons=8'h21;tick();check_state(3); // A uses the previously stored focus
         $display("PASS: Phase 8B focus navigation, held/released input, disabled Play, A selection, B loading/error recovery, unchanged armed game path");
         $display("PASS: Phase 8A supervisor all 48 state/command pairs, stale requests, input handoff, loading, recovery, developer and reset");
+        reset=1;buttons=0;tick();reset=0;tick();display_ack(0);tick();
+        library_enabled=1;library_open=1;
+        buttons=8'h20;tick();check_state(1);assert(!focus);
+        buttons=0;tick();buttons=8'h09;tick();check_state(1); // library owns A/START
+        library_load_request=1;tick();library_load_request=0;check_state(2);
+        assert(core_hold && game_buttons==0);
+        submit(1,status[31:16],0);display_ack(0);buttons=0;tick();
+        // Cancellation wins the new ready-window race with a host LAUNCH.
+        library_cancel=1;submit(2,status[31:16],1);check_state(5);
+        library_cancel=0;display_ack(0);tick();
+        library_cancel=1;submit(0,status[31:16],0);check_state(5);
+        library_cancel=0;display_ack(0);tick();
+        buttons=8'h04;tick();check_state(7); // SELECT remains available
+        buttons=0;submit(1,status[31:16],0);display_ack(0);tick();
+        buttons=1;submit(2,status[31:16],0);display_ack(1);check_state(4);
+        assert(game_buttons==0);buttons=0;tick();buttons=8'ha5;#1;
+        assert(game_buttons==8'ha5); // no steady-state game-input latency
+        buttons=0;submit(1,status[31:16],0);display_ack(0);
+        // The real loader exposes its OLD ERROR state on the BEGIN acceptance
+        // edge, then clears it one clock later. Do not mistake it for a new error.
+        loader_state=3;loader_error=12;tick();tick();check_state(6);
+        submit(1,status[31:16],0);display_ack(0);
+        library_load_request=1;tick();library_load_request=0;check_state(2);
+        begin
+            logic [15:0] before_epoch;
+            before_epoch=status[31:16];loader_begin=1;tick();loader_begin=0;
+            loader_state=1;loader_error=0;tick();check_state(2);
+            assert(status[31:16]==before_epoch+16'd1);
+        end
+        // An actually rejected retry still reports ERROR on its result cycle.
+        loader_state=3;loader_error=7;tick();tick();check_state(6);
+        submit(1,status[31:16],0);display_ack(0);
+        library_load_request=1;tick();library_load_request=0;
+        loader_begin=1;tick();loader_begin=0;tick();check_state(6);
+        assert(status[15:12]==7);
+        // Cancel cannot be undone by concurrent host or loader intentions.
+        library_cancel=1;submit(4,status[31:16],1);check_state(5);
+        library_cancel=0;display_ack(0);loader_state=0;loader_error=0;tick();
+        for(int rejected_begin=0;rejected_begin<2;rejected_begin++) begin
+            loader_state=0;loader_error=0;tick();
+            library_load_request=1;tick();library_load_request=0;
+            library_cancel=1;loader_begin=1;tick();check_state(5);
+            library_cancel=0;loader_begin=0;
+            loader_state=rejected_begin!=0 ? 2'd3 : 2'd1;loader_error=7;
+            tick();check_state(5);display_ack(0);check_state(1);
+        end
+        loader_state=0;loader_error=0;tick();
+        library_load_request=1;tick();library_load_request=0;
+        library_cancel=1;loader_state=3;loader_error=12;tick();check_state(5);
+        library_cancel=0;tick();display_ack(0);check_state(1);
+        // B simultaneous with ACTIVATE shares its epoch increment. The HPS
+        // service must also check the library revision before issuing LAUNCH.
+        loader_state=0;loader_error=0;tick();
+        library_load_request=1;tick();library_load_request=0;
+        begin
+            logic [15:0] before_epoch;
+            before_epoch=status[31:16];library_cancel=1;activated=1;tick();
+            check_state(5);assert(status[31:16]==before_epoch+16'd1);
+            library_cancel=0;activated=0;display_ack(0);check_state(1);
+        end
+        $display("PASS: Phase 8C supervisor library ownership, held input, valid/invalid BEGIN recovery, cancellation/host/loader races, Developer shortcut and direct game path");
         $finish;
     end
 endmodule

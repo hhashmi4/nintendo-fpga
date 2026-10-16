@@ -28,6 +28,7 @@ def main() -> None:
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--diagnostic-contract", type=Path, required=True)
     parser.add_argument("--console-contract", type=Path)
+    parser.add_argument("--library-contract", type=Path)
     parser.add_argument("--qsys", type=Path, required=True)
     parser.add_argument("--regmap", type=Path, required=True)
     args = parser.parse_args()
@@ -104,6 +105,19 @@ def main() -> None:
                 != integer(contract["hps_lightweight_window_base"])):
             raise ValueError("console MMIO lies outside the HPS lightweight window")
         print(f"Validated HPS console MMIO map: slave_offset={console_offset:#x}, span=32 bytes")
+
+    if args.library_contract:
+        library_contract = json.loads(args.library_contract.read_text(encoding="utf-8"))
+        offset = validate_bridge("library_mmio_bridge", library_contract, "6")
+        end = offset + integer(library_contract["span_bytes"])
+        existing = [(qsys_offset, contract), (diagnostic_offset, diagnostic_contract)]
+        if args.console_contract:
+            existing.append((console_offset, console_contract))
+        if any(max(offset, start) < min(end, start + integer(c["span_bytes"])) for start, c in existing):
+            raise ValueError("library MMIO overlaps an existing aperture")
+        if end > 0x200000 or integer(library_contract["hps_lightweight_window_base"]) != integer(contract["hps_lightweight_window_base"]):
+            raise ValueError("library MMIO outside lightweight window")
+        print(f"Validated HPS library MMIO map: slave_offset={offset:#x}, span=64 bytes")
 
     loader_end = qsys_offset + integer(contract["span_bytes"])
     diagnostic_end = diagnostic_offset + integer(diagnostic_contract["span_bytes"])

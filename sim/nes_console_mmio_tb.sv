@@ -35,6 +35,7 @@ module nes_console_mmio_tb;
         .destination_response({result,response_status})
     );
     nes_console_control control (
+        .library_enabled(1'b0), .library_open(1'b0), .library_load_request(1'b0), .library_cancel(1'b0),
         .clk(fabric_clk), .reset(reset), .bridge_reset(bridge_reset),
         .loader_begin(loader_begin), .activation_accepted(1'b0),
         .loader_hold(loader_begin), .runtime_active(1'b0), .loader_state(2'd0),

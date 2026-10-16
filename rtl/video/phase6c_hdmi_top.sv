@@ -45,6 +45,7 @@ module phase6c_hdmi_top (
     logic edid_available, video_clock_locked;
 
     phase6b_video_top shared_video (
+        .LIBRARY_WORD(32'd0), .LIBRARY_SHIFT(1'b0),
         .CLOCK_50(CLOCK_50),
         .RESET_N(RESET_N),
         .DEVELOPER_LAYOUT(DEVELOPER_LAYOUT),
